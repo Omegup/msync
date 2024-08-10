@@ -10,8 +10,8 @@ export const aggregate = <Result extends JsonObj>({
   input,
 }: {
   db: Db
-  comment: string
-  input: RawStages
+  comment?: string
+  input: RawStages<Result>
 }) => {
   const req = {
     aggregate: input.coll,
