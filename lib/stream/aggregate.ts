@@ -12,23 +12,24 @@ export const aggregate = <Result extends JsonObj>({
   db: Db
   comment?: string
   input: RawStages<Result>
-}) => {
-  const req = {
-    aggregate: input.coll,
-    pipeline: input.stages,
-    comment,
-    cursor: {},
-    readConcern: { level: 'snapshot' },
-  }
-  log('exec', req)
-  return db.command(req).then(
-    result => {
-      log('executed', req, result)
-      return { result: result as AggregateCommand<Result>, ok: true as const }
-    },
-    err => {
-      log('err', req, err)
-      return { err, ok: false as const }
-    },
-  )
-}
+}) =>
+  input(({ coll, stages }) => {
+    const req = {
+      aggregate: coll.collectionName,
+      pipeline: stages,
+      comment,
+      cursor: {},
+      readConcern: { level: 'snapshot' },
+    }
+    log('exec', req)
+    return db.command(req).then(
+      result => {
+        log('executed', req, result)
+        return { result: result as AggregateCommand<Result>, ok: true as const }
+      },
+      err => {
+        log('err', req, err)
+        return { err, ok: false as const }
+      },
+    )
+  })

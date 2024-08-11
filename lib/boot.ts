@@ -81,6 +81,5 @@ type Params<T extends JsonObj & { touchedAt: Timestamp }, Source extends Sources
 
 export const from = <T extends JsonObj & { touchedAt: Timestamp }, Source extends Sources>(
   ...[view, streamName, sourceMap]: Params<T, Source>
-): Stream<T, Source> => ({
-  execute: executionParam => executes(view, executionParam, streamName, sourceMap),
-})
+): Stream<T, Source> => executionParam => executes(view, executionParam, streamName, sourceMap),
+
