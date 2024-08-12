@@ -12,10 +12,14 @@ export type RawStages<out R> = <E>(
   consume: <S>(value: { stages: RawStagesPart<S, R>; coll: ReadonlyCollection<S> }) => E,
 ) => E
 
-export type Stages<out T, in out Param> = {
-  readonly get: (param: Partial<Param>) => RawStages<T>
-  readonly default: Param
+declare const NeverUsed: unique symbol
+
+type CovHack<out T> = {
+  readonly [_ in typeof NeverUsed]?: T
 }
+
+export type Stages<out T, in out Param> = (param: Partial<Param>) => RawStages<T> & CovHack<Param>
+
 export type StagesMapper<in S, out T, in out S_Param, in out T_Param = S_Param> = (
   previousStages: Stages<S, S_Param>,
 ) => Stages<T, T_Param>
