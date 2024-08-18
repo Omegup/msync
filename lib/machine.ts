@@ -1,6 +1,6 @@
 import type { AppMap, HKT, I, PromiseHKT, µ } from "../types";
 import type { AsNum, GetDom } from "../types/global";
-import type { Machine, Runner } from "./types";
+import type { Machine, RunnerSource } from "./types";
 import { splitAsyncIterator } from "./utils/async-iter";
 
 
@@ -21,8 +21,8 @@ interface MachineHKT<Dom = unknown> extends HKT<Dom> {
   readonly out: Machine<I<Dom, this>>
 }
 
-
-export const machine = <T, V extends readonly unknown[]>(runner: Runner<T>, childrenMachines: AppMap<MachineHKT, V>): Machine<readonly [T, V]> => async function* (restart): AsyncIterator<readonly [T, V], never, void> {
+/** @TODO each iteration run runner then check for restart request then run all children then (check and next)* */
+export const machine = <T, V extends readonly unknown[]>(runner: RunnerSource<T, void>, childrenMachines: AppMap<MachineHKT, V>): Machine<readonly [T, V]> => async function* (restart): AsyncIterator<readonly [T, V], never, void> {
   const [childrenPipe, restartChildren] = splitAsyncIterator<void>()
   const children = childrenMachines.map<V, MachineHKT, µ<[GetHKT, AsyncIteratorHKT], GetDom>>(child => child(childrenPipe))
   let restartReceived = true, restartPromise!: Promise<unknown>
@@ -35,7 +35,7 @@ export const machine = <T, V extends readonly unknown[]>(runner: Runner<T>, chil
       restartPromise.then(() => restartReceived = true)
     }
     let initialChildrenData: V | undefined, run = true
-    const { value: [data, nextReady] } = await runner.next()
+    const [data, nextReady] = (await runner.next()).value
     nextReady.then(() => run = false)
     if (!first) restartChildren()
     first = false

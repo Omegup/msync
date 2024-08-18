@@ -1,8 +1,14 @@
-import type { JsonObj } from '../../types'
-import type { RawStages, RawStagesPart, StagesMapper } from '../types'
+import type { HKT, JsonObj } from '../../types'
+import type { RawStages, RawStagesPart, StagesMapper, Stream } from '../types'
+
+export const fromStages =
+  <T extends JsonObj, V extends JsonObj>(stages: RawStagesPart<T, V>) =>
+  <F extends HKT<JsonObj>>(source: Stream<T, F>): Stream<V, F> =>
+  input =>
+    source(concatParts(stages, input))
 
 export const asRowPart = <T, V>(x: readonly JsonObj[]): RawStagesPart<T, V> => x
-const concatParts = <T, V, W>(
+export const concatParts = <T, V, W>(
   part1: RawStagesPart<T, V>,
   part2: RawStagesPart<V, W>,
 ): RawStagesPart<T, W> => asRowPart([...part1, ...part2])
