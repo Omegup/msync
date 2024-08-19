@@ -1,7 +1,7 @@
 import type { App, AppMap, AppMapRW, HKT, PromiseHKT } from '.'
 
 export type AsNum<R> = R extends `${infer A extends number}` ? A : never
-export type GetDom = readonly [unknown, keyof any]
+export type GetDom<Dom = unknown> = readonly [readonly Dom[], keyof any]
 
 declare global {
   type Entry<T> = { [k in keyof T]: readonly [string & k, T[k]] }[keyof T]
@@ -28,19 +28,20 @@ declare global {
       thisArg?: any,
     ): AppMapRW<G, V>
     map<
-      V extends ReadonlyArray<unknown>,
-      F extends HKT<unknown>,
-      G extends HKT<GetDom>,
+      V extends ReadonlyArray<Dom>,
+      F extends HKT<Dom>,
+      G extends HKT<GetDom<Dom>>,
+      Dom = unknown,
       _ extends 0 = 0,
     >(
-      this: AppMap<F, V>,
+      this: AppMap<F, V, Dom>,
       callbackfn: <I extends keyof V>(
-        value: App<F, V[I]>,
+        value: App<F, V[I] & Dom>,
         index: AsNum<I>,
         array: V,
       ) => App<G, readonly [V, I]>,
       thisArg?: any,
-    ): AppMapRW<G, { [I in keyof V]: readonly [V, I] }, GetDom>
+    ): AppMapRW<G, { [I in keyof V]: readonly [V, I] }, GetDom<Dom>>
   }
   interface PromiseConstructor {
     all<T extends readonly unknown[] | []>(values: AppMap<PromiseHKT, T>): Promise<T>

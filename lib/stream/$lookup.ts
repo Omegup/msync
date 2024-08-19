@@ -1,40 +1,53 @@
 import type { JsonObj } from '../../types'
 import { asRowPart, concatParts } from '../aggregate/prefix'
 import type {
+  Continuation,
   ExecutionResult,
+  IteratorResult,
   RawStagesPart,
   RawStagesSource,
+  Runner,
   RunnerSource,
   StreamSnapshot,
 } from '../types'
 
-const lookupRunner = <Left, Right, Result2>({
+const merge = () => 0
+
+const lookupRunner = <Left, Right, Result>({
   lsource,
   rsource,
 }: {
-  lsource: RunnerSource<readonly Result2[], Left>
-  rsource: RunnerSource<readonly Result2[], Right>
+  lsource: RunnerSource<readonly Result[], Left>
+  rsource: RunnerSource<readonly Result[], Right>
 }) => {
-  type Next = { source: 'L'; value: Left } | { source: 'R'; value: Right }
-  async function* run(): RunnerSource<readonly Result2[], Next> {
-    while (true) {
-      let [l, lnext] = (await lsource.next()).value
-      let [r, rnext] = (await rsource.next()).value
-      while (true) {
-        const request = yield [
-          [...l, ...r],
-          Promise.race<Next>([
-            lnext.then(x => ({ source: 'L', value: x })),
-            rnext.then(x => ({ source: 'R', value: x })),
-          ]),
-        ]
-        if (!request) break
-        if (request.source === 'L') {
-          ;[l, lnext] = (await lsource.next(request.value)).value
+  type Next<L = Left, R = Right> = { source: 'L'; value: L } | { source: 'R'; value: R }
+  const run =
+    (): RunnerSource<readonly Result[], Next> => (): IteratorResult<readonly Result[], Next> => {
+      let [l, lnext, lcont] = lsource()
+      let [r, rnext, rcont] = rsource()
+      const cont: Continuation<readonly Result[], Next> = <E>(
+        consume: <N>(next: (prev: Next) => IteratorResult<readonly Result[], N>) => E,
+      ): E => {
+        const lconsume = <L2>(lnext: (prev: Left) => IteratorResult<readonly Result[], L2>): E => {
+          return consume<Next<L2, Right> | Next>((prev: Next<Left, Right>): IteratorResult<readonly Result[], Next<L2, Right> | Next> => {
+            if(prev.source === 'L') {
+              return lookupRunner({ lsource: ()=>lnext(prev.value), rsource })()
+            }
+            return null
+          })
         }
+        return lcont(lconsume)
       }
+      return [
+        [...l, ...r],
+        Promise.race<Next>([
+          lnext.then(x => ({ source: 'L', value: x })),
+          rnext.then(x => ({ source: 'R', value: x })),
+        ]),
+        cont,
+        () => {},
+      ]
     }
-  }
   return run()
 }
 
@@ -66,3 +79,11 @@ export const $lookup =
         },
       ),
     )
+
+const lookupRunnerr =
+  <Result>(
+    lRunner: Runner<readonly Result[]>,
+    rRunner: Runner<readonly Result[]>,
+  ): Runner<readonly Result[]> =>
+  consume =>
+    lRunner(lsource => rRunner(rsource => consume(lookupRunner({ lsource, rsource }))))

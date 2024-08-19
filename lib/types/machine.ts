@@ -3,9 +3,25 @@
 export type Machine<T> = (
   restart: AsyncIterator<void, never, void>,
 ) => AsyncIterator<T, never, void>
-export type RunnerSource<T, S> = AsyncIterator<
-  [data: T, nextReady: PromiseLike<S>],
-  never,
-  S | void
->
-export type Runner<T> = <E>(c: <S>(x: RunnerSource<T, S>) => E) => E
+export type RunnerSource<T, S> = () => IteratorResult<T, S>
+
+export type Runner<T> = Iterator<T>
+
+export type IteratorResult<T, S> = readonly [T, PromiseLike<S>, Continuation<T, S>, stop: ()=>void]
+
+export type Continuation<T, S> = <E>(
+  consume: <N>(next: (prev: S) => IteratorResult<T, N>) => E,
+) => E
+export type Iterator<T> = Continuation<T, void>
+
+export type AsynIter<T> = readonly [T, () => PromiseLike<AsynIter<T>>]
+
+const run = <T>(cont: Iterator<T>) => cont(next => runCont(next()))
+const runCont = async <T, S>([, next, cont]: IteratorResult<T, S>): Promise<never> => {
+  const v: S = await next
+  return cont(next => runCont(next(v)))
+}
+const link = <T, S>([data, next, cont]: IteratorResult<T, S>): AsynIter<T> => {
+  return [data, () => next.then(v => cont(next => link(next(v))))]
+}
+const iterate = <T>([, next]: AsynIter<T>): PromiseLike<never> => next().then(iterate)
