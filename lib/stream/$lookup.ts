@@ -11,9 +11,8 @@ import type {
   StreamSnapshot,
 } from '../types'
 
-const merge = () => 0
 
-const lookupRunner = <Left, Right, Result>({
+const merge = <Left, Right, Result>({
   lsource,
   rsource,
 }: {
@@ -23,21 +22,21 @@ const lookupRunner = <Left, Right, Result>({
   type Next<L = Left, R = Right> = { source: 'L'; value: L } | { source: 'R'; value: R }
   const run =
     (): RunnerSource<readonly Result[], Next> => (): IteratorResult<readonly Result[], Next> => {
-      let [l, lnext, lcont] = lsource()
-      let [r, rnext, rcont] = rsource()
-      const cont: Continuation<readonly Result[], Next> = <E>(
-        consume: <N>(next: (prev: Next) => IteratorResult<readonly Result[], N>) => E,
-      ): E => {
-        const lconsume = <L2>(lnext: (prev: Left) => IteratorResult<readonly Result[], L2>): E => {
-          return consume<Next<L2, Right> | Next>((prev: Next<Left, Right>): IteratorResult<readonly Result[], Next<L2, Right> | Next> => {
-            if(prev.source === 'L') {
-              return lookupRunner({ lsource: ()=>lnext(prev.value), rsource })()
-            }
-            return null
-          })
+      let [l, lnext, lcont, lstop] = lsource()
+      let [r, rnext, rcont, rstop] = rsource()
+      const cont: Continuation<readonly Result[], Next> =
+        (prev: Next) =>
+        <E>(consume: <N>(next: IteratorResult<readonly Result[], N>) => E): E => {
+          if (prev.source === 'L') {
+            return lcont(prev.value)(lnext =>
+              consume(merge({ lsource: () => lnext, rsource })()),
+            )
+          } else {
+            return rcont(prev.value)(rnext =>
+              consume(merge({ lsource, rsource: () => rnext })()),
+            )
+          }
         }
-        return lcont(lconsume)
-      }
       return [
         [...l, ...r],
         Promise.race<Next>([
@@ -45,7 +44,10 @@ const lookupRunner = <Left, Right, Result>({
           rnext.then(x => ({ source: 'R', value: x })),
         ]),
         cont,
-        () => {},
+        () => {
+          lstop()
+          rstop()
+        },
       ]
     }
   return run()
@@ -73,17 +75,10 @@ export const $lookup =
               const lRunner = left.run(concatParts(lRunnerInput, nextInput))
               const rRunner = right.run(concatParts(concatParts(joinL_Snapshot, input), nextInput))
               return consume =>
-                lRunner(lsource => rRunner(rsource => consume(lookupRunner({ lsource, rsource }))))
+                lRunner(lsource => rRunner(rsource => consume(merge({ lsource, rsource }))))
             },
           }
         },
       ),
     )
 
-const lookupRunnerr =
-  <Result>(
-    lRunner: Runner<readonly Result[]>,
-    rRunner: Runner<readonly Result[]>,
-  ): Runner<readonly Result[]> =>
-  consume =>
-    lRunner(lsource => rRunner(rsource => consume(lookupRunner({ lsource, rsource }))))
