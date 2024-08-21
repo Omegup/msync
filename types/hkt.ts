@@ -44,7 +44,7 @@ export type AppMapRW<F extends HKT<Dom>, X extends readonly Dom[], Dom = unknown
   [I in keyof X]: App<F, X[I]>
 }
 export interface PromiseHKT<Dom = unknown> extends HKT<Dom> {
-  readonly out: Promise<I<Dom, this>>
+  readonly out: PromiseLike<I<Dom, this>>
 }
 
 export interface DeepFieldHKT<R, T, K extends keyof T, F extends HKT<R, T>>

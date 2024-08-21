@@ -30,7 +30,7 @@ export type Pipeline<in S, out T, in out S_Param, in out T_Param = S_Param> = {
 export type ExecutionResult<V> = {
   readonly run: <Result extends JsonObj>(
     input: RawStagesPart<V, Result>,
-  ) => Runner<readonly Result[]>
+  ) => Runner<readonly Result[], unknown>
   readonly stages: RawStages<V>
 }
 
