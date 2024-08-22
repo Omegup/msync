@@ -27,6 +27,25 @@ declare global {
       ) => App<G, V[I]>,
       thisArg?: any,
     ): AppMapRW<G, V>
+    reduce<U>(
+      callbackfn: (
+        previousValue: U,
+        currentValue: T,
+        currentIndex: number,
+        array: readonly T[],
+      ) => U,
+      initialValue: U,
+    ): U
+    reduce<V extends ReadonlyArray<unknown>, F extends HKT, U>(
+      this: AppMap<F, V>,
+      callbackfn: <I extends keyof V>(
+        previousValue: U,
+        currentValue: App<F, V[I]>,
+        currentIndex: AsNum<I>,
+        array: V,
+      ) => U,
+      initialValue: U,
+    ): U
     map<
       V extends ReadonlyArray<Dom>,
       F extends HKT<Dom>,

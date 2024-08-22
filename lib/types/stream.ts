@@ -7,28 +7,15 @@ declare const Pipeline: unique symbol
 export type RawStagesPart<S, R> = readonly JsonObj[] & {
   [Type]?(_: typeof RawStage, source: S): readonly [typeof RawStage, R]
 }
-export type RawStagesSource<S, R> = { stages: RawStagesPart<S, R>; coll: ReadonlyCollection<S> }
+export type RawStagesSource<in out S, out R> = { stages: RawStagesPart<S, R>; coll: ReadonlyCollection<S> }
 export type RawStages<out R> = <E>(
   consume: <S>(value: RawStagesSource<S, R>) => E,
 ) => E
 
-declare const NeverUsed: unique symbol
 
-type CovHack<out T> = {
-  readonly [_ in typeof NeverUsed]?: T
-}
-
-export type Stages<out T, in out Param> = (param: Partial<Param>) => RawStages<T> & CovHack<Param>
-
-export type StagesMapper<in S, out T, in out S_Param, in out T_Param = S_Param> = (
-  previousStages: Stages<S, S_Param>,
-) => Stages<T, T_Param>
-export type Pipeline<in S, out T, in out S_Param, in out T_Param = S_Param> = {
-  [Type]?: (_: typeof Pipeline, s: S) => readonly [typeof Pipeline, T]
-  readonly stages: StagesMapper<S, T, S_Param, T_Param>
-}
-export type ExecutionResult<V> = {
+export type SnapshotStreamExecutionResult<V> = {
   readonly run: <Result extends JsonObj>(
+    // this is the final input that should end with a merge stage
     input: RawStagesPart<V, Result>,
   ) => Runner<readonly Result[], unknown>
   readonly stages: RawStages<V>
@@ -38,8 +25,14 @@ export type Stream<T extends JsonObj, F extends HKT<JsonObj>> = <Result extends 
   input: RawStagesPart<T, Result>,
 ) => App<F, Result>
 
+
+// this type of streams is based on the separation between 
+// • last snapshot which is the last data successfully synced 
+// • and the new incoming data to be synced
 export type StreamSnapshot<T extends JsonObj> = <Result extends JsonObj>(
+  // this input doesn't end necessarily with merge stage, cuz it can be used for another lookup
+  // so input can be used to construct the stages of the left/rigth join of another lookup 
   input: RawStagesPart<T, Result>,
-) => ExecutionResult<Result>
+) => SnapshotStreamExecutionResult<Result>
 
 export interface StreamHKT extends HKT<JsonObj> {}

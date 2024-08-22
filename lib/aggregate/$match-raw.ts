@@ -2,13 +2,13 @@ import type { JsonObj } from '../../types'
 import type { Field } from '../field'
 import type { Query, RawStagesSource } from '../types'
 import { id } from '../utils/json'
-import { asRowPart } from './prefix'
+import { asRawPart } from './prefix'
 
 export const $matchRaw = <T extends JsonObj>(query: Query<T>) =>
-  asRowPart<T, T>([{ $match: query.raw(id) }])
+  asRawPart<T, T>([{ $match: query.raw(id) }])
 
 export const $projectRaw = <T>(projection: Record<keyof T, 1>) =>
-  asRowPart<T, T>([{ $project: projection }])
+  asRawPart<T, T>([{ $project: projection }])
 
 export const $lookupRaw = <
   T extends JsonObj,
@@ -18,12 +18,12 @@ export const $lookupRaw = <
   K1 extends string,
   K2 extends string,
 >(
-  { foreignField, localField }: { foreignField: Field<U, S>; localField: Field<T, S> },
+  { field2, field1 }: { field2: Field<U, S>; field1: Field<T, S> },
   { stages, coll }: RawStagesSource<R, U>,
   k1: K1,
   k2: K2,
 ) =>
-  asRowPart<T, Record<K1, T> & Record<K2, U>>([
+  asRawPart<T, Record<K1, T> & Record<K2, U>>([
     {
       $replaceWith: { [k1]: '$ROOT' },
     },
@@ -31,9 +31,9 @@ export const $lookupRaw = <
       $lookup: {
         from: coll.collectionName,
         as: k2,
-        let: { [k1]: `$${k1}.${localField.field}` },
-        pipeline: [{ $match: { $expr: { $eq: ['$$left_id', '$_id'] } } }, ...stages],
+        let: { local: `$${k1}.${field1.field}` },
+        pipeline: [{ $match: { $expr: { $eq: ['$$local', `$${field2.field}`] } } }, ...stages],
       },
     },
-    { $unwind: { path: '$right', preserveNullAndEmptyArrays: true } },
+    { $unwind: `$${k2}` },
   ])
