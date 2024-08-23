@@ -1,5 +1,4 @@
-import type { jsonItem } from '../../types'
-import { equal } from '../predicate/utils'
+import type { App, HKT, jsonItem } from '../../types'
 import type { BoolExpr, Expr } from '../types'
 import { val } from './val'
 
@@ -12,7 +11,6 @@ export const ite = (<T, D1, D2, C>(
     raw: () => ({
       $cond: { if: cond.raw(), then: then.raw(), else: orelse.raw() },
     }),
-    eval: (d, c) => (cond.eval(d, c) ? then.eval(d, c) : orelse.eval(d, c)),
   }
 }) as {
   <T, D, C>(cond: Expr<boolean, D, C>, then: Expr<T, D, C>, orelse: Expr<T, D, C>): Expr<T, D, C>
@@ -25,23 +23,28 @@ export const ite = (<T, D1, D2, C>(
 
 export const eq =
   <T, D, C>(a: Expr<T, D, C>) =>
-  (b: Expr<T, D, C>): Expr<boolean, D, C> => ({
+  (b: Expr<T, D, C>): BoolExpr<boolean, D, C> => ({
     raw: () => ({ $eq: [a.raw(), b.raw()] }),
-    eval: (d, c) => equal(a.eval(d, c), b.eval(d, c)),
+  })
+
+export const eqTyped =
+  <T1 extends Dom, T2 extends Dom, F extends HKT<Dom>, C, Dom = unknown>(
+    a: Expr<T1 | T2, App<F, T1 | T2>, C>,
+  ) =>
+  (b: Expr<T1, App<F, T1 | T2>, C>): BoolExpr<App<F, T1>, App<F, T2>, C> => ({
+    raw: () => ({ $eq: [a.raw(), b.raw()] }),
   })
 
 export const ne =
   <T, K, D, C>(a: Expr<T, D, C>) =>
   (b: Expr<K, D, C>): Expr<boolean, D, C> => ({
     raw: () => ({ $ne: [a.raw(), b.raw()] }),
-    eval: (d, c) => !equal(a.eval(d, c), b.eval(d, c)),
   })
-  
+
 export const $ifNull = <R, D, C>(
   ...expr: [...Expr<R | null | undefined, D, C>[], Expr<R | null | undefined, D, C>]
 ): Expr<R, D, C> => ({
   raw: () => ({ $ifNull: expr.map(e => e.raw()) }),
-  eval: (d, c) => expr.map(e => e.eval(d, c)).find(x => x != null)!,
 })
 
 export const exprMapVal = <K extends string, T extends Partial<Record<K, jsonItem>>, D, C>(
@@ -58,9 +61,6 @@ export const exprMapVal = <K extends string, T extends Partial<Record<K, jsonIte
       ...(or && { default: or.raw() }),
     },
   }),
-  eval: (d, c) => {
-    return (map[expr.eval(d, c)] ?? or)?.eval(d, c)
-  },
 })
 
 export const mapVal = <K extends string, T extends Partial<Record<K, jsonItem>>, D, C>(
@@ -90,10 +90,4 @@ export const setField = <K extends string, T, V, D, C>({
       value: value.raw(),
     },
   }),
-  eval: (d, c) => {
-    return {
-      ...input.eval(d, c),
-      ...Object.fromEntries<Record<K, V>>([[field.eval(d, c), value.eval(d, c)]]),
-    }
-  },
 })

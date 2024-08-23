@@ -1,24 +1,19 @@
-import { json, Query } from '../types';
-
-type Reducer = <T>(x: T[], f: (x: T) => boolean) => boolean;
+import type { json } from '../../types'
+import type { Query } from '../types'
 
 export const combine =
-  (op: string, reducer: Reducer) =>
+  (op: string) =>
   <T extends json>(...args: Query<T>[]): Query<T> => ({
-    raw: (prefix) => ({ [op]: args.map((x) => x.raw(prefix)) }),
-    test: (x) => reducer(args, (o) => o.test(x)),
-  });
+    raw: prefix => ({ [op]: args.map(x => x.raw(prefix)) }),
+    expr: ()=>0
+  })
 
-export const $and = combine('$and', (x, f) => x.every(f));
-export const $nor = combine('$nor', (x, f) => !x.some(f));
-export const $or = combine('$or', (x, f) => x.some(f));
-export const sub = <
-  T extends Record<K, json | null>,
-  K extends string & keyof T
->(
-  { raw, test }: Query<Exclude<T[K], null>>,
-  k: K
+export const $and = combine('$and')
+export const $nor = combine('$nor')
+export const $or = combine('$or')
+export const sub = <T extends Record<K, json | null>, K extends string & keyof T>(
+  { raw }: Query<Exclude<T[K], null>>,
+  k: K,
 ): Query<T> => ({
-  raw: (prefix) => raw((field) => prefix(`${k}.${field}`)),
-  test: (x) => x[k] !== null && test(x[k] as Exclude<T[K], null>),
-});
+  raw: prefix => raw(field => prefix(`${k}.${field}`)),
+})

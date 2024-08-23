@@ -1,5 +1,5 @@
 import type { HKT, JsonObj } from '../../types'
-import type { RawStages, RawStagesPart, RawStagesSource, Stream } from '../types'
+import type { RawStagesPart, RawStagesSource, Stream } from '../types'
 
 export const fromStages =
   <T extends JsonObj, V extends JsonObj>(stages: RawStagesPart<T, V>) =>

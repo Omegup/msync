@@ -6,25 +6,21 @@ import { log } from '../utils/log'
 
 export const aggregate = <Result extends JsonObj>({
   db,
-  comment,
   input,
 }: {
   db: Db
-  comment?: string
   input: RawStages<Result>
 }) =>
   input(({ coll, stages }) => {
     const req = {
       aggregate: coll.collectionName,
       pipeline: stages,
-      comment,
       cursor: {},
       readConcern: { level: 'snapshot' },
     }
     log('exec', req)
     return db.command(req).then(
       result => {
-        log('executed', req, result)
         return { result: result as AggregateCommand<Result>, ok: true as const }
       },
       err => {

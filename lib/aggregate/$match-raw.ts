@@ -1,14 +1,41 @@
-import type { JsonObj } from '../../types'
-import type { Field } from '../field'
-import type { Query, RawStagesSource } from '../types'
+import type { App, HKT, I, JsonObj, WriteonlyCollection } from '../../types'
+import { eqTyped, ite } from '../expression/logic'
+import { val } from '../expression/val'
+import { root, type Field } from '../field'
+import type { BoolExpr, Delta, Expr, Query, RawStagesSource } from '../types'
 import { id } from '../utils/json'
 import { asRawPart } from './prefix'
 
 export const $matchRaw = <T extends JsonObj>(query: Query<T>) =>
   asRawPart<T, T>([{ $match: query.raw(id) }])
 
+export const $deltaMatchRaw = <T extends JsonObj>(query: Query<T>) => {
+  type Update = Expr<T | null, Delta<T>, unknown>
+  const f = <K extends 'before' | 'after'>(field: K): Update => {
+    type DD = K
+    const ff: DD = field
+    interface F extends HKT {
+      readonly out: Readonly<Record<DD, I<unknown, this>>> & Delta<T>
+    }
+    const subField: Field<App<F, T>, unknown, T> = root<App<F, T>>().of(ff)
+    const nullExpr = val(() => null)
+    const isFieldNull = eqTyped<null, T, F, unknown>(root<Delta<T>>().of(ff).expr())(nullExpr)
+    const ee: Expr<T | null, App<F, T>, unknown> = ite<T | null, App<F, T>, unknown>(query.expr(subField), subField.expr(), nullExpr)
+    return ite<T | null, App<F, null>, App<F, T>, unknown>(
+      isFieldNull,
+      nullExpr,
+      ee,
+    )
+  }
+  return asRawPart<Delta<T>, Delta<T>>([
+    { $set: { after: f().raw(), before: f().raw() } },
+  ])
+}
 export const $projectRaw = <T>(projection: Record<keyof T, 1>) =>
   asRawPart<T, T>([{ $project: projection }])
+
+export const $simpleMergeRaw = <T>(out: WriteonlyCollection<T>) =>
+  asRawPart<T, never>([{ $merge: out.collectionName }])
 
 export const $lookupRaw = <
   T extends JsonObj,
