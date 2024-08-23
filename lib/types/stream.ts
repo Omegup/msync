@@ -29,7 +29,7 @@ export type Stream<T extends JsonObj, F extends HKT<JsonObj>> = <Result extends 
 // this type of streams is based on the separation between 
 // • last snapshot which is the last data successfully synced 
 // • and the new incoming data to be synced
-export type StreamSnapshot<T extends JsonObj> = <Result extends JsonObj>(
+export type SnapshotStream<T extends JsonObj> = <Result extends JsonObj>(
   // this input doesn't end necessarily with merge stage, cuz it can be used for another lookup
   // so input can be used to construct the stages of the left/rigth join of another lookup 
   input: RawStagesPart<T, Result>,

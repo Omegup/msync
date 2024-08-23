@@ -8,23 +8,27 @@ import type {
   RawStagesPart,
   RawStagesSource,
   Runner,
-  StreamSnapshot,
+  SnapshotStream,
+  Working,
 } from '../types'
-import { mergeIt } from '../utils/merge'
+import { mergeItResults } from '../utils/merge'
 
-type Next<L, R> = { source: 'L'; value: L } | { source: 'R'; value: R }
+type Next<L, R> = ({ source: 'L'; value: L } | { source: 'R'; value: R }) & Working
 
-const merge = <Left extends LDom, Right extends RDom, Result, LDom, RDom>({
+const merge = <L extends LD, R extends RD, Result, LD extends Working, RD extends Working>({
   lsource,
   rsource,
 }: {
-  lsource: IteratorResult<readonly Result[], Left, LDom>
-  rsource: IteratorResult<readonly Result[], Right, RDom>
-}): IteratorResult<readonly Result[], Next<Left, Right>, Next<LDom, RDom>> =>
-  mergeIt<'L' | 'R', { L: Left; R: Right }, Result, { L: LDom; R: RDom }>({
-    L: lsource,
-    R: rsource,
-  })
+  lsource: IteratorResult<readonly Result[], L, LD>
+  rsource: IteratorResult<readonly Result[], R, RD>
+}): IteratorResult<readonly Result[], Next<L, R>, Next<LD, RD>> =>
+  mergeItResults<'L' | 'R', { L: L; R: R }, Result, { L: LD; R: RD }>(
+    {
+      L: lsource,
+      R: rsource,
+    },
+    x => x.work,
+  )
 
 const join = <T extends JsonObj, U extends JsonObj, S, Result extends JsonObj, R, L>(
   { lField, rField, left, right }: Params<T, U, S>,
@@ -39,7 +43,7 @@ const join = <T extends JsonObj, U extends JsonObj, S, Result extends JsonObj, R
     stages: consume => consume(concatStages(resultingSnapshot, stagesUntilNextLookup)),
     run: <Final extends JsonObj>(
       finalInput: RawStagesPart<Result, Final>,
-    ): Runner<readonly Final[], unknown> => {
+    ): Runner<readonly Final[], Working> => {
       const leftJoinField = { field1: rField, field2: lField }
       const joinL_Snapshot = $lookupRaw(leftJoinField, leftSnapshot, 'right', 'left')
       const lRunnerInput = concatParts(joinR_Snapshot, stagesUntilNextLookup)
@@ -60,6 +64,6 @@ type Params<T extends JsonObj, U extends JsonObj, S> = {
 export const $lookup =
   <T extends JsonObj, U extends JsonObj, S>(
     p: Params<T, U, S>,
-  ): StreamSnapshot<{ left: T; right: U }> =>
+  ): SnapshotStream<{ left: T; right: U }> =>
   <Result extends JsonObj>(input: RawStagesPart<{ left: T; right: U }, Result>) =>
     p.left.stages(lStages => p.right.stages(rStages => join(p, lStages, rStages, input)))

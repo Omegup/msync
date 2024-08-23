@@ -3,12 +3,12 @@
 import type { App, HKT, I } from '../../types'
 
 // type Iter = AsyncIterator<void, never, never>
-export type Machine<T> = (
-  restart: AsyncIterator<void, never, void>,
-) => AsyncIterator<T, never, void>
 export type RunnerSource<T, S extends Dom, Dom> = () => IteratorResult<T, S, Dom>
 
-export type Runner<T, Dom> = Iterator<T, Dom>
+export type Working = { work: true | undefined }
+export type Runner<T, Dom extends Working> = Iterator<T, Dom>
+
+export type Machine<T, Dom = unknown> = Iterator<T, Dom>
 
 export type IteratorResult<out T, in out S extends Dom, out Dom> = {
   data: T
@@ -19,36 +19,6 @@ export type IteratorResult<out T, in out S extends Dom, out Dom> = {
 export type Exists<in out F extends HKT<Dom>, out Dom = unknown> = <E>(
   consume: <T extends Dom>(data: App<F, T>) => E,
 ) => E
-
-const doThings = async () => {
-  const data = await fetch('google.com')
-  console.log(JSON.stringify(await data.json()))
-}
-
-const doThingsCPS =
-  (i: number = 0): Iterator<string | void, unknown> =>
-  consume => {
-    console.log('fetching for iteration', i)
-    const response = fetch('google.com')
-
-    const stop = () => doThingsCPS(i + 1)
-
-    return consume({
-      data: void 0,
-      next: response,
-      cont: data => consume => {
-        const json = data.json() as Promise<unknown>
-        return consume({
-          data: void 0,
-          next: json,
-          cont: json => consume =>
-            consume({ data: JSON.stringify(json), next: Promise.resolve(), stop, cont: stop }),
-          stop,
-        })
-      },
-      stop,
-    })
-  }
 
 export type Continuation<out T, in S extends Dom, out Dom> = (prev: S) => Iterator<T, Dom>
 
