@@ -1,4 +1,4 @@
-import type { JsonObj } from '../../types'
+import type { JsonObj, Arr, notArr, O } from '../../types'
 import { $lookupRaw } from '../aggregate/$match-raw'
 import { concatParts, concatStages } from '../aggregate/prefix'
 import type { Field } from '../field'
@@ -10,6 +10,7 @@ import type {
   Runner,
   SnapshotStream,
   Working,
+  Delta,
 } from '../types'
 import { mergeItResults } from '../utils/merge'
 
@@ -30,11 +31,11 @@ const merge = <L extends LD, R extends RD, Result, LD extends Working, RD extend
     x => x.work,
   )
 
-const join = <T extends JsonObj, U extends JsonObj, S, Result extends JsonObj, R, L>(
+const join = <T extends JsonObj, U extends JsonObj, S extends notArr, Result extends JsonObj, R, L>(
   { lField, rField, left, right }: Params<T, U, S>,
   leftSnapshot: RawStagesSource<L, T>,
   rightSnapshot: RawStagesSource<R, U>,
-  stagesUntilNextLookup: RawStagesPart<{ left: T; right: U }, Result>,
+  stagesUntilNextLookup: RawStagesPart<Delta<O<{ left: T; right: U }>>, Result>,
 ): SnapshotStreamExecutionResult<Result> => {
   const rightJoinField = { field1: lField, field2: rField }
   const joinR_Snapshot = $lookupRaw(rightJoinField, rightSnapshot, 'left', 'right')
@@ -55,15 +56,15 @@ const join = <T extends JsonObj, U extends JsonObj, S, Result extends JsonObj, R
   }
 }
 
-type Params<T extends JsonObj, U extends JsonObj, S> = {
-  lField: Field<T, S> | Field<T, Arr<S>>
-  rField: Field<U, S> | Field<U, Arr<S>>
+type Params<T extends JsonObj, U extends JsonObj, S extends notArr> = {
+  lField: Field<T, S> //| Field<T, Arr<S>>
+  rField: Field<U, S> //| Field<U, Arr<S>>
   left: SnapshotStreamExecutionResult<T>
   right: SnapshotStreamExecutionResult<U>
 }
 export const $lookup =
-  <T extends JsonObj, U extends JsonObj, S>(
+  <T extends JsonObj, U extends JsonObj, S extends notArr>(
     p: Params<T, U, S>,
-  ): SnapshotStream<{ left: T; right: U }> =>
-  <Result extends JsonObj>(input: RawStagesPart<{ left: T; right: U }, Result>) =>
+  ): SnapshotStream<O<{ left: T; right: U }>> =>
+  <Result extends JsonObj>(input: RawStagesPart<Delta<O<{ left: T; right: U }>>, Result>) =>
     p.left.stages(lStages => p.right.stages(rStages => join(p, lStages, rStages, input)))

@@ -4,7 +4,8 @@ export type AsNum<R> = R extends `${infer A extends number}` ? A : never
 export type GetDom<Dom = unknown> = readonly [readonly Dom[], keyof any]
 
 declare global {
-  type Entry<T> = { [k in keyof T]: readonly [string & k, T[k]] }[keyof T]
+  type Entry<T> = [string, T[string & keyof T]] &
+    { [k in keyof T]: readonly [string & k, T[k]] }[keyof T]
   interface ObjectConstructor {
     entries<T, _ = 0>(object?: T): readonly Entry<T>[]
     fromEntries<T, _ = 0>(entries: readonly Entry<T>[]): T

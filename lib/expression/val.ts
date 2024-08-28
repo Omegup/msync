@@ -1,8 +1,8 @@
-import { Expr, jsonItem } from '../types'
+import type { jsonItem, rawItem } from '../../types'
+import type { Expr } from '../types'
 
-export const val = <T extends jsonItem, D, C = object>(val: () => T): Expr<T, D, C> => ({
+export const val = <T extends rawItem, D, C = object>(val: () => T): Expr<T, D, C> => ({
   raw: () => ({ $literal: val() }),
-  eval: val,
 })
 export const $getField = <T, K extends string & keyof T, D, C = object>(
   expr: Expr<T | null, D, C>,
@@ -14,10 +14,6 @@ export const $getField = <T, K extends string & keyof T, D, C = object>(
       input: expr.raw(),
     },
   }),
-  eval: (d, c) => {
-    const item = expr.eval(d, c)
-    return item?.[field] ?? null
-  },
 })
 
 export const func = <T extends jsonItem, A extends readonly jsonItem[], D, C = object>(
@@ -31,10 +27,6 @@ export const func = <T extends jsonItem, A extends readonly jsonItem[], D, C = o
       lang: 'js',
     },
   }),
-  eval: (d, c) => {
-    const arr = args.map(x => x.eval(d, c)) as readonly jsonItem[] as A
-    return f(...arr)
-  },
 })
 
 export const rand = function () {

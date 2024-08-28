@@ -1,5 +1,5 @@
 import type { Timestamp } from 'mongodb'
-import type { JsonObj, View } from '../types'
+import type { JsonObj, O, View } from '../types'
 import { $matchRaw, $projectRaw, $simpleMergeRaw } from './aggregate/$match-raw'
 import { concatParts } from './aggregate/prefix'
 import { root } from './field'
@@ -15,11 +15,7 @@ import type {
   Working,
 } from './types'
 
-
-
-
-
-type TS = { touchedAt: Timestamp; deletedAt?: Timestamp }
+type TS = O<{ touchedAt: Timestamp; deletedAt?: Timestamp }>
 
 const executes = <T extends JsonObj, Result extends JsonObj>(
   view: View<T & TS>,
@@ -30,8 +26,9 @@ const executes = <T extends JsonObj, Result extends JsonObj>(
   const db = collection.s.db,
     coll = collection.collectionName
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
-  const newCollection = db.collection<Delta<T>>(coll + '_' + streamName + '_new')
-  const snapshotCollection = db.collection<T>(coll + '_' + streamName + '_snapshot')
+  const snapshotCollection = db.collection<Delta<T> & { updated: boolean }>(
+    coll + '_' + streamName + '_snapshot',
+  )
   // TODO create indexes (if snapshot is in sources)
   const projectInput = $projectRaw(projection)
 
@@ -43,7 +40,14 @@ const executes = <T extends JsonObj, Result extends JsonObj>(
       return c => {
         async function f() {
           // Step 1 : empty new collection
-          await newCollection.deleteMany()
+          await snapshotCollection.deleteMany({ updated: true })
+          // put this in the right place
+          await snapshotCollection.deleteMany({ updated: true, after: null })
+          await snapshotCollection.updateMany({ updated: true }, [
+            { $set: { updated: false, after: null, before: '$after' } },
+          ])
+
+          //
           // Step 2 : clone into new collection
           const lastTS = await last.findOne({ _id: streamName })
           let startInput = projectInput
@@ -52,6 +56,13 @@ const executes = <T extends JsonObj, Result extends JsonObj>(
             const matchTS = $matchRaw<T & TS>(query)
             startInput = concatParts(startInput, matchTS)
           }
+          await collection
+            .aggregate([
+              { $match: { touchedAt: { $gte: lastTS!.ts } } },
+              { $replaceWith: { after: '$$ROOT', updated: true, _id: '$_id' } },
+              { $merge: { into: snapshotCollection.namespace } },
+            ])
+            .toArray()
           const cloneIntoNew = concatParts(startInput, $simpleMergeRaw<T>(snapshotCollection))
           const result = await aggregate<T>({
             db,
@@ -69,6 +80,7 @@ const executes = <T extends JsonObj, Result extends JsonObj>(
             db,
             input: c => c({ coll: newCollection, stages: $simpleMergeRaw<T>(snapshotCollection) }),
           })
+          // Step 5 : update __last
         }
 
         const runner: Runner<readonly Result[], Working> = {}
@@ -93,7 +105,6 @@ const executes = <T extends JsonObj, Result extends JsonObj>(
   //
 
   // while (true) {
-  //   // Step 5 : update __last
 
   //   const item = streamName ? await last.findOne({ _id: streamName }) : null
   //   const after = item?.ts

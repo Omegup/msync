@@ -1,29 +1,18 @@
-import { Expr, jsonItem } from '../types'
-import dayjs from 'dayjs'
+import type { Expr } from '../types'
 
 export const datePart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> => ({
   raw: () => ({ $dateToString: { date: date.raw(), format: '%Y-%m-%d' } }),
-  eval: (d, c) => {
-    return date.eval(d, c).toISOString().slice(0, 10) ?? ''
-  },
 })
 export const dayAndMonthPart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> => ({
   raw: () => ({ $dateToString: { date: date.raw(), format: '%m-%d' } }),
-  eval: (d, c) => dayjs(date.eval(d, c)).format('DD-MM'),
 })
 
 export const monthPart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> => ({
   raw: () => ({ $dateToString: { date: date.raw(), format: '%Y-%m' } }),
-  eval: (d, c) => {
-    return date.eval(d, c).toISOString().slice(0, 7) ?? ''
-  },
 })
 
 export const timePart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> => ({
   raw: () => ({ $dateToString: { date: date.raw(), format: '%H-%M' } }),
-  eval: (d, c) => {
-    return date.eval(d, c).toISOString().slice(11, 16) ?? ''
-  },
 })
 
 export const startOf = <D, C>(
@@ -132,36 +121,10 @@ export const startOf = <D, C>(
       },
     },
   }),
-  eval: (d, c) => {
-    const f = freq.eval(d, c),
-      i = offset.eval(d, c)
-    const start = new Date(startDate.eval(d, c).toISOString().slice(0, 10) + 'Z')
-    const output = new Date(start)
-    if (f === 'day' || f === 'week') {
-      const day = f === 'week' ? output.getUTCDay() || 7 : 0
-      output.setUTCDate(output.getUTCDate() - day + i)
-      if (f === 'week' && output < start) {
-        output.setUTCDate(output.getUTCDate() + 7)
-      }
-    } else if (f === 'year') {
-      output.setUTCMonth(Math.floor(i / 100) - 1)
-      output.setUTCDate(i % 100)
-      if (output < start) {
-        output.setUTCFullYear(output.getUTCFullYear() + 1)
-      }
-    } else {
-      output.setUTCDate(i)
-      if (output < start) {
-        output.setUTCMonth(output.getUTCMonth() + 1)
-      }
-    }
-    return output
-  },
 })
 
 export const toMS = <D, C>(date: Expr<Date, D, C>): Expr<number, D, C> => ({
   raw: () => ({ $toLong: date.raw() }),
-  eval: (d, c) => date.eval(d, c).getTime(),
 })
 
 export const dateAdd = <D, C>(
@@ -172,27 +135,14 @@ export const dateAdd = <D, C>(
   raw: () => ({
     $dateAdd: { startDate: date.raw(), unit: unit.raw(), amount: amount.raw() },
   }),
-  eval: (d, c) => dayjs(date.eval(d, c)).add(amount.eval(d, c), unit.eval(d, c)).toDate(),
 })
 
 export const maxDate = <D, C>(expr: Expr<Date[], D, C>): Expr<Date, D, C> => ({
   raw: () => ({ $max: expr.raw() }),
-  eval: (d, c) =>
-    expr
-      .eval(d, c)
-      .map(x => dayjs(x))
-      .reduce((a, b) => (a.diff(b) < 0 ? b : a))
-      .toDate(),
 })
 
 export const minDate = <D, C>(expr: Expr<Date[], D, C>): Expr<Date, D, C> => ({
   raw: () => ({ $min: expr.raw() }),
-  eval: (d, c) =>
-    expr
-      .eval(d, c)
-      .map(x => dayjs(x))
-      .reduce((a, b) => (a.diff(b) < 0 ? a : b))
-      .toDate(),
 })
 
 export const dateDiff = <D, C>({
@@ -283,10 +233,4 @@ export const dateDiff = <D, C>({
       },
     },
   }),
-  eval: (d, c) => {
-    const e = dayjs(end.eval(d, c))
-    const s = dayjs(start.eval(d, c)).startOf('day')
-    const diff = e.diff(s, unit.eval(d, c))
-    return diff
-  },
 })

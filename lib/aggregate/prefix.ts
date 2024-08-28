@@ -1,4 +1,4 @@
-import type { HKT, JsonObj } from '../../types'
+import type { HKT, JsonObj, RawObj } from '../../types'
 import type { RawStagesPart, RawStagesSource, Stream } from '../types'
 
 export const fromStages =
@@ -7,7 +7,7 @@ export const fromStages =
   input =>
     source(concatParts(stages, input))
 
-export const asRawPart = <T, V>(x: readonly JsonObj[]): RawStagesPart<T, V> => x
+export const asRawPart = <T, V>(x: readonly RawObj[]): RawStagesPart<T, V> => x
 export const concatParts = <T, V, W>(
   part1: RawStagesPart<T, V>,
   part2: RawStagesPart<V, W>,

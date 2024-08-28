@@ -1,34 +1,32 @@
-import type { App, HKT, I, JsonObj, WriteonlyCollection } from '../../types'
+import type { App, HKT, I, JsonObj, Rec, WriteonlyCollection, jsonItem } from '../../types'
 import { eqTyped, ite } from '../expression/logic'
 import { val } from '../expression/val'
 import { root, type Field } from '../field'
-import type { BoolExpr, Delta, Expr, Query, RawStagesSource } from '../types'
+import type { Delta, Expr, Query, RawStagesPart, RawStagesSource } from '../types'
 import { id } from '../utils/json'
 import { asRawPart } from './prefix'
 
 export const $matchRaw = <T extends JsonObj>(query: Query<T>) =>
   asRawPart<T, T>([{ $match: query.raw(id) }])
 
-export const $deltaMatchRaw = <T extends JsonObj>(query: Query<T>) => {
+export const $deltaMatchRaw = <T extends JsonObj>(
+  query: Query<T>,
+): RawStagesPart<Delta<T>, Delta<T>> => {
   type Update = Expr<T | null, Delta<T>, unknown>
   const f = <K extends 'before' | 'after'>(field: K): Update => {
-    type DD = K
-    const ff: DD = field
-    interface F extends HKT {
-      readonly out: Readonly<Record<DD, I<unknown, this>>> & Delta<T>
+    interface F extends HKT<jsonItem> {
+      readonly out: Readonly<Record<K, I<jsonItem, this>>> & Delta<T>
     }
-    const subField: Field<App<F, T>, unknown, T> = root<App<F, T>>().of(ff)
-    const nullExpr = val(() => null)
-    const isFieldNull = eqTyped<null, T, F, unknown>(root<Delta<T>>().of(ff).expr())(nullExpr)
-    const ee: Expr<T | null, App<F, T>, unknown> = ite<T | null, App<F, T>, unknown>(query.expr(subField), subField.expr(), nullExpr)
-    return ite<T | null, App<F, null>, App<F, T>, unknown>(
-      isFieldNull,
+    const subField = root<App<F, T>>().of(field)
+    const nullExpr: Expr<null, App<F, T | null>, unknown> = val(() => null)
+    return ite<T | null, null, T, F>(
+      eqTyped<null, T, F, unknown>(root<Delta<T>>().of(field), nullExpr),
       nullExpr,
-      ee,
+      ite(query.expr(subField), subField, nullExpr),
     )
   }
   return asRawPart<Delta<T>, Delta<T>>([
-    { $set: { after: f().raw(), before: f().raw() } },
+    { $set: { after: f('after').raw(), before: f('before').raw() } },
   ])
 }
 export const $projectRaw = <T>(projection: Record<keyof T, 1>) =>
@@ -58,8 +56,8 @@ export const $lookupRaw = <
       $lookup: {
         from: coll.collectionName,
         as: k2,
-        let: { local: `$${k1}.${field1.field}` },
-        pipeline: [{ $match: { $expr: { $eq: ['$$local', `$${field2.field}`] } } }, ...stages],
+        let: { local: root<Rec<K1, T>>().of(k1).of(field1).raw() },
+        pipeline: [{ $match: { $expr: { $eq: ['$$local', field2.raw()] } } }, ...stages],
       },
     },
     { $unwind: `$${k2}` },

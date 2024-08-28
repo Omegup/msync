@@ -1,9 +1,9 @@
-import type { App, HKT, JsonObj, ReadonlyCollection, Type } from '../../types'
+import type { App, HKT, JsonObj, O, RawObj, ReadonlyCollection, Type } from '../../types'
 import type { Runner, Working } from './machine'
 
 declare const RawStage: unique symbol
 
-export type RawStagesPart<S, R> = readonly JsonObj[] & {
+export type RawStagesPart<S, R> = readonly RawObj[] & {
   [Type]?(_: typeof RawStage, source: S): readonly [typeof RawStage, R]
 }
 export type RawStagesSource<in out S, out R> = {
@@ -24,7 +24,7 @@ export type Stream<T extends JsonObj, F extends HKT<JsonObj>> = <Result extends 
   input: RawStagesPart<T, Result>,
 ) => App<F, Result>
 
-export type PreDelta<out T> = Readonly<Record<'before' | 'after', T>>
+export type PreDelta<out T> = Readonly<O & Record<'before' | 'after', T>>
 export type Delta<out T> = PreDelta<T | null>
 
 // this type of streams is based on the separation between

@@ -1,7 +1,13 @@
-import type { ArrHKT, jsonItem } from '../../types'
-import { makeDualOperandPredicate } from './utils'
+import type { ArrHKT, ConstHKT, IdHKT, rawItem } from '../../types'
+import { operator } from './utils'
 
-const dualIn = makeDualOperandPredicate<'$in' | '$nin', ArrHKT<jsonItem>>()
+const dualIn = operator<
+  '$in' | '$nin',
+  ConstHKT<rawItem, ArrHKT<rawItem>>,
+  rawItem,
+  rawItem,
+  ConstHKT<rawItem, IdHKT<rawItem>>
+>()
 
 export const $in = dualIn('$in')
 export const $nin = dualIn('$nin')

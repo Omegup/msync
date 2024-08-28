@@ -1,4 +1,4 @@
-import type { App, HKT, jsonItem } from '../../types'
+import type { App, HKT, jsonItem, rawItem } from '../../types'
 import type { BoolExpr, Expr } from '../types'
 import { val } from './val'
 
@@ -13,12 +13,16 @@ export const ite = (<T, D1, D2, C>(
     }),
   }
 }) as {
-  <T, D, C>(cond: Expr<boolean, D, C>, then: Expr<T, D, C>, orelse: Expr<T, D, C>): Expr<T, D, C>
-  <T, D1, D2, C>(
-    cond: BoolExpr<D1, D2, C>,
-    then: Expr<T, D1, C>,
-    orelse: Expr<T, D2, C>,
-  ): Expr<T, D1 | D2, C>
+  <T, D, C = unknown>(
+    cond: Expr<boolean, D, C>,
+    then: Expr<T, D, C>,
+    orelse: Expr<T, D, C>,
+  ): Expr<T, D, C>
+  <T, R1 extends Dom, R2 extends Dom, F extends HKT<Dom>, Dom = jsonItem, C = unknown>(
+    cond: BoolExpr<App<F, R1>, App<F, R2>, C>,
+    then: Expr<T, App<F, R1>, C>,
+    orelse: Expr<T, App<F, R2>, C>,
+  ): Expr<T, App<F, R1 | R2>, C>
 }
 
 export const eq =
@@ -27,13 +31,12 @@ export const eq =
     raw: () => ({ $eq: [a.raw(), b.raw()] }),
   })
 
-export const eqTyped =
-  <T1 extends Dom, T2 extends Dom, F extends HKT<Dom>, C, Dom = unknown>(
-    a: Expr<T1 | T2, App<F, T1 | T2>, C>,
-  ) =>
-  (b: Expr<T1, App<F, T1 | T2>, C>): BoolExpr<App<F, T1>, App<F, T2>, C> => ({
-    raw: () => ({ $eq: [a.raw(), b.raw()] }),
-  })
+export const eqTyped = <T1 extends Dom, T2 extends Dom, F extends HKT<Dom>, C, Dom = jsonItem>(
+  a: Expr<T1 | T2, App<F, T1 | T2>, C>,
+  b: Expr<T1, App<F, T1 | T2>, C>,
+): BoolExpr<App<F, T1>, App<F, T2>, C> => ({
+  raw: () => ({ $eq: [a.raw(), b.raw()] }),
+})
 
 export const ne =
   <T, K, D, C>(a: Expr<T, D, C>) =>
@@ -47,7 +50,7 @@ export const $ifNull = <R, D, C>(
   raw: () => ({ $ifNull: expr.map(e => e.raw()) }),
 })
 
-export const exprMapVal = <K extends string, T extends Partial<Record<K, jsonItem>>, D, C>(
+export const exprMapVal = <K extends string, T extends Partial<Record<K, rawItem>>, D, C>(
   expr: Expr<K, D, C>,
   map: { [P in K]: Expr<T[P], D, C> },
   or?: Expr<T[K], D, C>,
@@ -63,7 +66,7 @@ export const exprMapVal = <K extends string, T extends Partial<Record<K, jsonIte
   }),
 })
 
-export const mapVal = <K extends string, T extends Partial<Record<K, jsonItem>>, D, C>(
+export const mapVal = <K extends string, T extends Partial<Record<K, rawItem>>, D, C>(
   expr: Expr<K, D, C>,
   map: T,
   or: T[K],
