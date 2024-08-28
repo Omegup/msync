@@ -24,5 +24,4 @@ export const $lte = comp('$lte')
 
 export const $elemMatch = <T extends jsonItem>(inner: Query<Inner<T>>): Predicate<T> => ({
   raw: { $elemMatch: inner.raw(id) },
-  expr: field => ({ raw: () => ({ $: field.expr().raw() }) }),
 })

@@ -56,8 +56,8 @@ const join = <T extends JsonObj, U extends JsonObj, S, Result extends JsonObj, R
 }
 
 type Params<T extends JsonObj, U extends JsonObj, S> = {
-  lField: Field<T, S>
-  rField: Field<U, S>
+  lField: Field<T, S> | Field<T, Arr<S>>
+  rField: Field<U, S> | Field<U, Arr<S>>
   left: SnapshotStreamExecutionResult<T>
   right: SnapshotStreamExecutionResult<U>
 }

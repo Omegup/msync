@@ -1,17 +1,23 @@
 import type { Timestamp } from 'mongodb'
 import type { JsonObj, View } from '../types'
 import { $matchRaw, $projectRaw, $simpleMergeRaw } from './aggregate/$match-raw'
+import { concatParts } from './aggregate/prefix'
+import { root } from './field'
+import { $gteTs } from './predicate'
 import { aggregate } from './stream/aggregate'
 import type {
+  Delta,
+  Query,
   RawStagesPart,
   Runner,
   SnapshotStream,
   SnapshotStreamExecutionResult,
   Working,
 } from './types'
-import { concatParts } from './aggregate/prefix'
-import { root } from './field'
-import { $gtTs, $gteTs } from './predicate'
+
+
+
+
 
 type TS = { touchedAt: Timestamp; deletedAt?: Timestamp }
 
@@ -24,7 +30,7 @@ const executes = <T extends JsonObj, Result extends JsonObj>(
   const db = collection.s.db,
     coll = collection.collectionName
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
-  const newCollection = db.collection<T>(coll + '_' + streamName + '_new')
+  const newCollection = db.collection<Delta<T>>(coll + '_' + streamName + '_new')
   const snapshotCollection = db.collection<T>(coll + '_' + streamName + '_snapshot')
   // TODO create indexes (if snapshot is in sources)
   const projectInput = $projectRaw(projection)
@@ -42,10 +48,11 @@ const executes = <T extends JsonObj, Result extends JsonObj>(
           const lastTS = await last.findOne({ _id: streamName })
           let startInput = projectInput
           if (lastTS) {
-            const matchTS = $matchRaw<T>(root<TS>().of('touchedAt').has($gteTs(lastTS.ts)))
+            const query: Query<T & TS> = root<TS>().of('touchedAt').has($gteTs(lastTS.ts))
+            const matchTS = $matchRaw<T & TS>(query)
             startInput = concatParts(startInput, matchTS)
           }
-          const cloneIntoNew = concatParts(startInput, $simpleMergeRaw<T>(newCollection))
+          const cloneIntoNew = concatParts(startInput, $simpleMergeRaw<T>(snapshotCollection))
           const result = await aggregate<T>({
             db,
             input: c => c({ coll: collection, stages: cloneIntoNew }),

@@ -19,6 +19,8 @@
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
 
+    "noErrorTruncation": true,
+
     // Some stricter flags (disabled by default)
     "noUnusedLocals": true,
     "noUnusedParameters": false,

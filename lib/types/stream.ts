@@ -2,7 +2,6 @@ import type { App, HKT, JsonObj, ReadonlyCollection, Type } from '../../types'
 import type { Runner, Working } from './machine'
 
 declare const RawStage: unique symbol
-declare const Pipeline: unique symbol
 
 export type RawStagesPart<S, R> = readonly JsonObj[] & {
   [Type]?(_: typeof RawStage, source: S): readonly [typeof RawStage, R]

@@ -12,7 +12,6 @@ export const makeDualOperandPredicate =
   <D2 extends Dom = Dom>(op: K) =>
   <T extends D2>(operand: App<F, T>): Predicate<T> => {
     return {
-      expr: x => ({ raw: () => ({ [op]: [x.expr().raw(), operand] }) }),
       raw: { [op]: operand },
     }
   }
