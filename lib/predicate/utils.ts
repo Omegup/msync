@@ -1,7 +1,5 @@
 import type { App, HKT, rawItem } from '../../types'
-import type { DeepTest, Predicate } from '../types'
-
-export type AsDeepTest = <T>(testOnPart: (part: T) => boolean) => DeepTest<T>
+import type { Predicate } from '../types'
 
 type Operators = '$eq' | '$ne' | '$gt' | '$gte' | '$lt' | '$lte' | '$in' | '$nin'
 export const operator =

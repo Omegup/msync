@@ -1,9 +1,9 @@
 import type { Timestamp } from 'mongodb'
 import type { ID, JsonObj, O, View, doc } from '../types'
 import { $matchRaw, $projectRaw, $replaceWith, $simpleMergeRaw } from './aggregate/$match-raw'
-import { concatParts } from './aggregate/prefix'
+import { concatStages } from './aggregate/prefix'
 import { field } from './expression/concat'
-import { eq, ite } from './expression/logic'
+import { ite } from './expression/logic'
 import { val } from './expression/val'
 import { root } from './field'
 import { $eq, $gteTs, $ne } from './predicate'
@@ -12,7 +12,7 @@ import { aggregate } from './stream/aggregate'
 import type {
   Delta,
   Query,
-  RawStagesPart,
+  RawStages,
   Runner,
   SnapshotStream,
   SnapshotStreamExecutionResult,
@@ -25,7 +25,7 @@ type TS = D & { touchedAt: Timestamp }
 
 const executes = <T extends doc, Result extends JsonObj, V extends T & TS & JsonObj>(
   view: View<T & D, V>,
-  input: RawStagesPart<Delta<T>, Delta<Result>>,
+  input: RawStages<Delta<T>, Result>,
   streamName: string,
 ): SnapshotStreamExecutionResult<Result> => {
   const { collection, projection, hardMatch, match } = view
@@ -41,9 +41,9 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
 
   return {
     stages: c =>
-      c({ coll: snapshotCollection, stages: concatParts($matchRaw(isNew(false)), input) }),
+      c({ coll: snapshotCollection, stages: concatStages($matchRaw(isNew(false)), input) }),
     run: <Result2 extends JsonObj>(
-      finalInput: RawStagesPart<Delta<Result>, Result2>,
+      finalInput: RawStages<Result, Result2>,
     ): Runner<readonly Result2[], Working> => {
       return c => {
         async function f() {
@@ -56,8 +56,8 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
             lastTS && root<TS>().of('touchedAt').has($gteTs(lastTS.ts)),
             hardMatch,
           )
-          const startInput: RawStagesPart<V, T & D> = hardQuery
-            ? concatParts($matchRaw(hardQuery), projectInput)
+          const startInput: RawStages<V, T & D> = hardQuery
+            ? concatStages($matchRaw(hardQuery), projectInput)
             : projectInput
           const notDeleted = root<D>().of('deletedAt').has($ne<Timestamp | null | undefined>(null))
           const replaceRaw = $replaceWith(
@@ -71,8 +71,8 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
               _id: root<ID>().of('_id'),
             }),
           )
-          const cloneIntoNew = concatParts(
-            concatParts(startInput, replaceRaw),
+          const cloneIntoNew = concatStages(
+            concatStages(startInput, replaceRaw),
             $simpleMergeRaw<Delta<T>, 'after'>(snapshotCollection),
           )
           const result = await aggregate<T>(c => c({ coll: collection, stages: cloneIntoNew }))
@@ -82,7 +82,7 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
           const aggResult = await aggregate(c =>
             c({
               coll: snapshotCollection,
-              stages: concatParts(concatParts($matchRaw(isNew(false)), input), finalInput),
+              stages: concatStages(concatStages($matchRaw(isNew(false)), input), finalInput),
             }),
           )
           if (!aggResult.ok) throw aggResult.err

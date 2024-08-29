@@ -28,3 +28,6 @@ export class Field<in R extends JsonObj, out V> implements Expr<V, R, unknown> {
 }
 
 export const { root } = Field
+
+
+export type JField<T extends JsonObj, S> = Field<T, S> | Field<T, Arr<S>>

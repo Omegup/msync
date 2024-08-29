@@ -8,6 +8,7 @@ export type ExprRaw<T, Doc, Ctx, V = rawItem> = V & {
 export type Expr<out T, in Doc, in Ctx = unknown> = {
   [Type]?(x: typeof Expr): void
   raw: () => ExprRaw<T, Doc, Ctx>
+  // rawF: <DeltaD extends JsonObj>(f: Field<DeltaD, Doc>) => ExprRaw<T, DeltaD, Ctx>
 }
 
 export type BoolExpr<in D1, in D2, in Ctx = unknown> = {

@@ -1,9 +1,9 @@
 import type { JsonObj } from '../../types'
-import type { RawStages } from '../types'
+import type { Stages } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
 import { log } from '../utils/log'
 
-export const aggregate = <Result extends JsonObj>(input: RawStages<Result>) =>
+export const aggregate = <Result extends JsonObj>(input: Stages<Result>) =>
   input(({ coll, stages }) => {
     const req = {
       aggregate: coll.collectionName,

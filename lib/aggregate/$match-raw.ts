@@ -1,17 +1,18 @@
 import type { App, HKT, I, ID, JsonObj, Rec, WriteonlyCollection, jsonItem } from '../../types'
+import { field } from '../expression/concat'
 import { eqTyped, ite } from '../expression/logic'
 import { val } from '../expression/val'
 import { root, type Field } from '../field'
-import type { Delta, Expr, Query, RawStagesPart, RawStagesSource } from '../types'
-import { id } from '../utils/json'
-import { asRawPart } from './prefix'
+import type { Delta, Expr, Query, RawStages, TStages } from '../types'
+import { asRec, id } from '../utils/json'
+import { asStages, concat, concatStages } from './prefix'
 
-export const $matchRaw = <T extends JsonObj>(query: Query<T>) =>
-  asRawPart<T, T>([{ $match: query.raw(id) }])
+export const $matchRaw = <T extends JsonObj, C = unknown>(query: Query<T, C>) =>
+  asStages<T, T, C>([{ $match: query.raw(id) }])
 
 export const $deltaMatchRaw = <T extends JsonObj>(
   query: Query<T>,
-): RawStagesPart<Delta<T>, Delta<T>> => {
+): RawStages<Delta<T>, Delta<T>> => {
   type Update = Expr<T | null, Delta<T>, unknown>
   const f = <K extends 'before' | 'after'>(field: K): Update => {
     interface F extends HKT<jsonItem> {
@@ -25,18 +26,32 @@ export const $deltaMatchRaw = <T extends JsonObj>(
       ite(query.expr(subField), subField, nullExpr),
     )
   }
-  return asRawPart<Delta<T>, Delta<T>>([
+  return asStages<Delta<T>, Delta<T>>([
     { $set: { after: f('after').raw(), before: f('before').raw() } },
   ])
 }
 export const $projectRaw = <T>(projection: Record<keyof T, 1>) =>
-  asRawPart<T, T>([{ $project: projection }])
+  asStages<T, T>([{ $project: projection }])
 
-export const $replaceWith = <T, V>(expr: Expr<V, T>) => asRawPart<T, V>([{ $replaceWith: expr.raw() }])
+export const $replaceWith = <T, V>(expr: Expr<V, T>) =>
+  asStages<T, V>([{ $replaceWith: expr.raw() }])
 
 export const $simpleMergeRaw = <T, K extends keyof T>(out: WriteonlyCollection<T & ID>) =>
-  asRawPart<Pick<T, K> & ID, never>([{ $merge: out.collectionName }])
+  asStages<Pick<T, K> & ID, never>([{ $merge: out.collectionName }])
 
+export const $lookupRawDelta = <
+  T extends JsonObj,
+  U extends JsonObj,
+  R,
+  S,
+  K1 extends string,
+  K2 extends string,
+>(
+  { field2, field1 }: { field2: Field<U, S>; field1: Field<T, S> },
+  { stages, coll }: TStages<R, U>,
+  k1: K1,
+  k2: K2,
+) => asStages<Delta<T>, Delta<Rec<K1, T> & Rec<K2, U>>>([])
 export const $lookupRaw = <
   T extends JsonObj,
   U extends JsonObj,
@@ -46,21 +61,25 @@ export const $lookupRaw = <
   K2 extends string,
 >(
   { field2, field1 }: { field2: Field<U, S>; field1: Field<T, S> },
-  { stages, coll }: RawStagesSource<R, U>,
+  { stages, coll }: TStages<R, U>,
   k1: K1,
   k2: K2,
 ) =>
-  asRawPart<T, Record<K1, T> & Record<K2, U>>([
-    {
-      $replaceWith: { [k1]: '$ROOT' },
-    },
-    {
-      $lookup: {
-        from: coll.collectionName,
-        as: k2,
-        let: { local: root<Rec<K1, T>>().of(k1).of(field1).raw() },
-        pipeline: [...stages, { $match: { $expr: { $eq: ['$$local', field2.raw()] } } }],
+  concat(
+    $replaceWith<T, Rec<K1, T>>(field(Object.fromEntries<Record<K1, Expr<T, T>>>([[k1, root()]]))),
+  ).with(
+    asStages<Rec<K1, T>, Rec<K1, T> & Rec<K2, U>>([
+      {
+        $lookup: {
+          from: coll.collectionName,
+          as: k2,
+          let: { local: root<Rec<K1, T>>().of(k1).of(field1).raw() },
+          pipeline: concatStages(
+            stages,
+            asStages<U, U>([{ $match: { $expr: { $eq: ['$$local', field2.raw()] } } }]),
+          ),
+        },
       },
-    },
-    { $unwind: `$${k2}` },
-  ])
+      { $unwind: `$${k2}` },
+    ]),
+  ).stages

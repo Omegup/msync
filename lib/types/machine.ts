@@ -29,20 +29,3 @@ export interface IteratorResultHKT<Dom, T> extends HKT<Dom> {
 export type Iterator<out T, out Dom> = Exists<IteratorResultHKT<Dom, T>, Dom>
 
 export type AsynIter<T> = readonly [T, () => PromiseLike<AsynIter<T>>]
-
-const run = <T, Dom>(cont: Iterator<T, Dom>) => cont(next => runCont(next))
-const runCont = async <T, S extends Dom, Dom>({
-  next,
-  cont,
-}: IteratorResult<T, S, Dom>): Promise<never> => {
-  const v: S = await next
-  return cont(v)(runCont)
-}
-const link = <T, S extends Dom, Dom>({
-  data,
-  next,
-  cont,
-}: IteratorResult<T, S, Dom>): AsynIter<T> => {
-  return [data, () => next.then(v => cont(v)(next => link(next)))]
-}
-const iterate = <T>([, next]: AsynIter<T>): PromiseLike<never> => next().then(iterate)

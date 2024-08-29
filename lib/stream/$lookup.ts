@@ -1,16 +1,17 @@
-import type { JsonObj, Arr, notArr, O } from '../../types'
-import { $lookupRaw } from '../aggregate/$match-raw'
-import { concatParts, concatStages } from '../aggregate/prefix'
+import type { JsonObj, O, notArr } from '../../types'
+import { $lookupRaw, $lookupRawDelta } from '../aggregate/$match-raw'
+import { concatStages, concatTStages } from '../aggregate/prefix'
 import type { Field } from '../field'
 import type {
-  SnapshotStreamExecutionResult,
+  Delta,
+  DeltaStages,
   IteratorResult,
-  RawStagesPart,
-  RawStagesSource,
+  RawStages,
   Runner,
   SnapshotStream,
+  SnapshotStreamExecutionResult,
+  TStages,
   Working,
-  Delta,
 } from '../types'
 import { mergeItResults } from '../utils/merge'
 
@@ -33,32 +34,33 @@ const merge = <L extends LD, R extends RD, Result, LD extends Working, RD extend
 
 const join = <T extends JsonObj, U extends JsonObj, S extends notArr, Result extends JsonObj, R, L>(
   { lField, rField, left, right }: Params<T, U, S>,
-  leftSnapshot: RawStagesSource<L, T>,
-  rightSnapshot: RawStagesSource<R, U>,
-  stagesUntilNextLookup: RawStagesPart<Delta<O<{ left: T; right: U }>>, Result>,
+  leftSnapshot: TStages<L, T>,
+  rightSnapshot: TStages<R, U>,
+  stagesUntilNextLookup: DeltaStages<O<{ readonly left: T; readonly right: U }>, Result>,
 ): SnapshotStreamExecutionResult<Result> => {
   const rightJoinField = { field1: lField, field2: rField }
   const joinR_Snapshot = $lookupRaw(rightJoinField, rightSnapshot, 'left', 'right')
-  const resultingSnapshot = concatStages(leftSnapshot, joinR_Snapshot)
+  const resultingSnapshot = concatTStages(leftSnapshot, joinR_Snapshot)
   return {
-    stages: consume => consume(concatStages(resultingSnapshot, stagesUntilNextLookup)),
+    stages: consume => consume(concatTStages(resultingSnapshot, stagesUntilNextLookup.raw)),
     run: <Final extends JsonObj>(
-      finalInput: RawStagesPart<Result, Final>,
+      finalInput: RawStages<Delta<Result>, Final>,
     ): Runner<readonly Final[], Working> => {
       const leftJoinField = { field1: rField, field2: lField }
-      const joinL_Snapshot = $lookupRaw(leftJoinField, leftSnapshot, 'right', 'left')
-      const lRunnerInput = concatParts(joinR_Snapshot, stagesUntilNextLookup)
-      const rRunnerInput = concatParts(joinL_Snapshot, stagesUntilNextLookup)
-      const lRunner = left.run(concatParts(lRunnerInput, finalInput))
-      const rRunner = right.run(concatParts(rRunnerInput, finalInput))
+      const joinL_Delta = $lookupRawDelta(leftJoinField, leftSnapshot, 'right', 'left')
+      const joinR_Delta = $lookupRawDelta(rightJoinField, rightSnapshot, 'left', 'right')
+      const lRunnerInput = concatStages(joinR_Delta, stagesUntilNextLookup.delta)
+      const rRunnerInput = concatStages(joinL_Delta, stagesUntilNextLookup.delta)
+      const lRunner = left.run(concatStages(lRunnerInput, finalInput))
+      const rRunner = right.run(concatStages(rRunnerInput, finalInput))
       return consume => lRunner(lsource => rRunner(rsource => consume(merge({ lsource, rsource }))))
     },
   }
 }
 
 type Params<T extends JsonObj, U extends JsonObj, S extends notArr> = {
-  lField: Field<T, S> //| Field<T, Arr<S>>
-  rField: Field<U, S> //| Field<U, Arr<S>>
+  lField: Field<T, S>
+  rField: Field<U, S>
   left: SnapshotStreamExecutionResult<T>
   right: SnapshotStreamExecutionResult<U>
 }
@@ -66,5 +68,5 @@ export const $lookup =
   <T extends JsonObj, U extends JsonObj, S extends notArr>(
     p: Params<T, U, S>,
   ): SnapshotStream<O<{ left: T; right: U }>> =>
-  <Result extends JsonObj>(input: RawStagesPart<Delta<O<{ left: T; right: U }>>, Result>) =>
+  <Result extends JsonObj>(input: DeltaStages<O<{ left: T; right: U }>, Result>) =>
     p.left.stages(lStages => p.right.stages(rStages => join(p, lStages, rStages, input)))
