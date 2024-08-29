@@ -1,19 +1,26 @@
-import type { json } from '../../types'
+import type { JsonObj, N, rawItem } from '../../types'
 import type { Query } from '../types'
+import { defined } from '../utils/json'
 
+type Many<T> = readonly (T | N)[]
+type Result<Dom> = Dom | { readonly [_: string]: readonly Dom[] } | undefined
+type Combiner = {
+  <T extends JsonObj>(first: Query<T>, ...args: Many<Query<T>>): Query<T>
+  <T extends JsonObj>(...args: Many<Query<T>>): Query<T> | undefined
+}
+type Maker = <T, Dom extends rawItem>(op: string, args: Many<T>, map: (x: T) => Dom) => Result<Dom>
+type Alter = <Dom extends rawItem>(op: string, x: readonly Dom[]) => Result<Dom>
+const make = (alter: Alter): Maker => {
+  return (op, args, map) => alter(op, args.filter(defined).map(map))
+}
 export const combine =
-  (op: string) =>
-  <T extends json>(...args: Query<T>[]): Query<T> => ({
-    raw: prefix => ({ [op]: args.map(x => x.raw(prefix)) }),
-    expr: ()=>0
+  (op: string, make: Maker): Combiner =>
+  <T extends JsonObj>(...args: Many<Query<T>>): Query<T> => ({
+    raw: prefix => make(op, args, x => x.raw(prefix))!,
+    expr: f => ({ raw: () => make(op, args, x => x.expr(f).raw())! }),
   })
-
-export const $and = combine('$and')
-export const $nor = combine('$nor')
-export const $or = combine('$or')
-export const sub = <T extends Record<K, json | null>, K extends string & keyof T>(
-  { raw }: Query<Exclude<T[K], null>>,
-  k: K,
-): Query<T> => ({
-  raw: prefix => raw(field => prefix(`${k}.${field}`)),
-})
+const all: Alter = (op, x) => (x.length === 0 ? undefined : { [op]: x })
+const first: Alter = (op, x) => (x.length === 1 ? x[0] : all(op, x))
+export const $and = combine('$and', make(first))
+export const $nor = combine('$nor', make(all))
+export const $or = combine('$or', make(first))

@@ -1,4 +1,4 @@
-import type { App, HKT, I, JsonObj, Rec, WriteonlyCollection, jsonItem } from '../../types'
+import type { App, HKT, I, ID, JsonObj, Rec, WriteonlyCollection, jsonItem } from '../../types'
 import { eqTyped, ite } from '../expression/logic'
 import { val } from '../expression/val'
 import { root, type Field } from '../field'
@@ -32,8 +32,10 @@ export const $deltaMatchRaw = <T extends JsonObj>(
 export const $projectRaw = <T>(projection: Record<keyof T, 1>) =>
   asRawPart<T, T>([{ $project: projection }])
 
-export const $simpleMergeRaw = <T>(out: WriteonlyCollection<T>) =>
-  asRawPart<T, never>([{ $merge: out.collectionName }])
+export const $replaceWith = <T, V>(expr: Expr<V, T>) => asRawPart<T, V>([{ $replaceWith: expr.raw() }])
+
+export const $simpleMergeRaw = <T, K extends keyof T>(out: WriteonlyCollection<T & ID>) =>
+  asRawPart<Pick<T, K> & ID, never>([{ $merge: out.collectionName }])
 
 export const $lookupRaw = <
   T extends JsonObj,
@@ -57,7 +59,7 @@ export const $lookupRaw = <
         from: coll.collectionName,
         as: k2,
         let: { local: root<Rec<K1, T>>().of(k1).of(field1).raw() },
-        pipeline: [{ $match: { $expr: { $eq: ['$$local', field2.raw()] } } }, ...stages],
+        pipeline: [...stages, { $match: { $expr: { $eq: ['$$local', field2.raw()] } } }],
       },
     },
     { $unwind: `$${k2}` },

@@ -1,10 +1,10 @@
 import type { Arr, JsonObj, O } from '../../types'
-import type { Expr, Query } from '../types'
+import type { Expr, ExprRaw, Query } from '../types'
 import type { Predicate } from '../types/predicate'
 import { id } from '../utils/json'
 
 export class Field<in R extends JsonObj, out V> implements Expr<V, R, unknown> {
-  raw = () => (this.field ? `$${this.field}` : '$$ROOT')
+  raw = (): ExprRaw<V, R, unknown, string> => (this.field ? `$${this.field}` : '$$ROOT')
   has(p: Predicate<V>): Query<R>
   has<V>(this: Field<R, Arr<V>>, p: Predicate<V>): Query<R>
   has(p: Predicate<V>): Query<R> {

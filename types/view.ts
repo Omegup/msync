@@ -16,9 +16,9 @@ export type WriteonlyCollection<in R> = {
   collectionName: string
 }
 
-export type View<T extends JsonObj> = {
-  collection: ReadonlyCollection<T>
+export type View<T extends JsonObj, V extends T & JsonObj = T> = {
+  collection: ReadonlyCollection<V>
   projection: Record<keyof T, 1>
   match?: Query<T>
-  hardMatch?: Query<T>
+  hardMatch?: Query<V>
 }

@@ -1,4 +1,4 @@
-import type { App, HKT, JsonObj, O, RawObj, ReadonlyCollection, Type } from '../../types'
+import type { App, HKT, ID, JsonObj, RawObj, ReadonlyCollection, Type } from '../../types'
 import type { Runner, Working } from './machine'
 
 declare const RawStage: unique symbol
@@ -15,17 +15,18 @@ export type RawStages<out R> = <E>(consume: <S>(value: RawStagesSource<S, R>) =>
 export type SnapshotStreamExecutionResult<V> = {
   readonly run: <Result extends JsonObj>(
     // this is the final input that should end with a merge stage
-    input: RawStagesPart<V, Result>,
+    input: RawStagesPart<Delta<V>, Result>,
   ) => Runner<readonly Result[], Working>
-  readonly stages: RawStages<V>
+  readonly stages: RawStages<Delta<V>>
 }
 
 export type Stream<T extends JsonObj, F extends HKT<JsonObj>> = <Result extends JsonObj>(
   input: RawStagesPart<T, Result>,
 ) => App<F, Result>
 
-export type PreDelta<out T> = Readonly<O & Record<'before' | 'after', T>>
-export type Delta<out T> = PreDelta<T | null>
+export type PreDelta<T, E> = { readonly [_ in 'before' | 'after']: T } & E
+export type Delta<T, E = ID> = PreDelta<T | null, E>
+export type UDelta<T> = Delta<T | null, ID & { readonly updated: boolean }>
 
 // this type of streams is based on the separation between
 // • last snapshot which is the last data successfully synced
@@ -33,7 +34,5 @@ export type Delta<out T> = PreDelta<T | null>
 export type SnapshotStream<T extends JsonObj> = <Result extends JsonObj>(
   // this input doesn't end necessarily with merge stage, cuz it can be used for another lookup
   // so input can be used to construct the stages of the left/rigth join of another lookup
-  input: RawStagesPart<Delta<T>, Result>,
+  input: RawStagesPart<Delta<T>, Delta<Result>>,
 ) => SnapshotStreamExecutionResult<Result>
-
-export interface StreamHKT extends HKT<JsonObj> {}

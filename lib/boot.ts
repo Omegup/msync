@@ -1,9 +1,13 @@
 import type { Timestamp } from 'mongodb'
-import type { JsonObj, O, View } from '../types'
-import { $matchRaw, $projectRaw, $simpleMergeRaw } from './aggregate/$match-raw'
+import type { ID, JsonObj, O, View, doc } from '../types'
+import { $matchRaw, $projectRaw, $replaceWith, $simpleMergeRaw } from './aggregate/$match-raw'
 import { concatParts } from './aggregate/prefix'
+import { field } from './expression/concat'
+import { eq, ite } from './expression/logic'
+import { val } from './expression/val'
 import { root } from './field'
-import { $gteTs } from './predicate'
+import { $eq, $gteTs, $ne } from './predicate'
+import { $and } from './query/logic'
 import { aggregate } from './stream/aggregate'
 import type {
   Delta,
@@ -12,75 +16,87 @@ import type {
   Runner,
   SnapshotStream,
   SnapshotStreamExecutionResult,
+  UDelta,
   Working,
 } from './types'
 
-type TS = O<{ touchedAt: Timestamp; deletedAt?: Timestamp }>
+type D = O<{ deletedAt: Timestamp | undefined }>
+type TS = D & { touchedAt: Timestamp }
 
-const executes = <T extends JsonObj, Result extends JsonObj>(
-  view: View<T & TS>,
-  input: RawStagesPart<T, Result>,
+const executes = <T extends doc, Result extends JsonObj, V extends T & TS & JsonObj>(
+  view: View<T & D, V>,
+  input: RawStagesPart<Delta<T>, Delta<Result>>,
   streamName: string,
 ): SnapshotStreamExecutionResult<Result> => {
-  const { collection, projection } = view
+  const { collection, projection, hardMatch, match } = view
   const db = collection.s.db,
     coll = collection.collectionName
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
-  const snapshotCollection = db.collection<Delta<T> & { updated: boolean }>(
-    coll + '_' + streamName + '_snapshot',
-  )
+  const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
   // TODO create indexes (if snapshot is in sources)
-  const projectInput = $projectRaw(projection)
+  const projectInput = $projectRaw<T & D>({ ...projection, deletedAt: 1 })
+
+  const isNew = (isNew: boolean): Query<UDelta<T>> =>
+    root<UDelta<T>>().of('updated').has($eq<boolean>(isNew))
 
   return {
-    stages: c => c({ coll: snapshotCollection, stages: input }),
+    stages: c =>
+      c({ coll: snapshotCollection, stages: concatParts($matchRaw(isNew(false)), input) }),
     run: <Result2 extends JsonObj>(
-      finalInput: RawStagesPart<Result, Result2>,
+      finalInput: RawStagesPart<Delta<Result>, Result2>,
     ): Runner<readonly Result2[], Working> => {
       return c => {
         async function f() {
           // Step 1 : empty new collection
           await snapshotCollection.deleteMany({ updated: true })
-          // put this in the right place
+
+          // Step 2 : clone into new collection
+          const lastTS = await last.findOne({ _id: streamName })
+          const hardQuery = $and(
+            lastTS && root<TS>().of('touchedAt').has($gteTs(lastTS.ts)),
+            hardMatch,
+          )
+          const startInput: RawStagesPart<V, T & D> = hardQuery
+            ? concatParts($matchRaw(hardQuery), projectInput)
+            : projectInput
+          const notDeleted = root<D>().of('deletedAt').has($ne<Timestamp | null | undefined>(null))
+          const replaceRaw = $replaceWith(
+            field<T & D, Omit<Delta<T>, 'before'> & { updated: true }>({
+              after: ite(
+                $and(notDeleted, match).expr(root()),
+                root<T>(),
+                val(() => null),
+              ),
+              updated: val(() => true),
+              _id: root<ID>().of('_id'),
+            }),
+          )
+          const cloneIntoNew = concatParts(
+            concatParts(startInput, replaceRaw),
+            $simpleMergeRaw<Delta<T>, 'after'>(snapshotCollection),
+          )
+          const result = await aggregate<T>(c => c({ coll: collection, stages: cloneIntoNew }))
+          if (!result.ok) throw result.err
+
+          // Step 3 : run the aggregation // idempotent
+          const aggResult = await aggregate(c =>
+            c({
+              coll: snapshotCollection,
+              stages: concatParts(concatParts($matchRaw(isNew(false)), input), finalInput),
+            }),
+          )
+          if (!aggResult.ok) throw aggResult.err
+          // Step 4 : update snapshot aggregation (if snapshot is in sources)
           await snapshotCollection.deleteMany({ updated: true, after: null })
           await snapshotCollection.updateMany({ updated: true }, [
             { $set: { updated: false, after: null, before: '$after' } },
           ])
-
-          //
-          // Step 2 : clone into new collection
-          const lastTS = await last.findOne({ _id: streamName })
-          let startInput = projectInput
-          if (lastTS) {
-            const query: Query<T & TS> = root<TS>().of('touchedAt').has($gteTs(lastTS.ts))
-            const matchTS = $matchRaw<T & TS>(query)
-            startInput = concatParts(startInput, matchTS)
-          }
-          await collection
-            .aggregate([
-              { $match: { touchedAt: { $gte: lastTS!.ts } } },
-              { $replaceWith: { after: '$$ROOT', updated: true, _id: '$_id' } },
-              { $merge: { into: snapshotCollection.namespace } },
-            ])
-            .toArray()
-          const cloneIntoNew = concatParts(startInput, $simpleMergeRaw<T>(snapshotCollection))
-          const result = await aggregate<T>({
-            db,
-            input: c => c({ coll: collection, stages: cloneIntoNew }),
-          })
-          if (!result.ok) throw result.err
-          // Step 3 : run the aggregation // idempotent
-          const aggResult = await aggregate({
-            db,
-            input: c => c({ coll: newCollection, stages: concatParts(input, finalInput) }),
-          })
-          if (!aggResult.ok) throw aggResult.err
-          // Step 4 : update snapshot aggregation (if snapshot is in sources)
-          const resultSnapshot = await aggregate<T>({
-            db,
-            input: c => c({ coll: newCollection, stages: $simpleMergeRaw<T>(snapshotCollection) }),
-          })
           // Step 5 : update __last
+          await last.updateOne(
+            { _id: streamName },
+            { $set: { ts: result.result.cursor.atClusterTime } },
+            { upsert: true },
+          )
         }
 
         const runner: Runner<readonly Result[], Working> = {}
@@ -131,14 +147,14 @@ const executes = <T extends JsonObj, Result extends JsonObj>(
   // }
 }
 
-type Params<T extends JsonObj & { touchedAt: Timestamp }> = readonly [
-  view: View<T>,
+type Params<T extends doc, V extends T & TS & JsonObj> = readonly [
+  view: View<T & D, V>,
   streamName: string,
 ]
 
 export const from =
-  <T extends JsonObj & { touchedAt: Timestamp }>(
-    ...[view, streamName]: Params<T>
+  <T extends doc, V extends T & TS & JsonObj>(
+    ...[view, streamName]: Params<T, V>
   ): SnapshotStream<T> =>
   executionParam =>
     executes(view, executionParam, streamName)

@@ -1,16 +1,9 @@
-import { Db } from 'mongodb'
 import type { JsonObj } from '../../types'
 import type { RawStages } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
 import { log } from '../utils/log'
 
-export const aggregate = <Result extends JsonObj>({
-  db,
-  input,
-}: {
-  db: Db
-  input: RawStages<Result>
-}) =>
+export const aggregate = <Result extends JsonObj>(input: RawStages<Result>) =>
   input(({ coll, stages }) => {
     const req = {
       aggregate: coll.collectionName,
@@ -19,7 +12,7 @@ export const aggregate = <Result extends JsonObj>({
       readConcern: { level: 'snapshot' },
     }
     log('exec', req)
-    return db.command(req).then(
+    return coll.s.db.command(req).then(
       result => {
         return { result: result as AggregateCommand<Result>, ok: true as const }
       },

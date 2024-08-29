@@ -7,8 +7,8 @@ export const str = <D, C>(expr: Expr<unknown, D, C>): Expr<string, D, C> => ({
   raw: () => ({ $toString: expr.raw() }),
 })
 
-export const field = <D, C, T extends object>(expr: {
-  [K in keyof T]: Expr<T[K], D, C>
+export const field = <D, T extends object, C = unknown>(expr: {
+  [K in string & keyof T]: Expr<T[K], D, C>
 }): Expr<T, D, C> => ({
   raw: () => Object.fromEntries(Object.entries(expr).map(([k, e]) => [k, e.raw()])),
 })

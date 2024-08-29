@@ -1,6 +1,7 @@
 import type { Timestamp } from 'mongodb'
 import type { Type } from './class'
 
+export type N = null | undefined
 export type jsonPrim = number | null | string | boolean | Timestamp | Date
 export type notArr = jsonPrim | JsonObj | undefined
 export type jsonItem = jsonPrim | json
@@ -19,6 +20,8 @@ export interface JsonObj {
   [Type]: typeof object
   readonly [_: string]: jsonItem | undefined
 }
+export type ID = O<{ _id: string }>
+export type doc = JsonObj & ID
 export interface RawObj {
   readonly [_: string]: rawItem | undefined
 }
