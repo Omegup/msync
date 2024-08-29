@@ -16,8 +16,8 @@ const make = (alter: Alter): Maker => {
 export const combine =
   (op: string, make: Maker): Combiner =>
   <T extends JsonObj>(...args: Many<Query<T>>): Query<T> => ({
-    raw: prefix => make(op, args, x => x.raw(prefix))!,
-    expr: f => ({ raw: () => make(op, args, x => x.expr(f).raw())! }),
+    raw: field => make(op, args, x => x.raw(field))!,
+    expr: { raw: f => make(op, args, x => x.expr.raw(f))! },
   })
 const all: Alter = (op, x) => (x.length === 0 ? undefined : { [op]: x })
 const first: Alter = (op, x) => (x.length === 1 ? x[0] : all(op, x))

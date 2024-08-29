@@ -1,4 +1,5 @@
-import type { App, HKT, jsonItem, rawItem } from '../../types'
+import type { App, HKT, JsonObj, jsonItem, rawItem } from '../../types'
+import type { Field } from '../field'
 import type { BoolExpr, Expr } from '../types'
 import { val } from './val'
 
@@ -8,8 +9,12 @@ export const ite = (<T, D1, D2, C>(
   orelse: Expr<T, D2, C>,
 ): Expr<T, D1 | D2, C> => {
   return {
-    raw: () => ({
-      $cond: { if: cond.raw(), then: then.raw(), else: orelse.raw() },
+    raw: <DeltaD extends JsonObj>(f: Field<DeltaD, D1 | D2>) => ({
+      $cond: {
+        if: cond.raw(f),
+        then: then.raw(f as Field<DeltaD, D1>),
+        else: orelse.raw(f as Field<DeltaD, D2>),
+      },
     }),
   }
 }) as {
@@ -27,27 +32,27 @@ export const ite = (<T, D1, D2, C>(
 
 export const eq =
   <T, D, C>(a: Expr<T, D, C>) =>
-  (b: Expr<T, D, C>): BoolExpr<boolean, D, C> => ({
-    raw: () => ({ $eq: [a.raw(), b.raw()] }),
+  (b: Expr<T, D, C>): Expr<boolean, D, C> => ({
+    raw: f => ({ $eq: [a.raw(f), b.raw(f)] }),
   })
 
 export const eqTyped = <T1 extends Dom, T2 extends Dom, F extends HKT<Dom>, C, Dom = jsonItem>(
   a: Expr<T1 | T2, App<F, T1 | T2>, C>,
   b: Expr<T1, App<F, T1 | T2>, C>,
 ): BoolExpr<App<F, T1>, App<F, T2>, C> => ({
-  raw: () => ({ $eq: [a.raw(), b.raw()] }),
+  raw: f => ({ $eq: [a.raw(f), b.raw(f)] }),
 })
 
 export const ne =
   <T, K, D, C>(a: Expr<T, D, C>) =>
   (b: Expr<K, D, C>): Expr<boolean, D, C> => ({
-    raw: () => ({ $ne: [a.raw(), b.raw()] }),
+    raw: f => ({ $ne: [a.raw(f), b.raw(f)] }),
   })
 
 export const $ifNull = <R, D, C>(
   ...expr: [...Expr<R | null | undefined, D, C>[], Expr<R | null | undefined, D, C>]
 ): Expr<R, D, C> => ({
-  raw: () => ({ $ifNull: expr.map(e => e.raw()) }),
+  raw: f => ({ $ifNull: expr.map(e => e.raw(f)) }),
 })
 
 export const exprMapVal = <K extends string, T extends Partial<Record<K, rawItem>>, D, C>(
@@ -55,13 +60,13 @@ export const exprMapVal = <K extends string, T extends Partial<Record<K, rawItem
   map: { [P in K]: Expr<T[P], D, C> },
   or?: Expr<T[K], D, C>,
 ): Expr<T[K & keyof T], D, C> => ({
-  raw: () => ({
+  raw: f => ({
     $switch: {
       branches: Object.entries(map).map(([k, v]) => ({
-        case: { $eq: [expr.raw(), { $literal: k }] },
-        then: v.raw(),
+        case: { $eq: [expr.raw(f), { $literal: k }] },
+        then: v.raw(f),
       })),
-      ...(or && { default: or.raw() }),
+      ...(or && { default: or.raw(f) }),
     },
   }),
 })
@@ -86,11 +91,11 @@ export const setField = <K extends string, T, V, D, C>({
   input: Expr<T, D, C>
   value: Expr<V, D, C>
 }): Expr<T & Record<K, V>, D, C> => ({
-  raw: () => ({
+  raw: f => ({
     $setField: {
-      field: field.raw(),
-      input: input.raw(),
-      value: value.raw(),
+      field: field.raw(f),
+      input: input.raw(f),
+      value: value.raw(f),
     },
   }),
 })

@@ -8,10 +8,10 @@ export const $getField = <T, K extends string & keyof T, D, C = object>(
   expr: Expr<T | null, D, C>,
   field: K,
 ): Expr<T[K] | null, D, C> => ({
-  raw: () => ({
+  raw: f => ({
     $getField: {
       field: field,
-      input: expr.raw(),
+      input: expr.raw(f),
     },
   }),
 })
@@ -20,10 +20,10 @@ export const func = <T extends jsonItem, A extends readonly jsonItem[], D, C = o
   f: (...args: A) => T,
   ...args: { [X in keyof A]: Expr<A[X], D, C> }
 ): Expr<T, D, C> => ({
-  raw: () => ({
+  raw: f => ({
     $function: {
       body: f.toString(),
-      args: args.map(x => x.raw()),
+      args: args.map(x => x.raw(f)),
       lang: 'js',
     },
   }),

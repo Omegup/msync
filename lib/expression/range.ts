@@ -6,7 +6,7 @@ export const range = <D, C>(
   end: Expr<number, D, C>,
   step?: Expr<number, D, C>,
 ): Expr<readonly number[], D, C> => ({
-  raw: () => ({ $range: [start.raw(), end.raw(), step?.raw() ?? 1] }),
+  raw: f => ({ $range: [start.raw(f), end.raw(f), step?.raw(f) ?? 1] }),
 })
 
 export const $map =
@@ -15,11 +15,11 @@ export const $map =
     expr: Expr<readonly T[], D, C>,
     map: (i: Expr<T, D, C>) => Expr<R, D, C>,
   ): Expr<readonly R[], D, C> => ({
-    raw: () => ({
+    raw: f => ({
       $map: {
-        input: expr.raw(),
+        input: expr.raw(f),
         as: 'item',
-        in: map({ raw: () => '$$item' }).raw(),
+        in: map({ raw: () => '$$item' }).raw(f),
       },
     }),
   })

@@ -1,13 +1,13 @@
 import type { Expr } from '../types'
 
 export const max = <D, C>(...expr: Expr<number, D, C>[]): Expr<number, D, C> => ({
-  raw: () => ({ $max: expr.map(e => e.raw()) }),
+  raw: f => ({ $max: expr.map(e => e.raw(f)) }),
 })
 
 export const lt = <D, C>(
   ...expr: [Expr<number, D, C>, Expr<number, D, C>]
 ): Expr<boolean, D, C> => ({
-  raw: () => ({ $lt: expr.map(e => e.raw()) }),
+  raw: f => ({ $lt: expr.map(e => e.raw(f)) }),
 })
 
 export const $lte: {
@@ -16,7 +16,7 @@ export const $lte: {
 } = <D, C>(
   ...expr: [Expr<number | Date, D, C>, Expr<number | Date, D, C>]
 ): Expr<boolean, D, C> => ({
-  raw: () => ({ $lte: expr.map(e => e.raw()) }),
+  raw: f => ({ $lte: expr.map(e => e.raw(f)) }),
 })
 
 type Num = number | null | undefined
@@ -28,7 +28,7 @@ export function subtract<D, C>(...expr: [Expr<Num, D, C>, Expr<Num, D, C>]): Exp
 
 export function subtract<D, C>(...expr: [Expr<Num, D, C>, Expr<Num, D, C>]): Expr<Num, D, C> {
   return {
-    raw: () => ({ $subtract: expr.map(e => e.raw()) }),
+    raw: f => ({ $subtract: expr.map(e => e.raw(f)) }),
   }
 }
 
@@ -37,7 +37,7 @@ export function add<D, C>(...expr: [Expr<Num, D, C>, Expr<Num, D, C>]): Expr<Num
 
 export function add<D, C>(...expr: [Expr<Num, D, C>, Expr<Num, D, C>]): Expr<Num, D, C> {
   return {
-    raw: () => ({ $add: expr.map(e => e.raw()) }),
+    raw: f => ({ $add: expr.map(e => e.raw(f)) }),
   }
 }
 
@@ -46,7 +46,7 @@ export function divide<D, C>(...expr: [Expr<Num, D, C>, Expr<Num, D, C>]): Expr<
 
 export function divide<D, C>(...expr: [Expr<Num, D, C>, Expr<Num, D, C>]): Expr<Num, D, C> {
   return {
-    raw: () => ({ $divide: expr.map(e => e.raw()) }),
+    raw: f => ({ $divide: expr.map(e => e.raw(f)) }),
   }
 }
 
@@ -56,7 +56,7 @@ export function multiply<D, C>(
 export function multiply<D, C>(...expr: [Expr<Num, D, C>, Expr<Num, D, C>]): Expr<Num, D, C>
 export function multiply<D, C>(...expr: [Expr<Num, D, C>, Expr<Num, D, C>]): Expr<Num, D, C> {
   return {
-    raw: () => ({ $multiply: expr.map(e => e.raw()) }),
+    raw: f => ({ $multiply: expr.map(e => e.raw(f)) }),
   }
 }
 
@@ -64,7 +64,7 @@ export function floor<D, C>(expr: Expr<number, D, C>): Expr<number, D, C>
 export function floor<D, C>(expr: Expr<Num, D, C>): Expr<Num, D, C>
 export function floor<D, C>(expr: Expr<Num, D, C>): Expr<Num, D, C> {
   return {
-    raw: () => ({ $floor: expr.raw() }),
+    raw: f => ({ $floor: expr.raw(f) }),
   }
 }
 
@@ -72,6 +72,6 @@ export function ceil<D, C>(expr: Expr<number, D, C>): Expr<number, D, C>
 export function ceil<D, C>(expr: Expr<Num, D, C>): Expr<Num, D, C>
 export function ceil<D, C>(expr: Expr<Num, D, C>): Expr<Num, D, C> {
   return {
-    raw: () => ({ $ceil: expr.raw() }),
+    raw: f => ({ $ceil: expr.raw(f) }),
   }
 }

@@ -4,13 +4,13 @@ import type { Predicate } from '../types/predicate'
 import { id } from '../utils/json'
 
 export class Field<in R extends JsonObj, out V> implements Expr<V, R, unknown> {
-  raw = (): ExprRaw<V, R, unknown, string> => (this.field ? `$${this.field}` : '$$ROOT')
+  raw = <DeltaD extends JsonObj>(f: Field<DeltaD, R>): ExprRaw<V, DeltaD, unknown, string> => (this.field ? `$${this.field}` : '$$ROOT')
   has(p: Predicate<V>): Query<R>
   has<V>(this: Field<R, Arr<V>>, p: Predicate<V>): Query<R>
   has(p: Predicate<V>): Query<R> {
     return {
-      raw: prefix => ({ [prefix(this.field)]: p.raw }),
-      expr: field => p.expr(field.of(this)),
+      raw: f => ({ [`${f.of(this)}`]: p.raw }),
+      expr: p.expr(this),
     }
   }
   private constructor(private field: string) {}
@@ -28,6 +28,5 @@ export class Field<in R extends JsonObj, out V> implements Expr<V, R, unknown> {
 }
 
 export const { root } = Field
-
 
 export type JField<T extends JsonObj, S> = Field<T, S> | Field<T, Arr<S>>

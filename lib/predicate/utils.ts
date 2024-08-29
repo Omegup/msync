@@ -14,6 +14,6 @@ export const operator =
   <T extends D2>(operand: App<App<F, D2>, T>): Predicate<App<App<G, D2>, T>> => {
     return {
       raw: { [op]: operand },
-      expr: field => ({ raw: () => ({ [op]: [field.raw(), operand] }) }),
+      expr: field => ({ raw: f => ({ [op]: [field.raw(f), operand] }) }),
     }
   }

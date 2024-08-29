@@ -11,6 +11,6 @@ export type QueryRaw<T, C> = RawObj & {
 
 export type Query<in T extends JsonObj, in C = unknown> = {
   [Type]?(x: typeof Query, y: T, c: C): void
-  raw: (prefix: (k: string) => string) => QueryRaw<T, C>
-  expr: <DeltaT extends JsonObj>(f: Field<DeltaT, T>)=>Expr<boolean, DeltaT, C>
+  raw: <DeltaT extends JsonObj>(f: Field<DeltaT, T>) => QueryRaw<DeltaT, C>
+  expr: Expr<boolean, T, C>
 }

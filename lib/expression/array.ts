@@ -1,8 +1,8 @@
-import type { App, HKT } from "../../types"
-import type { BoolExpr, Expr } from "../types"
+import type { App, HKT } from '../../types'
+import type { BoolExpr, Expr } from '../types'
 
 export const $size = <T, D, C>(expr: Expr<T[], D, C>): Expr<number, D, C> => ({
-  raw: () => ({ $size: expr.raw() }),
+  raw: f => ({ $size: expr.raw(f) }),
 })
 export const $filter = <T, D, C, K extends string>({
   as,
@@ -15,7 +15,7 @@ export const $filter = <T, D, C, K extends string>({
   cond: Expr<boolean, D, C & Record<K, T>>
   limit?: Expr<number, D, C>
 }): Expr<T[], D, C> => ({
-  raw: () => ({ $filter: { input: expr.raw(), as, cond: cond.raw(), limit: limit?.raw() } }),
+  raw: f => ({ $filter: { input: expr.raw(f), as, cond: cond.raw(f), limit: limit?.raw(f) } }),
 })
 export const $sortArray = <T, D, C, K extends keyof T>({
   sortBy,
@@ -26,28 +26,28 @@ export const $sortArray = <T, D, C, K extends keyof T>({
   sortBy: K
   order?: 1 | -1
 }): Expr<T[], D, C> => ({
-  raw: () => ({ $sortArray: { input: expr.raw(), sortBy: { [sortBy]: order ?? -1 } } }),
+  raw: f => ({ $sortArray: { input: expr.raw(f), sortBy: { [sortBy]: order ?? -1 } } }),
 })
 
 export const $isArray = <T, D, C, F extends HKT<T | readonly T[]>>(
   expr: Expr<T | readonly T[], D & (App<F, T> | App<F, readonly T[]>), C>,
 ): BoolExpr<D & App<F, readonly T[]>, D & App<F, T>, C> => ({
-  raw: () => ({ $isArray: expr.raw() }),
+  raw: f => ({ $isArray: expr.raw(f) }),
 })
 
 export const $array = <T, D, C>(...exprs: Expr<T, D, C>[]): Expr<T[], D, C> => ({
-  raw: (): {} => exprs.map(x => x.raw()),
+  raw: (f): {} => exprs.map(x => x.raw(f)),
 })
 
 export const $concat = <T, D, C>(...exprs: Expr<T[], D, C>[]): Expr<T[], D, C> => ({
-  raw: () => ({ $concatArrays: exprs.map(x => x.raw()) }),
+  raw: f => ({ $concatArrays: exprs.map(x => x.raw(f)) }),
 })
 
 export const $first = <T, D, C>(expr: Expr<T[], D, C>): Expr<T | null, D, C> => ({
-  raw: () => ({ $first: expr.raw() }),
+  raw: f => ({ $first: expr.raw(f) }),
 })
 export const $mergeObjects = <T extends object, D, C>(
   ...exprs: Expr<T, D, C>[]
 ): Expr<T, D, C> => ({
-  raw: () => ({ $mergeObjects: exprs.map(x => x.raw()) }),
+  raw: f => ({ $mergeObjects: exprs.map(x => x.raw(f)) }),
 })

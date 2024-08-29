@@ -1,15 +1,15 @@
 import type { O } from '../../types'
 import type { Expr } from '../types'
 export const concat = <D, C>(...expr: Expr<string, D, C>[]): Expr<string, D, C> => ({
-  raw: () => ({ $concat: expr.map(e => e.raw()) }),
+  raw: f => ({ $concat: expr.map(e => e.raw(f)) }),
 })
 
 export const str = <D, C>(expr: Expr<unknown, D, C>): Expr<string, D, C> => ({
-  raw: () => ({ $toString: expr.raw() }),
+  raw: f => ({ $toString: expr.raw(f) }),
 })
 
 export const field = <D, T extends object, C = unknown>(expr: {
   [K in string & keyof T]: Expr<T[K], D, C>
 }): Expr<O<T>, D, C> => ({
-  raw: () => Object.fromEntries(Object.entries(expr).map(([k, e]) => [k, e.raw()])),
+  raw: f => Object.fromEntries(Object.entries(expr).map(([k, e]) => [k, e.raw(f)])),
 })

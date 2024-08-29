@@ -1,18 +1,18 @@
 import type { Expr } from '../types'
 
 export const datePart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> => ({
-  raw: () => ({ $dateToString: { date: date.raw(), format: '%Y-%m-%d' } }),
+  raw: f => ({ $dateToString: { date: date.raw(f), format: '%Y-%m-%d' } }),
 })
 export const dayAndMonthPart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> => ({
-  raw: () => ({ $dateToString: { date: date.raw(), format: '%m-%d' } }),
+  raw: f => ({ $dateToString: { date: date.raw(f), format: '%m-%d' } }),
 })
 
 export const monthPart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> => ({
-  raw: () => ({ $dateToString: { date: date.raw(), format: '%Y-%m' } }),
+  raw: f => ({ $dateToString: { date: date.raw(f), format: '%Y-%m' } }),
 })
 
 export const timePart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> => ({
-  raw: () => ({ $dateToString: { date: date.raw(), format: '%H-%M' } }),
+  raw: f => ({ $dateToString: { date: date.raw(f), format: '%H-%M' } }),
 })
 
 export const startOf = <D, C>(
@@ -20,9 +20,9 @@ export const startOf = <D, C>(
   freq: Expr<'week' | 'day' | 'month' | 'year', D, C>,
   offset: Expr<number, D, C>,
 ): Expr<Date, D, C> => ({
-  raw: () => ({
+  raw: f => ({
     $let: {
-      vars: { d: startDate.raw(), f: freq.raw(), i: offset.raw() },
+      vars: { d: startDate.raw(f), f: freq.raw(f), i: offset.raw(f) },
       in: {
         $switch: {
           branches: [
@@ -124,7 +124,7 @@ export const startOf = <D, C>(
 })
 
 export const toMS = <D, C>(date: Expr<Date, D, C>): Expr<number, D, C> => ({
-  raw: () => ({ $toLong: date.raw() }),
+  raw: f => ({ $toLong: date.raw(f) }),
 })
 
 export const dateAdd = <D, C>(
@@ -132,17 +132,17 @@ export const dateAdd = <D, C>(
   amount: Expr<number, D, C>,
   unit: Expr<'year' | 'week' | 'month' | 'day' | 'hour' | 'minute' | 'second', D, C>,
 ): Expr<Date, D, C> => ({
-  raw: () => ({
-    $dateAdd: { startDate: date.raw(), unit: unit.raw(), amount: amount.raw() },
+  raw: f => ({
+    $dateAdd: { startDate: date.raw(f), unit: unit.raw(f), amount: amount.raw(f) },
   }),
 })
 
 export const maxDate = <D, C>(expr: Expr<Date[], D, C>): Expr<Date, D, C> => ({
-  raw: () => ({ $max: expr.raw() }),
+  raw: f => ({ $max: expr.raw(f) }),
 })
 
 export const minDate = <D, C>(expr: Expr<Date[], D, C>): Expr<Date, D, C> => ({
-  raw: () => ({ $min: expr.raw() }),
+  raw: f => ({ $min: expr.raw(f) }),
 })
 
 export const dateDiff = <D, C>({
@@ -154,12 +154,12 @@ export const dateDiff = <D, C>({
   end: Expr<Date, D, C>
   unit: Expr<'week' | 'day' | 'month' | 'year', D, C>
 }): Expr<number, D, C> => ({
-  raw: () => ({
+  raw: f => ({
     $let: {
       vars: {
-        f: unit.raw(),
-        end: end.raw(),
-        start: start.raw(),
+        f: unit.raw(f),
+        end: end.raw(f),
+        start: start.raw(f),
       },
       in: {
         $let: {

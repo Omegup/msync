@@ -1,4 +1,5 @@
-import type { Arr, O, Type, notArr, rawItem } from '../../types'
+import type { Arr, JsonObj, O, Type, notArr, rawItem } from '../../types'
+import { root } from '../field'
 import type { Expr } from '../types'
 
 declare const FieldUpdaterRaw: unique symbol
@@ -25,8 +26,10 @@ export const set = <
 > => ({
   raw: Object.entries(fields).flatMap(([k, v]) => v.raw.map(([l, v]) => [`.${k}${l}`, v])),
 })
-export const to = <R, V>(expr: Expr<V, R, unknown>): FieldUpdaterRaw<R, notArr, V> => ({
-  raw: [['', expr.raw()]],
+export const to = <R extends JsonObj, V>(
+  expr: Expr<V, R, unknown>,
+): FieldUpdaterRaw<R, notArr, V> => ({
+  raw: [['', expr.raw(root<R>())]],
 })
 export const items = <R, T, V>(x: FieldUpdaterRaw<R, T, V>) =>
   x as {} as FieldUpdaterRaw<R, Arr<T>, Arr<V>>
