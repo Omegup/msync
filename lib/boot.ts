@@ -1,7 +1,12 @@
 import type { Timestamp } from 'mongodb'
-import type { ID, JsonObj, O, View, doc } from '../types'
-import { $matchRaw, $projectRaw, $replaceWith, $simpleMergeRaw } from './aggregate/$match-raw'
-import { concatStages } from './aggregate/prefix'
+import type { JsonObj, O, View, doc } from '../types'
+import {
+  $match_,
+  $project_,
+  $replaceWith_,
+  $simpleMerge_
+} from './aggregate/$match-raw'
+import { concatStages, link } from './aggregate/prefix'
 import { field } from './expression/concat'
 import { ite } from './expression/logic'
 import { val } from './expression/val'
@@ -10,7 +15,10 @@ import { $eq, $gteTs, $ne } from './predicate'
 import { $and } from './query/logic'
 import { aggregate } from './stream/aggregate'
 import type {
+  After,
+  Before,
   Delta,
+  DeltaStages,
   Query,
   RawStages,
   Runner,
@@ -25,7 +33,7 @@ type TS = D & { touchedAt: Timestamp }
 
 const executes = <T extends doc, Result extends JsonObj, V extends T & TS & JsonObj>(
   view: View<T & D, V>,
-  input: RawStages<Delta<T>, Result>,
+  input: DeltaStages<T, Result>,
   streamName: string,
 ): SnapshotStreamExecutionResult<Result> => {
   const { collection, projection, hardMatch, match } = view
@@ -34,16 +42,19 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
   // TODO create indexes (if snapshot is in sources)
-  const projectInput = $projectRaw<T & D>({ ...projection, deletedAt: 1 })
+  const projectInput = $project_<T & D>({ ...projection, deletedAt: 1 })
 
   const isNew = (isNew: boolean): Query<UDelta<T>> =>
     root<UDelta<T>>().of('updated').has($eq<boolean>(isNew))
 
   return {
     stages: c =>
-      c({ coll: snapshotCollection, stages: concatStages($matchRaw(isNew(false)), input) }),
+      c({
+        coll: snapshotCollection,
+        stages: concatStages($match_(isNew(false)) as RawStages<UDelta<T>, Before<T>>, input.raw),
+      }),
     run: <Result2 extends JsonObj>(
-      finalInput: RawStages<Result, Result2>,
+      finalInput: RawStages<Delta<Result>, Result2>,
     ): Runner<readonly Result2[], Working> => {
       return c => {
         async function f() {
@@ -56,33 +67,30 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
             lastTS && root<TS>().of('touchedAt').has($gteTs(lastTS.ts)),
             hardMatch,
           )
-          const startInput: RawStages<V, T & D> = hardQuery
-            ? concatStages($matchRaw(hardQuery), projectInput)
-            : projectInput
           const notDeleted = root<D>().of('deletedAt').has($ne<Timestamp | null | undefined>(null))
-          const replaceRaw = $replaceWith(
-            field<T & D, Omit<Delta<T>, 'before'> & { updated: true }>({
+          const replaceRaw: RawStages<T & D, After<T> & { updated: true }> = $replaceWith_(
+            field<T & D, After<T> & { updated: true }>({
               after: ite(
-                $and(notDeleted, match).expr(root()),
+                $and(notDeleted, match).expr,
                 root<T>(),
                 val(() => null),
               ),
               updated: val(() => true),
-              _id: root<ID>().of('_id'),
             }),
           )
-          const cloneIntoNew = concatStages(
-            concatStages(startInput, replaceRaw),
-            $simpleMergeRaw<Delta<T>, 'after'>(snapshotCollection),
-          )
+          const cloneIntoNew = link<V>()
+            .with($match_(hardQuery))
+            .with(projectInput)
+            .with(replaceRaw)
+            .with($simpleMerge_<Delta<T>, 'after'>(snapshotCollection)).stages
           const result = await aggregate<T>(c => c({ coll: collection, stages: cloneIntoNew }))
           if (!result.ok) throw result.err
 
           // Step 3 : run the aggregation // idempotent
           const aggResult = await aggregate(c =>
-            c({
+            c<UDelta<T>>({
               coll: snapshotCollection,
-              stages: concatStages(concatStages($matchRaw(isNew(false)), input), finalInput),
+              stages: concatStages(concatStages($match_(isNew(false)), input.delta), finalInput),
             }),
           )
           if (!aggResult.ok) throw aggResult.err
@@ -156,5 +164,5 @@ export const from =
   <T extends doc, V extends T & TS & JsonObj>(
     ...[view, streamName]: Params<T, V>
   ): SnapshotStream<T> =>
-  executionParam =>
-    executes(view, executionParam, streamName)
+  input =>
+    executes(view, input, streamName)

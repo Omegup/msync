@@ -6,12 +6,12 @@ export const operator =
   <
     K extends Operators,
     F extends HKT<Dom, HKT<Dom, Dom>>,
-    Dom extends rawItem = rawItem,
+    Dom extends unknown,
     Default extends Dom = Dom,
     G extends HKT<Dom, HKT<Dom, Dom>> = F,
   >() =>
   <D2 extends Dom = Default>(op: K) =>
-  <T extends D2>(operand: App<App<F, D2>, T>): Predicate<App<App<G, D2>, T>> => {
+  <T extends D2>(operand: rawItem & App<App<F, D2>, T>): Predicate<App<App<G, D2>, T>> => {
     return {
       raw: { [op]: operand },
       expr: field => ({ raw: f => ({ [op]: [field.raw(f), operand] }) }),

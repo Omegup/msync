@@ -36,6 +36,8 @@ export const eq =
     raw: f => ({ $eq: [a.raw(f), b.raw(f)] }),
   })
 
+export const sub = <T, D, C, DeltaD extends JsonObj>(a: Expr<T, D, C>, f: Field<DeltaD, D>): Expr<T, DeltaD, C> => ({raw: g=> a.raw(g.of(f)) })
+
 export const eqTyped = <T1 extends Dom, T2 extends Dom, F extends HKT<Dom>, C, Dom = jsonItem>(
   a: Expr<T1 | T2, App<F, T1 | T2>, C>,
   b: Expr<T1, App<F, T1 | T2>, C>,

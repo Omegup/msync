@@ -14,7 +14,7 @@ export type I<Dom, F extends HKT<Dom>> = F['in'] extends (x: infer X extends Dom
 
 
 
-export interface ArrHKT<Dom> extends HKT<Dom> {
+export interface ArrHKT<Dom = unknown> extends HKT<Dom> {
   readonly out: readonly I<Dom, this>[]
 }
 
@@ -57,6 +57,6 @@ export interface DeepFieldHKT<R, T, K extends keyof T, F extends HKT<R, T>>
 }
 
 export interface FieldHKT<K extends string> extends DeepFieldHKT<Record<K, unknown>, Record<K, unknown>, K, IdHKT<Record<K, unknown>>> {}
-export interface RecordHKT<K extends string> extends HKT<unknown, Record<K, unknown>> {
-  readonly out: Record<K, I<unknown, this>>
+export interface RecordHKT<K extends string, Dom = unknown> extends HKT<Dom, Record<K, Dom>> {
+  readonly out: Record<K, I<Dom, this>>
 }

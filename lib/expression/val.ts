@@ -1,10 +1,10 @@
 import type { jsonItem, rawItem } from '../../types'
 import type { Expr } from '../types'
 
-export const val = <T extends rawItem, D, C = object>(val: () => T): Expr<T, D, C> => ({
+export const val = <T extends rawItem, D, C = unknown>(val: () => T): Expr<T, D, C> => ({
   raw: () => ({ $literal: val() }),
 })
-export const $getField = <T, K extends string & keyof T, D, C = object>(
+export const $getField = <T, K extends string & keyof T, D, C = unknown>(
   expr: Expr<T | null, D, C>,
   field: K,
 ): Expr<T[K] | null, D, C> => ({
@@ -16,7 +16,7 @@ export const $getField = <T, K extends string & keyof T, D, C = object>(
   }),
 })
 
-export const func = <T extends jsonItem, A extends readonly jsonItem[], D, C = object>(
+export const func = <T extends jsonItem, A extends readonly jsonItem[], D, C = unknown>(
   f: (...args: A) => T,
   ...args: { [X in keyof A]: Expr<A[X], D, C> }
 ): Expr<T, D, C> => ({
