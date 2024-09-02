@@ -1,9 +1,14 @@
-import type { jsonItem, rawItem } from '../../types'
+import type { RORec, jsonItem, rawItem } from '../../types'
 import type { Expr } from '../types'
 
 export const val = <T extends rawItem, D, C = unknown>(val: () => T): Expr<T, D, C> => ({
   raw: () => ({ $literal: val() }),
 })
+
+export const ctx = <K extends string, V>(k: K): Expr<V, unknown, RORec<K, V>> => ({
+  raw: () => `$$${k}`,
+})
+
 export const $getField = <T, K extends string & keyof T, D, C = unknown>(
   expr: Expr<T | null, D, C>,
   field: K,

@@ -69,7 +69,7 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
           )
           const notDeleted = root<D>().of('deletedAt').has($ne<Timestamp | null | undefined>(null))
           const replaceRaw: RawStages<T & D, After<T> & { updated: true }> = $replaceWith_(
-            field<T & D, After<T> & { updated: true }>({
+            field<After<T> & { updated: true }, T & D>({
               after: ite(
                 $and(notDeleted, match).expr,
                 root<T>(),

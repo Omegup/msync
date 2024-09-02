@@ -1,5 +1,6 @@
 import type { JsonObj, O, notArr } from '../../types'
-import { $lookupRaw, $lookupRawDelta } from '../aggregate/$match-raw'
+import { $lookupDelta } from '../aggregate/$lookup-delta'
+import { $lookupRaw } from '../aggregate/$lookup-raw'
 import { concatStages, concatTStages } from '../aggregate/prefix'
 import type { Field } from '../field'
 import type {
@@ -47,8 +48,8 @@ const join = <T extends JsonObj, U extends JsonObj, S extends notArr, Result ext
       finalInput: RawStages<Delta<Result>, Final>,
     ): Runner<readonly Final[], Working> => {
       const leftJoinField = { field1: rField, field2: lField }
-      const joinL_Delta = $lookupRawDelta(leftJoinField, leftSnapshot, 'right', 'left')
-      const joinR_Delta = $lookupRawDelta(rightJoinField, rightSnapshot, 'left', 'right')
+      const joinL_Delta = $lookupDelta(leftJoinField, leftSnapshot, 'right', 'left')
+      const joinR_Delta = $lookupDelta(rightJoinField, rightSnapshot, 'left', 'right')
       const lRunnerInput = concatStages(joinR_Delta, stagesUntilNextLookup.delta)
       const rRunnerInput = concatStages(joinL_Delta, stagesUntilNextLookup.delta)
       const lRunner = left.run(concatStages(lRunnerInput, finalInput))

@@ -5,8 +5,8 @@ import { defined } from '../utils/json'
 type Many<T> = readonly (T | N)[]
 type Result<Dom> = Dom | { readonly [_: string]: readonly Dom[] } | undefined
 type Combiner = {
-  <T extends JsonObj>(first: Query<T>, ...args: Many<Query<T>>): Query<T>
-  <T extends JsonObj>(...args: Many<Query<T>>): Query<T> | undefined
+  <T extends JsonObj, C>(first: Query<T, C>, ...args: Many<Query<T, C>>): Query<T, C>
+  <T extends JsonObj, C>(...args: Many<Query<T, C>>): Query<T, C> | undefined
 }
 type Maker = <T, Dom extends rawItem>(op: string, args: Many<T>, map: (x: T) => Dom) => Result<Dom>
 type Alter = <Dom extends rawItem>(op: string, x: readonly Dom[]) => Result<Dom>
@@ -15,7 +15,7 @@ const make = (alter: Alter): Maker => {
 }
 export const combine =
   (op: string, make: Maker): Combiner =>
-  <T extends JsonObj>(...args: Many<Query<T>>): Query<T> => ({
+  <T extends JsonObj, C>(...args: Many<Query<T, C>>): Query<T, C> => ({
     raw: field => make(op, args, x => x.raw(field))!,
     expr: { raw: f => make(op, args, x => x.expr.raw(f))! },
   })
