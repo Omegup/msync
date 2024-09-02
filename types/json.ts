@@ -13,7 +13,7 @@ export interface JsonArr {
   readonly [_: number]: jsonItem | undefined
 }
 export type A = { [Type]: typeof array }
-export type Arr<T, N extends number = number> = A & { readonly [_ in N]: T }
+export type Arr<T = unknown, N extends number = number> = A & { readonly [_ in N]: T }
 export type O<T = unknown> = { [Type]: typeof object } & T
 export type RORec<K extends string, T = unknown> = { readonly [P in K]: T }
 export type Rec<K extends string, T = unknown> = O<{ readonly [P in K]: T }>

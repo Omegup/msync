@@ -1,9 +1,9 @@
-import type { ArrHKT, ConstHKT, IdHKT } from '../../types'
+import type { ArrayHKT, ConstHKT, IdHKT } from '../../types'
 import { operator } from './utils'
 
 const dualIn = operator<
   '$in' | '$nin',
-  ConstHKT<unknown, ArrHKT>,
+  ConstHKT<unknown, ArrayHKT>,
   unknown,
   unknown,
   ConstHKT<unknown, IdHKT>

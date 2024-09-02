@@ -1,16 +1,11 @@
 import type { Timestamp } from 'mongodb'
-import type { JsonObj, O, View, doc } from '../types'
-import {
-  $match_,
-  $project_,
-  $replaceWith_,
-  $simpleMerge_
-} from './aggregate/$match-raw'
+import type { App, ConstHKT, HKT, IdHKT, JsonObj, O, RecHKT, View, doc } from '../types'
+import { $match_, $project_, $replaceWith_, $simpleMerge_ } from './aggregate/$match-raw'
 import { concatStages, link } from './aggregate/prefix'
 import { field } from './expression/concat'
 import { ite } from './expression/logic'
 import { val } from './expression/val'
-import { root } from './field'
+import { expr, root, s } from './field'
 import { $eq, $gteTs, $ne } from './predicate'
 import { $and } from './query/logic'
 import { aggregate } from './stream/aggregate'
@@ -72,7 +67,7 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
             field<T & D, After<T> & { updated: true }>({
               after: ite(
                 $and(notDeleted, match).expr,
-                root<T>(),
+                expr(s<T & D>()),
                 val(() => null),
               ),
               updated: val(() => true),
@@ -166,3 +161,15 @@ export const from =
   ): SnapshotStream<T> =>
   input =>
     executes(view, input, streamName)
+
+type Id<out Dom> = <T extends Dom>(x: T) => T
+declare const f: Id<number | null>
+
+const g: Id<number> = f
+
+type Path<in Dom, in F extends HKT<Dom>> = <T extends Dom>(x: App<F, T>) => T
+type CPath<in R, out V> = (x: R) => V
+declare const fe: Path<number | null, RecHKT<'j'>>
+
+const ge: Path<number, ConstHKT<unknown, never>> = fe
+const gje: CPath<{ j: number | null }, number> = fe

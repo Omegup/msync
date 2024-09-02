@@ -1,4 +1,20 @@
-import type { App, Arr, HKT, JsonObj, N, O, Rec, RecordHKT, Type, notArr } from '../../types'
+import type {
+  App,
+  Arr,
+  ArrHKT,
+  ArrayHKT,
+  HKT,
+  IdHKT,
+  ItemsHKT,
+  JsonObj,
+  N,
+  O,
+  Rec,
+  RecHKT,
+  Type,
+  notArr,
+  µ,
+} from '../../types'
 import type { Expr, ExprRaw, Query } from '../types'
 import type { Predicate } from '../types/predicate'
 import { id } from '../utils/json'
@@ -64,12 +80,62 @@ const prevArr = <T, V, K extends string>(
 ): Field2<Arr<Rec<K, T>>, Arr<V>> => ({ get: x => f.get(x[k]) })
 
 declare const PathType: unique symbol
-export type Path<in F extends HKT<Dom>, out Dom = unknown> = {
+const Path = Symbol()
+export type Path<in F extends HKT<Dom, JsonObj>, in Dom = unknown> = {
   [Type]?(type: typeof PathType): void
   [PathType]?<T extends Dom>(x: App<F, T>): T
+  [Path]: readonly string[]
 }
 
-const s = <K extends string>(k: K): Path<RecordHKT<K>> => ({})
+export const s: {
+  <T extends JsonObj = JsonObj>(): Path<IdHKT<T>, T>
+  <K extends string>(k: K): Path<RecHKT<K>>
+} = (...k: string[]) => ({ [Path]: k })
+
+export const then: {
+  <F extends HKT<GIm, JsonObj>, G extends HKT<GDom, GIm>, GIm extends JsonObj, GDom = unknown>(
+    p1: Path<F, GIm>,
+    p2: Path<G, GDom>,
+  ): Path<µ<[G, F], GDom, GIm, JsonObj>, GDom>
+  <
+    F extends HKT<Arr<GIm>, JsonObj>,
+    G extends HKT<Arr<GDom>, GIm>,
+    GIm extends JsonObj,
+    GDom = unknown,
+  >(
+    p1: Path<F, Arr<GIm>>,
+    p2: Path<G, Arr<GDom>>,
+  ): Path<
+    µ<[µ<[G, ArrHKT<GIm>], Arr<GDom>, GIm, Arr<GIm>>, F], Arr<GDom>, Arr<GIm>, JsonObj>,
+    Arr<GDom>
+  >
+  <F extends HKT<Arr<GIm>, JsonObj>, G extends HKT<GDom, GIm>, GIm extends JsonObj, GDom = unknown>(
+    p1: Path<F, Arr<GIm>>,
+    p2: Path<G, GDom>,
+  ): Path<
+    µ<
+      [µ<[µ<[ItemsHKT<GDom>, G], Arr<GDom>, GDom, GIm>, ArrHKT<GIm>], Arr<GDom>, GIm, Arr<GIm>>, F],
+      Arr<GDom>,
+      Arr<GIm>,
+      JsonObj
+    >,
+    Arr<GDom>
+  >
+} = (p1: Path<never, never>, p2: Path<never, never>) => ({
+  [Path]: [...p1[Path], ...p2[Path]],
+})
+
+const rawPath = (p: { [Path]: readonly string[] }) => {
+  const parts = p[Path]
+  if (!parts.length) return '$$ROOT'
+  return `$${parts.join('.')}`
+}
+
+export const expr = <G extends HKT<T, JsonObj>, T = unknown>(
+  path: Path<G, T>,
+): Expr<T, App<G, T>> => ({
+  raw: f => rawPath(then(f, path)),
+})
 
 export const { root } = Field
 

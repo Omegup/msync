@@ -1,5 +1,5 @@
-import type { JsonObj, Type, rawItem } from '../../types'
-import type { Field } from '../field'
+import type { App, HKT, JsonObj, Type, rawItem } from '../../types'
+import type { Path } from '../field'
 
 declare const Expr: unique symbol
 declare const ExprRaw: unique symbol
@@ -8,10 +8,10 @@ export type ExprRaw<T, Doc, Ctx, V = rawItem> = V & {
 }
 export type Expr<out T, in Doc, in Ctx = unknown> = {
   [Type]?(x: typeof Expr): void
-  raw: <DeltaD extends JsonObj>(f: Field<DeltaD, Doc>) => ExprRaw<T, DeltaD, Ctx>
+  raw: <F extends HKT<unknown, JsonObj>>(f: Path<F>) => ExprRaw<T, App<F, Doc>, Ctx>
 }
 
 export type BoolExpr<in D1, in D2, in Ctx = unknown> = {
   [Type]?(x: typeof Expr): void
-  raw: <DeltaD extends JsonObj>(f: Field<DeltaD, D1 | D2>) => ExprRaw<boolean, DeltaD, Ctx>
+  raw: <F extends HKT<unknown, JsonObj>>(f: Path<F>) => ExprRaw<boolean, App<F, D1 | D2>, Ctx>
 }

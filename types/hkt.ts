@@ -1,3 +1,5 @@
+import type { Arr, Rec } from "."
+
 export interface HKT<in Dom = unknown, out Im = unknown> {
   readonly in: (x: Dom) => void
   readonly out: Im
@@ -14,8 +16,17 @@ export type I<Dom, F extends HKT<Dom>> = F['in'] extends (x: infer X extends Dom
 
 
 
-export interface ArrHKT<Dom = unknown> extends HKT<Dom> {
+export interface ArrayHKT<Dom = unknown> extends HKT<Dom> {
   readonly out: readonly I<Dom, this>[]
+}
+export interface ArrHKT<Dom = unknown> extends HKT<Dom, Arr<Dom>> {
+  readonly out: Arr<I<Dom, this>>
+}
+
+type Items<T> = T extends Arr<infer D> ? D : never
+
+export interface ItemsHKT<Dom = unknown> extends HKT<Arr<Dom>, Dom> {
+  readonly out: Items<I<Arr<Dom>, this>>
 }
 
 export interface IdHKT<Dom = unknown> extends HKT<Dom> {
@@ -57,6 +68,6 @@ export interface DeepFieldHKT<R, T, K extends keyof T, F extends HKT<R, T>>
 }
 
 export interface FieldHKT<K extends string> extends DeepFieldHKT<Record<K, unknown>, Record<K, unknown>, K, IdHKT<Record<K, unknown>>> {}
-export interface RecordHKT<K extends string, Dom = unknown> extends HKT<Dom, Record<K, Dom>> {
-  readonly out: Record<K, I<Dom, this>>
+export interface RecHKT<K extends string, Dom = unknown> extends HKT<Dom, Rec<K, Dom>> {
+  readonly out: Rec<K, I<Dom, this>>
 }
