@@ -1,6 +1,6 @@
 import type { App, HKT, I, JsonObj, RORec, Rec, jsonItem } from '../../types'
 import { eqTyped, ite, sub } from '../expression/logic'
-import { val } from '../expression/val'
+import { nil } from '../expression/val'
 import { root } from '../field'
 import type { BA, Delta, Expr, RawStages } from '../types'
 import { set, to } from '../update'
@@ -17,10 +17,9 @@ const deltaExpr =
   ) =>
   <K extends BA>(field: K): Expr<V | null, Delta<T> & E> => {
     type F = ParDeltaHKT<K, T, E>
-    const nullExpr: Expr<null, App<F, T | null>, unknown> = val(() => null)
     return ite<V | null, null, T, F>(
-      eqTyped<null, T, F, unknown>(root<Delta<T>>().of(field), nullExpr),
-      nullExpr,
+      eqTyped<null, T, F, unknown>(root<Delta<T>>().of(field), nil),
+      nil,
       expr(field),
     )
   }

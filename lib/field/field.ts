@@ -6,6 +6,7 @@ import { id } from '../utils/json'
 export class Field<in R extends JsonObj, out V> implements Expr<V, R, unknown> {
   raw = <DeltaD extends JsonObj>(f: Field<DeltaD, R>): ExprRaw<V, DeltaD, unknown, string> =>
     this.field ? `$${this.field}` : '$$ROOT'
+  str = ''
   has(p: Predicate<V>): Query<R>
   has<V>(this: Field<R, Arr<V>>, p: Predicate<V>): Query<R>
   has(p: Predicate<V>): Query<R> {

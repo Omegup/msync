@@ -1,7 +1,7 @@
 import type { Arr, JsonObj, ReadonlyCollection, Rec, WriteonlyCollection } from '../../types'
-import { root } from '../field'
+import { Field, root } from '../field'
 import type { Expr, Query, RawStages } from '../types'
-import { type Updater } from '../update'
+import type { Updater } from '../update'
 import { asStages } from './prefix'
 
 type s = string
@@ -19,8 +19,13 @@ export const $project_ = <T>(projection: Record<keyof T, 1>) =>
 export const $replaceWith_ = <T extends J, V>(expr: Expr<V, T>) =>
   asStages<T, V>([{ $replaceWith: expr.raw(root()) }])
 
-export const $simpleMerge_ = <T, K extends keyof T>(out: WriteonlyCollection<T>) =>
-  asStages<Pick<T, K>, never>([{ $merge: out.collectionName }])
+export const $merge_ = <T>({
+  into,
+  on,
+}: {
+  into: WriteonlyCollection<T>
+  on?: Field<J, T>
+}) => asStages<T, never>([{ $merge: into.collectionName, on: on?.str }])
 
 export const $unwind_ = <T, K extends s, U>(k: K): RawStages<T & Rec<K, Arr<U>>, T & Rec<K, U>> =>
   asStages<T & Rec<K, Arr<U>>, T & Rec<K, U>>([{ $unwind: `$${k}` }])

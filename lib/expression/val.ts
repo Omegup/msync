@@ -1,9 +1,16 @@
+import type { Timestamp } from 'mongodb'
 import type { RORec, jsonItem, rawItem } from '../../types'
 import type { Expr } from '../types'
 
 export const val = <T extends rawItem, D, C = unknown>(val: () => T): Expr<T, D, C> => ({
   raw: () => ({ $literal: val() }),
 })
+
+export const now: Expr<Timestamp, unknown> = {
+  raw: () => '$$NOW',
+}
+
+export const nil = val(() => null)
 
 export const ctx = <K extends string, V>(k: K): Expr<V, unknown, RORec<K, V>> => ({
   raw: () => `$$${k}`,

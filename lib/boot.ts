@@ -1,10 +1,10 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
 import type { JsonObj, N, O, View, doc } from '../types'
-import { $match_, $project_, $replaceWith_, $simpleMerge_ } from './aggregate/mongo-stages'
+import { $match_, $merge_, $project_, $replaceWith_, $set_ } from './aggregate/mongo-stages'
 import { concatStages, link } from './aggregate/prefix'
 import { field } from './expression/concat'
-import { ite } from './expression/logic'
-import { val } from './expression/val'
+import { $ifNull, ite } from './expression/logic'
+import { nil, val } from './expression/val'
 import { root } from './field'
 import { $eq, $gteTs, $ne } from './predicate'
 import { $and } from './query/logic'
@@ -21,9 +21,10 @@ import type {
   SnapshotStream,
   SnapshotStreamExecutionResult,
   UDelta,
-  Working,
+  Working
 } from './types'
 import type { AggregateCommand } from './types/aggregate'
+import { set, to } from './update'
 import { makeWatchStream } from './watch'
 
 type D = O<{ deletedAt: Timestamp | undefined }>
@@ -91,7 +92,7 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
         .with($match_(hardQuery))
         .with(projectInput)
         .with(replaceRaw)
-        .with($simpleMerge_<Delta<T>, 'after'>(snapshotCollection)).stages
+        .with($merge_<UDelta<T>>({ into: snapshotCollection })).stages
       const next = work(
         aggregate<T>(c => c({ coll: collection, stages: cloneIntoNew })),
         true,
@@ -107,6 +108,7 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
 
     const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
     // Step 4 : run the aggregation // idempotent
+    
     const step4 =
       ({ data: result }: { data: AggregateCommand<T> }): It =>
       c =>
@@ -118,6 +120,14 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
                 coll: snapshotCollection,
                 stages: link<UDelta<T>>()
                   .with($match_(isNew(false)))
+                  .with(
+                    $set_<UDelta<T>, UDelta<T> & Delta<T>>(
+                      set({
+                        before: to($ifNull(root<UDelta<T>>().of('before'), nil)),
+                        after: to($ifNull(root<UDelta<T>>().of('after'), nil)),
+                      }),
+                    ),
+                  )
                   .with(input.delta)
                   .with(finalInput).stages,
               }),

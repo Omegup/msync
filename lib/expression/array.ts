@@ -46,8 +46,8 @@ export const $concat = <T, D, C>(...exprs: Expr<Arr<T>, D, C>[]): Expr<Arr<T>, D
 export const $first = <T, D, C>(expr: Expr<Arr<T>, D, C>): Expr<T | null, D, C> => ({
   raw: f => ({ $first: expr.raw(f) }),
 })
-export const $mergeObjects = <T extends object, D, C>(
-  ...exprs: Expr<T, D, C>[]
-): Expr<T, D, C> => ({
+export const $mergeObjects = <T1, T2, D, C = unknown>(
+  ...exprs: readonly [Expr<T1, D, C>, Expr<T2, D, C>]
+): Expr<T1 & T2, D, C> => ({
   raw: f => ({ $mergeObjects: exprs.map(x => x.raw(f)) }),
 })

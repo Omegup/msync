@@ -23,7 +23,7 @@ export const ite = (<T, D1, D2, C>(
     then: Expr<T, D, C>,
     orelse: Expr<T, D, C>,
   ): Expr<T, D, C>
-  <T, R1 extends Dom, R2 extends Dom, F extends HKT<Dom>, Dom = jsonItem, C = unknown>(
+  <T, R1, R2, F extends HKT<R1 | R2>, C = unknown>(
     cond: BoolExpr<App<F, R1>, App<F, R2>, C>,
     then: Expr<T, App<F, R1>, C>,
     orelse: Expr<T, App<F, R2>, C>,
@@ -38,7 +38,7 @@ export const eq =
 
 export const sub = <T, D, C, DeltaD extends JsonObj>(a: Expr<T, D, C>, f: Field<DeltaD, D>): Expr<T, DeltaD, C> => ({raw: g=> a.raw(g.of(f)) })
 
-export const eqTyped = <T1 extends Dom, T2 extends Dom, F extends HKT<Dom>, C, Dom = jsonItem>(
+export const eqTyped = <T1 extends Dom, T2 extends Dom, F extends HKT<Dom>, C = unknown, Dom = jsonItem>(
   a: Expr<T1 | T2, App<F, T1 | T2>, C>,
   b: Expr<T1, App<F, T1 | T2>, C>,
 ): BoolExpr<App<F, T1>, App<F, T2>, C> => ({
