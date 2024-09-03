@@ -38,7 +38,10 @@ const join = <T extends doc, U extends doc, S extends notArr, Result extends Jso
   { lField, rField, left, right }: Params<T, U, S>,
   leftSnapshot: TStages<L, Before<T>>,
   rightSnapshot: TStages<R, Before<U>>,
-  stagesUntilNextLookup: DeltaStages<O<{ readonly left: T; readonly right: U }>, Result>,
+  stagesUntilNextLookup: DeltaStages<
+    O<{ readonly left: T; readonly right: U; readonly _id: string }>,
+    Result
+  >,
 ): SnapshotStreamExecutionResult<Result> => {
   const rightJoinField = { field1: lField, field2: rField }
   const joinR_Snapshot = $lookupRaw(rightJoinField, rightSnapshot, 'left', 'right', {

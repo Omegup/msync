@@ -1,7 +1,7 @@
 import type { Arr, RORec, Rec, doc } from '../../types'
-import { field, fieldM } from '../expression/concat'
+import { concat, field, fieldM } from '../expression/concat'
 import { eq } from '../expression/logic'
-import { ctx } from '../expression/val'
+import { ctx, val } from '../expression/val'
 import { Field, root } from '../field'
 import { $expr } from '../predicate/$expr'
 import type { Before, Expr, RawStages, TStages } from '../types'
@@ -16,7 +16,7 @@ export const $lookupRaw = <T extends doc, U extends doc, R, S, K1 extends s, K2 
   k1: K1,
   k2: K2,
   dict: RORec<K1, 'a'> & RORec<K2, 'b'>,
-): RawStages<Before<T>, Before<Rec<K1, T> & Rec<K2, U>>> => {
+): RawStages<Before<T>, Before<Rec<K1, T> & Rec<K2, U> & { readonly _id: string }>> => {
   type D = Before<Rec<K1, T>> & Rec<K2, U>
   return link<Before<T>>()
     .with<Before<Rec<K1, T>>>(
@@ -38,15 +38,24 @@ export const $lookupRaw = <T extends doc, U extends doc, R, S, K1 extends s, K2 
       }),
     )
     .with<D>($unwind_<Before<Rec<K1, T>>, K2, U>(k2))
-    .with<Before<Rec<K1, T> & Rec<K2, U>>>(
+    .with<Before<Rec<K1, T> & Rec<K2, U> & { readonly _id: string }>>(
       $replaceWith_(
         field({
-          before: fieldM<RORec<K1, 'a'> & RORec<K2, 'b'>, { a: T; b: U }, D>(
+          before: fieldM<
+            RORec<K1, 'a'> & RORec<K2, 'b'> & { readonly _id: string },
+            { a: T; b: U; _id: string },
+            D
+          >(
             {
               a: root<Before<Rec<K1, T>>>().of('before').of(k1),
               b: root<D>().of(k2),
+              _id: concat(
+                root<Before<Rec<K1, T>>>().of('before').of(k1).of('_id'),
+                val(() => '.'),
+                root<D>().of(k2).of('_id'),
+              ),
             },
-            dict,
+            { ...dict, _id: '_id' },
           ),
         }),
       ),

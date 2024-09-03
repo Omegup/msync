@@ -1,4 +1,4 @@
-import type { Arr, JsonObj, N, RORec, Rec, doc } from '../../types'
+import type { Arr, ID, JsonObj, N, RORec, Rec, doc } from '../../types'
 import { $filter } from '../expression/array'
 import { field } from '../expression/concat'
 import { eq } from '../expression/logic'
@@ -19,7 +19,7 @@ export const $lookupDelta = <T extends JsonObj, U extends doc, R, S, K1 extends 
   { stages, coll }: TStages<R, Before<U>>,
   k1: K1,
   k2: K2,
-): RawStages<Delta<T>, Delta<Rec<K1, T> & Rec<K2, U>>> => {
+): RawStages<Delta<T>, Delta<Rec<K1, T> & Rec<K2, U> & ID>> => {
   type BU = Before<U>
   type DeltaS = RORec<BA, S | N>
   const f2: Expr<S, BU> = root<BU>().of('before').of(field2)
@@ -67,5 +67,5 @@ export const $lookupDelta = <T extends JsonObj, U extends doc, R, S, K1 extends 
         },
       ),
     )
-    .with<Delta<Rec<K1, T> & Rec<K2, U>>>($unwindDelta(k1, k2)).stages
+    .with<Delta<Rec<K1, T> & Rec<K2, U> & ID>>($unwindDelta(k1, k2)).stages
 }

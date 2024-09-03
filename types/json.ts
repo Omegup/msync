@@ -22,7 +22,7 @@ export interface JsonObj {
   [Type]: typeof object
   readonly [_: string]: jsonItem | undefined
 }
-export type ID = O<{ _id: string }>
+export type ID = { readonly _id: string }
 export type doc = JsonObj & ID
 export interface RawObj {
   readonly [_: string]: rawItem | undefined
