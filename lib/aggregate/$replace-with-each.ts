@@ -4,7 +4,7 @@ import { val } from '../expression/val'
 import { root } from '../field'
 import type { BA, Delta, Expr, RawStages } from '../types'
 import { set, to } from '../update'
-import { $set_ } from './$match-raw'
+import { $set_ } from './mongo-stages'
 
 type J = JsonObj
 interface ParDeltaHKT<K extends BA, T extends J, E> extends HKT<jsonItem> {

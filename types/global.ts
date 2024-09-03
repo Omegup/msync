@@ -1,11 +1,11 @@
-import type { App, AppMap, AppMapRW, HKT, PromiseHKT } from '.'
+import type { App, AppMap, AppMapRW, HKT, PromiseHKT, RORec } from '.'
 
 export type AsNum<R> = R extends `${infer A extends number}` ? A : never
 export type GetDom<Dom = unknown> = readonly [readonly Dom[], keyof any]
 
 declare global {
-  type Entry<T> = [string, T[string & keyof T]] &
-    { [k in keyof T]: readonly [string & k, T[k]] }[keyof T]
+  type Entry<T, K extends keyof T = keyof T> = readonly [string, T[string & K]] &
+    { [k in K]: readonly [string & k, T[k]] }[K]
   interface ObjectConstructor {
     entries<T, _ = 0>(object?: T): readonly Entry<T>[]
     fromEntries<T, _ = 0>(entries: readonly Entry<T>[]): T
@@ -14,6 +14,15 @@ declare global {
   interface ReadonlyArray<T> {
     includes<T, V extends T>(this: ReadonlyArray<V>, item: T, fromIndex?: number): item is V
     map<U>(callbackfn: (value: T, index: number, array: readonly T[]) => U, thisArg?: any): U[]
+    map<K extends string, T extends RORec<K>, U extends RORec<K>, _ extends 2 = 2>(
+      this: readonly Entry<T, K>[],
+      callbackfn: <P extends K>(
+        value: [P, T[P]],
+        index: number,
+        array: this,
+      ) => readonly [P, U[P]],
+      thisArg?: any,
+    ): readonly Entry<U, K> []
     map<
       V extends ReadonlyArray<unknown>,
       F extends HKT<unknown>,

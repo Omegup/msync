@@ -1,35 +1,54 @@
-import type { Rec, doc } from '../../types'
-import { field } from '../expression/concat'
+import type { Arr, RORec, Rec, doc } from '../../types'
+import { field, fieldM } from '../expression/concat'
 import { eq } from '../expression/logic'
 import { ctx } from '../expression/val'
 import { Field, root } from '../field'
 import { $expr } from '../predicate/$expr'
-import type { Expr, TStages } from '../types'
-import { $match_, $replaceWith_, $simpleLookup_, $unwind_ } from './$match-raw'
-import { concatStages, link } from './prefix'
+import type { Before, Expr, RawStages, TStages } from '../types'
+import { map1 } from '../utils/json'
+import { $match_, $replaceWith_, $simpleLookup_, $unwind_ } from './mongo-stages'
+import { link } from './prefix'
 
 type s = string
 export const $lookupRaw = <T extends doc, U extends doc, R, S, K1 extends s, K2 extends s>(
-  { field2, field1 }: { field2: Field<U, S>; field1: Field<T, S> },
-  { stages, coll }: TStages<R, U>,
+  { field1, field2 }: { field1: Field<T, S>; field2: Field<U, S> },
+  { stages, coll }: TStages<R, Before<U>>,
   k1: K1,
   k2: K2,
-) =>
-  link<T>()
-    .with(
-      $replaceWith_<T, Rec<K1, T>>(
-        field(Object.fromEntries<Record<K1, Expr<T, T>>>([[k1, root()]])),
+  dict: RORec<K1, 'a'> & RORec<K2, 'b'>,
+): RawStages<Before<T>, Before<Rec<K1, T> & Rec<K2, U>>> => {
+  type D = Before<Rec<K1, T>> & Rec<K2, U>
+  return link<Before<T>>()
+    .with<Before<Rec<K1, T>>>(
+      $replaceWith_<Before<T>, Before<Rec<K1, T>>>(
+        field({
+          before: field(map1<K1, Expr<T, Before<T>>>(k1, root<Before<T>>().of('before'))),
+        }),
       ),
     )
-    .with(
-      $simpleLookup_<Rec<K1, T>, U, R, K2, { readonly local: S }, unknown>({
+    .with<Before<Rec<K1, T>> & Rec<K2, Arr<U>>>(
+      $simpleLookup_<Before<Rec<K1, T>>, U, R, K2, { readonly local: S }, unknown>({
         coll,
         k: k2,
-        vars: { local: root<Rec<K1, T>>().of(k1).of(field1) },
-        pipeline: concatStages(
-          stages,
-          $match_($expr(eq<S, U, { readonly local: S }>(ctx('local'))(field2))),
-        ),
+        vars: { local: root<Before<Rec<K1, T>>>().of('before').of(k1).of(field1) },
+        pipeline: link<R, { readonly local: S }>()
+          .with(stages)
+          .with<U>($replaceWith_(root<Before<U>>().of('before')))
+          .with<U>($match_($expr(eq<S, U, { readonly local: S }>(ctx('local'))(field2)))).stages,
       }),
     )
-    .with($unwind_<Rec<K1, T>, K2, U>(k2)).stages
+    .with<D>($unwind_<Before<Rec<K1, T>>, K2, U>(k2))
+    .with<Before<Rec<K1, T> & Rec<K2, U>>>(
+      $replaceWith_(
+        field({
+          before: fieldM<RORec<K1, 'a'> & RORec<K2, 'b'>, { a: T; b: U }, D>(
+            {
+              a: root<Before<Rec<K1, T>>>().of('before').of(k1),
+              b: root<D>().of(k2),
+            },
+            dict,
+          ),
+        }),
+      ),
+    ).stages
+}

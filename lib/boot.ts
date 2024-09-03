@@ -5,7 +5,7 @@ import {
   $project_,
   $replaceWith_,
   $simpleMerge_
-} from './aggregate/$match-raw'
+} from './aggregate/mongo-stages'
 import { concatStages, link } from './aggregate/prefix'
 import { field } from './expression/concat'
 import { ite } from './expression/logic'

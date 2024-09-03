@@ -5,7 +5,7 @@ import { root } from '../field'
 import { $ne } from '../predicate'
 import { $or } from '../query/logic'
 import type { Delta, Query, RawStages } from '../types'
-import { $match_ } from './$match-raw'
+import { $match_ } from './mongo-stages'
 import { $replaceWithDelta } from './$replace-with-each'
 import { concatStages } from './prefix'
 

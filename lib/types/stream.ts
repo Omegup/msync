@@ -30,7 +30,7 @@ export type Stream<T extends JsonObj, F extends HKT<JsonObj>> = <Result extends 
 ) => App<F, Result>
 
 export type BA = 'before' | 'after'
-export type PreDelta<T, K extends BA, E = unknown> = Rec<K, T> & E
+export type PreDelta<T, K extends BA = BA, E = unknown> = Rec<K, T> & E
 export type Delta<T, K extends BA = BA, E = unknown> = PreDelta<T | null, K, E>
 export type Before<T> = PreDelta<T, 'before'>
 export type After<T> = Delta<T, 'after'>

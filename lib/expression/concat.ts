@@ -1,5 +1,7 @@
-import type { O } from '../../types'
+import type { JsonObj, O, RORec } from '../../types'
+import type { Field } from '../field'
 import type { Expr } from '../types'
+
 export const concat = <D, C>(...expr: Expr<string, D, C>[]): Expr<string, D, C> => ({
   raw: f => ({ $concat: expr.map(e => e.raw(f)) }),
 })
@@ -8,10 +10,29 @@ export const str = <D, C>(expr: Expr<unknown, D, C>): Expr<string, D, C> => ({
   raw: f => ({ $toString: expr.raw(f) }),
 })
 
-export type DDDD<D, T, C = unknown> = {
-  [K in string & keyof T]: Expr<T[K], D, C>
-}
-
-export const field = <T extends object, D, C = unknown>(expr: DDDD<D, T, C>): Expr<O<T>, D, C> => ({
+export const fieldM = <
+  M extends RORec<Dom, Ref>,
+  T extends RORec<Ref, unknown>,
+  D,
+  Dom extends string = string & keyof M,
+  Ref extends string = string & keyof T,
+  C = unknown,
+>(
+  expr: {
+    readonly [K in Ref]: Expr<T[K], D, C>
+  },
+  m: Pick<M, Dom>,
+): Expr<O<{ readonly [K in Dom]: T[M[K]] }>, D, C> => ({
+  raw: <DeltaD extends JsonObj>(f: Field<DeltaD, D>) =>
+    Object.fromEntries(
+      Object.entries(m).map(<K extends Dom>([dom, ref]: readonly [K, M[K]]) => [
+        dom,
+        expr[ref].raw(f),
+      ]),
+    ),
+})
+export const field = <T extends object, D, C = unknown>(expr: {
+  readonly [K in string & keyof T]: Expr<T[K], D, C>
+}): Expr<O<T>, D, C> => ({
   raw: f => Object.fromEntries(Object.entries(expr).map(([k, e]) => [k, e.raw(f)])),
 })

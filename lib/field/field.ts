@@ -16,6 +16,10 @@ export class Field<in R extends JsonObj, out V> implements Expr<V, R, unknown> {
   }
   private constructor(private field: string) {}
   static root = <T extends JsonObj>() => new Field<T, T>('')
+
+  get<R2, C>(expr: Expr<R, R2, C>): Expr<V, R2, C> {
+    return ({raw: f => ()})
+  }
   public of<V, K extends keyof V, _ extends 0>(this: Field<R, Arr<V>>, k: K): Field<R, Arr<V[K]>>
   public of<V, K extends keyof V, _ extends 1>(
     this: Field<R, Arr<V> | N>,
