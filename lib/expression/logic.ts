@@ -1,23 +1,24 @@
 import type { App, HKT, JsonObj, jsonItem, rawItem } from '../../types'
-import type { Field } from '../field'
+import type { Field, Path } from '../field'
 import type { BoolExpr, Expr } from '../types'
+import { asBoolExpr, asExpr, asExprRaw } from './expr-base'
 import { val } from './val'
 
 export const ite = (<T, D1, D2, C>(
   cond: BoolExpr<D1, D2, C>,
   then: Expr<T, D1, C>,
   orelse: Expr<T, D2, C>,
-): Expr<T, D1 | D2, C> => {
-  return {
-    raw: <DeltaD extends JsonObj>(f: Field<DeltaD, D1 | D2>) => ({
-      $cond: {
-        if: cond.raw(f),
-        then: then.raw(f as Field<DeltaD, D1>),
-        else: orelse.raw(f as Field<DeltaD, D2>),
-      },
-    }),
-  }
-}) as {
+) =>
+  asExpr<T, D1 | D2, C>({
+    raw: <DeltaD extends JsonObj, Ctx>(f: Field<DeltaD, D1 | D2, Ctx>) =>
+      asExprRaw<T, DeltaD, C & Ctx>({
+        $cond: {
+          if: cond.raw(f),
+          then: then.raw(f as Field<DeltaD, D1>),
+          else: orelse.raw(f as Field<DeltaD, D2>),
+        },
+      }),
+  })) as {
   <T, D, C = unknown>(
     cond: Expr<boolean, D, C>,
     then: Expr<T, D, C>,
@@ -32,56 +33,72 @@ export const ite = (<T, D1, D2, C>(
 
 export const eq =
   <T, D, C>(a: Expr<T, D, C>) =>
-  (b: Expr<T, D, C>): Expr<boolean, D, C> => ({
-    raw: f => ({ $eq: [a.raw(f), b.raw(f)] }),
-  })
+  (b: Expr<T, D, C>) =>
+    asExpr<boolean, D, C>({
+      raw: f => asExprRaw({ $eq: [a.raw(f), b.raw(f)] }),
+    })
 
-export const sub = <T, D, C, DeltaD extends JsonObj>(a: Expr<T, D, C>, f: Field<DeltaD, D>): Expr<T, DeltaD, C> => ({raw: g=> a.raw(g.of(f)) })
+export const sub = <T, D, Ctx, P extends JsonObj>(a: Expr<T, D, Ctx>, f: Path<P, D, Ctx>) =>
+  asExpr<T, P, Ctx>({ raw: g => asExprRaw(a.raw(f(g))) })
 
-export const eqTyped = <T1 extends Dom, T2 extends Dom, F extends HKT<Dom>, C = unknown, Dom = jsonItem>(
+export const eqTyped = <
+  T1 extends Dom,
+  T2 extends Dom,
+  F extends HKT<Dom>,
+  C = unknown,
+  Dom = jsonItem,
+>(
   a: Expr<T1 | T2, App<F, T1 | T2>, C>,
   b: Expr<T1, App<F, T1 | T2>, C>,
-): BoolExpr<App<F, T1>, App<F, T2>, C> => ({
-  raw: f => ({ $eq: [a.raw(f), b.raw(f)] }),
-})
+): BoolExpr<App<F, T1>, App<F, T2>, C> =>
+  asBoolExpr({
+    raw: <DeltaD extends JsonObj>(f: Field<DeltaD, App<F, T1> | App<F, T2>>) =>
+      asExprRaw<never, DeltaD, C>({ $eq: [a.raw(f), b.raw(f)] }),
+  })
 
 export const ne =
   <T, K, D, C>(a: Expr<T, D, C>) =>
-  (b: Expr<K, D, C>): Expr<boolean, D, C> => ({
-    raw: f => ({ $ne: [a.raw(f), b.raw(f)] }),
-  })
+  (b: Expr<K, D, C>) =>
+    asExpr<boolean, D, C>({
+      raw: f => asExprRaw({ $ne: [a.raw(f), b.raw(f)] }),
+    })
 
 export const $ifNull = <R, D, C>(
   ...expr: [...Expr<R | null | undefined, D, C>[], Expr<R | null | undefined, D, C>]
-): Expr<R, D, C> => ({
-  raw: f => ({ $ifNull: expr.map(e => e.raw(f)) }),
-})
+) =>
+  asExpr<R, D, C>({
+    raw: f => asExprRaw({ $ifNull: expr.map(e => e.raw(f)) }),
+  })
 
 export const exprMapVal = <K extends string, T extends Partial<Record<K, rawItem>>, D, C>(
   expr: Expr<K, D, C>,
-  map: { [P in K]: Expr<T[P], D, C> },
+  map: { readonly [P in K]: Expr<T[P], D, C> },
   or?: Expr<T[K], D, C>,
-): Expr<T[K & keyof T], D, C> => ({
-  raw: f => ({
-    $switch: {
-      branches: Object.entries(map).map(([k, v]) => ({
-        case: { $eq: [expr.raw(f), { $literal: k }] },
-        then: v.raw(f),
-      })),
-      ...(or && { default: or.raw(f) }),
-    },
-  }),
-})
+) =>
+  asExpr<T[K & keyof T], D, C>({
+    raw: f =>
+      asExprRaw({
+        $switch: {
+          branches: Object.entries(map).map(([k, v]) => ({
+            case: { $eq: [expr.raw(f), { $literal: k }] },
+            then: v.raw(f),
+          })),
+          ...(or && { default: or.raw(f) }),
+        },
+      }),
+  })
 
 export const mapVal = <K extends string, T extends Partial<Record<K, rawItem>>, D, C>(
   expr: Expr<K, D, C>,
   map: T,
   or: T[K],
-): Expr<T[K & keyof T], D, C> =>
+): Expr<T[K], D, C> =>
   exprMapVal<K, T, D, C>(
     expr,
-    Object.fromEntries(Object.entries(map as Pick<T, K>).map(([k, v]) => [k, val(() => v)])),
-    val(() => or),
+    Object.fromEntries<{ readonly [P in K]: Expr<T[P], D, C> }>(
+      Object.entries(map as Pick<T, K>).map(([k, v]) => [k, val(v)]),
+    ),
+    val(or),
   )
 
 export const setField = <K extends string, T, V, D, C>({
@@ -92,12 +109,14 @@ export const setField = <K extends string, T, V, D, C>({
   field: Expr<K, D, C>
   input: Expr<T, D, C>
   value: Expr<V, D, C>
-}): Expr<T & Record<K, V>, D, C> => ({
-  raw: f => ({
-    $setField: {
-      field: field.raw(f),
-      input: input.raw(f),
-      value: value.raw(f),
-    },
-  }),
-})
+}) =>
+  asExpr<T & Record<K, V>, D, C>({
+    raw: f =>
+      asExprRaw({
+        $setField: {
+          field: field.raw(f),
+          input: input.raw(f),
+          value: value.raw(f),
+        },
+      }),
+  })
