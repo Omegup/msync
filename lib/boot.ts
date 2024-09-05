@@ -28,9 +28,9 @@ import { set, to } from './update'
 import { makeWatchStream } from './watch'
 
 type D = O<{ deletedAt: Timestamp | undefined }>
-type TS = D & { touchedAt: Timestamp }
+export type TS = D & { touchedAt: Timestamp }
 
-const executes = <T extends doc, Result extends JsonObj, V extends T & TS & JsonObj>(
+const executes = <T extends doc, Result extends JsonObj, V extends T & TS>(
   view: View<T & D, V>,
   input: DeltaStages<T, Result>,
   streamName: string,
@@ -84,6 +84,7 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
           updated: val(true),
         }),
       )
+      console.log(hardQuery)
       const cloneIntoNew = link<V>()
         .with($match_(hardQuery))
         .with(projectInput)
@@ -219,7 +220,7 @@ type Params<T extends doc, V extends T & TS & JsonObj> = readonly [
 ]
 
 export const from =
-  <T extends doc, V extends T & TS & JsonObj>(
+  <T extends doc, V extends T & TS>(
     ...[view, streamName]: Params<T, V>
   ): SnapshotStream<T> =>
   input =>

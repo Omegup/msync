@@ -13,7 +13,7 @@ export const $match_ = <T extends J, C = unknown>(query?: Query<T, C>) =>
 export const $set_ = <T, V, C = unknown>(updater: Updater<T, T, V, C>) =>
   asStages<T, V, C>([{ $set: updater.raw }])
 
-export const $project_ = <T>(projection: Record<keyof T, 1>) =>
+export const $project_ = <T>(projection: Record<string & keyof T, 1>) =>
   asStages<T, T>([{ $project: projection }])
 
 export const $replaceWith_ = <T extends J, V>(expr: Expr<V, T>) =>
@@ -37,7 +37,7 @@ export const $simpleLookup_ = <T extends J, U extends J, R, K extends s, Ctx, C>
       $lookup: {
         from: coll.collectionName,
         as: k,
-        let: Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, v.raw(root())])),
+        let: Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, v.raw(root()).get()])),
         pipeline,
       },
     },

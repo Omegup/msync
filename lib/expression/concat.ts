@@ -41,5 +41,5 @@ export const field = <T extends object, D, C = unknown>(expr: {
   readonly [K in string & keyof T]: Expr<T[K], D, C>
 }) =>
   asExpr<O<T>, D, C>({
-    raw: f => asExprRaw(Object.fromEntries(Object.entries(expr).map(([k, e]) => [k, e.raw(f)]))),
+    raw: f => asExprRaw(Object.fromEntries(Object.entries(expr).map(([k, e]) => [k, e.raw(f).get()]))),
   })

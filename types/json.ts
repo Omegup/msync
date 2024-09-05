@@ -30,6 +30,3 @@ export interface RawObj {
 export type json = JsonArr | JsonObj
 export type raw = readonly rawItem[] | RawObj
 
-export type Inner<T> = T extends readonly unknown[] ? T[number] : never
-
-export type Items<T> = T | Inner<T>
