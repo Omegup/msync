@@ -5,12 +5,12 @@ import { asExpr, asExprRaw } from './expr-base'
 
 export const concat = <D, C>(...expr: Expr<string, D, C>[]) =>
   asExpr<string, D, C>({
-    raw: f => asExprRaw({ $concat: expr.map(e => e.raw(f)) }),
+    raw: f => asExprRaw({ $concat: expr.map(e => e.raw(f).get()) }),
   })
 
 export const str = <D, C>(expr: Expr<unknown, D, C>) =>
   asExpr<string, D, C>({
-    raw: f => asExprRaw({ $toString: expr.raw(f) }),
+    raw: f => asExprRaw({ $toString: expr.raw(f).get() }),
   })
 
 export const fieldM = <

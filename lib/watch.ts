@@ -15,7 +15,7 @@ export type Change<T extends JsonObj> = O<{
 export const subQ = <D extends JsonObj, C, DeltaD extends JsonObj>(
   a: Query<D, C>,
   f: Field<DeltaD, D>,
-): Query<DeltaD, C> => ({ raw: g => a.raw(g.of(f)), expr: sub(a.expr, f) })
+): Query<DeltaD, C> => ({ raw: g => a.raw(g.with(f)), expr: sub(a.expr, f) })
 
 export const makeWatchStream = <T extends doc, V extends T & JsonObj = T>(
   db: Db,
@@ -42,7 +42,7 @@ export const makeWatchStream = <T extends doc, V extends T & JsonObj = T>(
   })
 
   pipeline.push({
-    $match: {$expr: {$ne: ['$fullDocument', '$fullDocumentBeforeChange']}}
+    $match: { $expr: { $ne: ['$fullDocument', '$fullDocumentBeforeChange'] } },
   })
 
   return db.collection(collection.collectionName).watch(pipeline, {

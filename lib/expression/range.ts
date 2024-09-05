@@ -1,8 +1,7 @@
 import type { RORec } from '../../types'
-import { expr } from '../field'
+import { ctx } from '../field'
 import type { Expr } from '../types'
 import { asExpr, asExprRaw } from './expr-base'
-import { ctx } from './val'
 
 // exclusif
 export const range = <D, C>(
@@ -11,7 +10,8 @@ export const range = <D, C>(
   step?: Expr<number, D, C>,
 ) =>
   asExpr<readonly number[], D, C>({
-    raw: f => asExprRaw({ $range: [start.raw(f), end.raw(f), step?.raw(f) ?? 1] }),
+    raw: f =>
+      asExprRaw({ $range: [start.raw(f).get(), end.raw(f).get(), step?.raw(f).get() ?? 1] }),
   })
 
 export const $map =
@@ -21,9 +21,9 @@ export const $map =
       raw: f =>
         asExprRaw({
           $map: {
-            input: ex.raw(f),
+            input: ex.raw(f).get(),
             as: 'item',
-            in: map(expr<D, T, RORec<'item', T>>(() => ctx<T, 'item'>('item'))).raw(f),
+            in: map(ctx<T>()('item').expr()).raw(f).get(),
           },
         }),
     })

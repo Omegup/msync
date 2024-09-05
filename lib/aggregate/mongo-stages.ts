@@ -17,15 +17,10 @@ export const $project_ = <T>(projection: Record<keyof T, 1>) =>
   asStages<T, T>([{ $project: projection }])
 
 export const $replaceWith_ = <T extends J, V>(expr: Expr<V, T>) =>
-  asStages<T, V>([{ $replaceWith: expr.raw(root()) }])
+  asStages<T, V>([{ $replaceWith: expr.raw(root()).get() }])
 
-export const $merge_ = <T>({
-  into,
-  on,
-}: {
-  into: WriteonlyCollection<T>
-  on?: Field<J, T>
-}) => asStages<T, never>([{ $merge: into.collectionName, on: on?.str }])
+export const $merge_ = <T>({ into, on }: { into: WriteonlyCollection<T>; on?: Field<J, T> }) =>
+  asStages<T, never>([{ $merge: into.collectionName, on: on?.str() }])
 
 export const $unwind_ = <T, K extends s, U>(k: K): RawStages<T & Rec<K, Arr<U>>, T & Rec<K, U>> =>
   asStages<T & Rec<K, Arr<U>>, T & Rec<K, U>>([{ $unwind: `$${k}` }])

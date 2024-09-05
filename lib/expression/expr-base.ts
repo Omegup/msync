@@ -1,7 +1,7 @@
 import type { rawItem } from '../../types'
 import type { BoolExpr, Expr, ExprRaw } from '../types'
 
-export const asExprRaw = <T, Doc, Ctx>(raw: rawItem) => raw as ExprRaw<T, Doc, Ctx>
+export const asExprRaw = <T, Doc, Ctx>(raw: rawItem) => ({ get: () => raw }) as ExprRaw<T, Doc, Ctx>
 export const asExpr = <T, Doc, Ctx = unknown>(r: Pick<Expr<T, Doc, Ctx>, 'raw'>) =>
   r as Expr<T, Doc, Ctx>
 

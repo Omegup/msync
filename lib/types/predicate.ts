@@ -7,8 +7,8 @@ declare const PredicateRaw: unique symbol
 export type PredicateRaw = RawObj & {
   [Type]?(x: typeof PredicateRaw): void
 }
-export interface Predicate<in D> {
-  [Type]?(x: typeof Predicate, _: D): void
+export interface Predicate<in V> {
+  [Type]?(x: typeof Predicate, _: V): void
   raw: PredicateRaw
-  expr: <T extends JsonObj>(field: Field<T, D>) => Expr<boolean, T, unknown>
+  expr: <D extends JsonObj, C>(field: Field<D, V, C>) => Expr<boolean, D, C>
 }

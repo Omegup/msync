@@ -22,10 +22,10 @@ export const $mergeDelta = <T extends JsonObj>(
     .with<(T & { deletedAt: null }) | Del>(
       $replaceWith_(
         ite<(T & { deletedAt: null }) | Del, null, T, AfterHKT<T>>(
-          eqTyped<null, T, AfterHKT<T>>(root<Delta<T>>().of('after'), nil),
+          eqTyped<null, T, AfterHKT<T>>(root<Delta<T>>().of('after').expr(), nil),
           field({ deletedAt: now }),
           $mergeObjects<T, { deletedAt: null }, App<AfterHKT<T>, T>>(
-            root<App<AfterHKT<T>, T>>().of('after'),
+            root<App<AfterHKT<T>, T>>().of('after').expr(),
             field({ deletedAt: nil }),
           ),
         ),

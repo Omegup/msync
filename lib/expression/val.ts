@@ -2,7 +2,6 @@ import type { Timestamp } from 'mongodb'
 import type { jsonItem, rawItem } from '../../types'
 import type { Expr } from '../types'
 import { asExpr, asExprRaw } from './expr-base'
-export { ctx } from '../field'
 
 export const val = <T extends rawItem>(val: T): Expr<T, unknown> =>
   asExpr({
@@ -20,7 +19,6 @@ export const now: Expr<Timestamp, unknown> = asExpr({
 
 export const nil = val(null)
 
-
 export const $getField = <T, K extends string & keyof T, D, C = unknown>(
   expr: Expr<T | null, D, C>,
   field: K,
@@ -30,7 +28,7 @@ export const $getField = <T, K extends string & keyof T, D, C = unknown>(
       asExprRaw({
         $getField: {
           field: field,
-          input: expr.raw(f),
+          input: expr.raw(f).get(),
         },
       }),
   })
@@ -40,11 +38,11 @@ export const func = <T extends jsonItem, A extends readonly jsonItem[], D, C = u
   ...args: { [X in keyof A]: Expr<A[X], D, C> }
 ) =>
   asExpr<T, D, C>({
-    raw: f =>
+    raw: field =>
       asExprRaw({
         $function: {
           body: f.toString(),
-          args: args.map(x => x.raw(f)),
+          args: args.map(x => x.raw(field).get()),
           lang: 'js',
         },
       }),

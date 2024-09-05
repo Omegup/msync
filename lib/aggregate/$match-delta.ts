@@ -11,7 +11,7 @@ import { concatStages } from './prefix'
 
 export const $matchDelta = <T extends JsonObj>(query: Query<T>): RawStages<Delta<T>, Delta<T>> => {
   return concatStages(
-    $replaceWithDelta(ite(query.expr, root(), nil)),
+    $replaceWithDelta(ite(query.expr, root<T>().expr(), nil)),
     $match_(
       $or(
         root<Delta<T>>().of('after').has($ne<T | null>(null)),

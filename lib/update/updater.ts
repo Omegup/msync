@@ -32,7 +32,7 @@ export const set = <
 export const to = <R extends JsonObj, V, C = unknown>(
   expr: Expr<V, R, C>,
 ): Updater<R, notArr, V, C> => ({
-  raw: [['', expr.raw(root<R>())]],
+  raw: [['', expr.raw(root<R>()).get()]],
 })
 export const items = <R, T, V, C = unknown>(x: Updater<R, T, V, C>) =>
   x as {} as Updater<R, Arr<T>, Arr<V>, C>

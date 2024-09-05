@@ -7,7 +7,7 @@ declare const ExprRaw: unique symbol
 export type ExprRaw<out T, in Doc, in Ctx = unknown> = {
   [Type]?(x: typeof ExprRaw): void
   [ExprRaw](doc: Doc, ctx: Ctx): T
-  raw: rawItem
+  get: () => rawItem
 }
 export type Expr<out T, in Doc, in Ctx = unknown> = {
   [Type]?(x: typeof Expr): void
@@ -25,5 +25,3 @@ export type BoolExpr<in D1, in D2, in Ctx = unknown> = {
     <DeltaD extends JsonObj, C = unknown>(f: Field<DeltaD, D2, C>): ExprRaw<false, DeltaD, Ctx & C>
   }
 }
-
-const ee = <D1, D2>(x: BoolExpr<D1, D2>): Expr<boolean, D1 | D2> => x

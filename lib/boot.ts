@@ -21,7 +21,7 @@ import type {
   SnapshotStream,
   SnapshotStreamExecutionResult,
   UDelta,
-  Working
+  Working,
 } from './types'
 import type { AggregateCommand } from './types/aggregate'
 import { set, to } from './update'
@@ -80,12 +80,8 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
       const notDeleted = root<D>().of('deletedAt').has($ne<Timestamp | N>(null))
       const replaceRaw: RawStages<T & D, After<T> & { updated: true }> = $replaceWith_(
         field<After<T> & { updated: true }, T & D>({
-          after: ite(
-            $and(notDeleted, match).expr,
-            root<T>(),
-            val(() => null),
-          ),
-          updated: val(() => true),
+          after: ite($and(notDeleted, match).expr, root<T>().expr(), val(null)),
+          updated: val(true),
         }),
       )
       const cloneIntoNew = link<V>()
@@ -108,7 +104,7 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
 
     const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
     // Step 4 : run the aggregation // idempotent
-    
+
     const step4 =
       ({ data: result }: { data: AggregateCommand<T> }): It =>
       c =>
@@ -123,8 +119,8 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS & Json
                   .with(
                     $set_<UDelta<T>, UDelta<T> & Delta<T>>(
                       set({
-                        before: to($ifNull(root<UDelta<T>>().of('before'), nil)),
-                        after: to($ifNull(root<UDelta<T>>().of('after'), nil)),
+                        before: to($ifNull(root<UDelta<T>>().of('before').expr(), nil)),
+                        after: to($ifNull(root<UDelta<T>>().of('after').expr(), nil)),
                       }),
                     ),
                   )

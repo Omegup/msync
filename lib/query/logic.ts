@@ -1,4 +1,5 @@
 import type { JsonObj, N, rawItem } from '../../types'
+import { asExpr, asExprRaw } from '../expression/expr-base'
 import type { Query } from '../types'
 import { defined } from '../utils/json'
 
@@ -17,7 +18,7 @@ export const combine =
   (op: string, make: Maker): Combiner =>
   <T extends JsonObj, C>(...args: Many<Query<T, C>>): Query<T, C> => ({
     raw: field => make(op, args, x => x.raw(field))!,
-    expr: { raw: f => make(op, args, x => x.expr.raw(f))! },
+    expr: asExpr<boolean, T, C>({ raw: f => asExprRaw(make(op, args, x => x.expr.raw(f).get())!) }),
   })
 const all: Alter = (op, x) => (x.length === 0 ? undefined : { [op]: x })
 const first: Alter = (op, x) => (x.length === 1 ? x[0] : all(op, x))

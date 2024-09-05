@@ -1,8 +1,8 @@
 import type { Arr, RORec, Rec, doc } from '../../types'
 import { concat, field, fieldM } from '../expression/concat'
 import { eq } from '../expression/logic'
-import { ctx, val } from '../expression/val'
-import { Field, root } from '../field'
+import { val } from '../expression/val'
+import { Field, ctx, root } from '../field'
 import { $expr } from '../predicate/$expr'
 import type { Before, Expr, RawStages, TStages } from '../types'
 import { map1 } from '../utils/json'
@@ -22,7 +22,7 @@ export const $lookupRaw = <T extends doc, U extends doc, R, S, K1 extends s, K2 
     .with<Before<Rec<K1, T>>>(
       $replaceWith_<Before<T>, Before<Rec<K1, T>>>(
         field({
-          before: field(map1<K1, Expr<T, Before<T>>>(k1, root<Before<T>>().of('before'))),
+          before: field(map1<K1, Expr<T, Before<T>>>(k1, root<Before<T>>().of('before').expr())),
         }),
       ),
     )
@@ -30,11 +30,15 @@ export const $lookupRaw = <T extends doc, U extends doc, R, S, K1 extends s, K2 
       $simpleLookup_<Before<Rec<K1, T>>, U, R, K2, { readonly local: S }, unknown>({
         coll,
         k: k2,
-        vars: { local: root<Before<Rec<K1, T>>>().of('before').of(k1).of(field1) },
+        vars: { local: root<Before<Rec<K1, T>>>().of('before').of(k1).with(field1).expr() },
         pipeline: link<R, { readonly local: S }>()
           .with(stages)
-          .with<U>($replaceWith_(root<Before<U>>().of('before')))
-          .with<U>($match_($expr(eq<S, U, { readonly local: S }>(ctx('local'))(field2)))).stages,
+          .with<U>($replaceWith_(root<Before<U>>().of('before').expr()))
+          .with<U>(
+            $match_(
+              $expr(eq<S, U, { readonly local: S }>(ctx<S>()('local').expr())(field2.expr())),
+            ),
+          ).stages,
       }),
     )
     .with<D>($unwind_<Before<Rec<K1, T>>, K2, U>(k2))
@@ -47,12 +51,12 @@ export const $lookupRaw = <T extends doc, U extends doc, R, S, K1 extends s, K2 
             D
           >(
             {
-              a: root<Before<Rec<K1, T>>>().of('before').of(k1),
-              b: root<D>().of(k2),
+              a: root<Before<Rec<K1, T>>>().of('before').of(k1).expr(),
+              b: root<D>().of(k2).expr(),
               _id: concat(
-                root<Before<Rec<K1, T>>>().of('before').of(k1).of('_id'),
-                val(() => '.'),
-                root<D>().of(k2).of('_id'),
+                root<Before<Rec<K1, T>>>().of('before').of(k1).of('_id').expr(),
+                val('.'),
+                root<D>().of(k2).of('_id').expr(),
               ),
             },
             { ...dict, _id: '_id' },
