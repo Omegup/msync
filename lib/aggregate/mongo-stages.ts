@@ -1,4 +1,4 @@
-import type { Arr, JsonObj, ReadonlyCollection, Rec, WriteonlyCollection } from '../../types'
+import type { Arr, JsonObj, ReadonlyCollection, Rec, WriteonlyCollection, jsonItem } from '../../types'
 import { Field, root } from '../field'
 import type { Expr, Query, RawStages } from '../types'
 import type { Updater } from '../update'
@@ -11,7 +11,7 @@ export const $match_ = <T extends J, C = unknown>(query?: Query<T, C>) =>
   asStages<T, T, C>(query ? [{ $match: query.raw(root()) }] : [])
 
 export const $set_ = <T, V, C = unknown>(updater: Updater<T, T, V, C>) =>
-  asStages<T, V, C>([{ $set: updater.raw }])
+  asStages<T, V, C>([{ $set: Object.fromEntries(updater.raw.map(([k, v]) => [k.slice(1), v])) }])
 
 export const $project_ = <T>(projection: Record<string & keyof T, 1>) =>
   asStages<T, T>([{ $project: projection }])
@@ -19,8 +19,8 @@ export const $project_ = <T>(projection: Record<string & keyof T, 1>) =>
 export const $replaceWith_ = <T extends J, V>(expr: Expr<V, T>) =>
   asStages<T, V>([{ $replaceWith: expr.raw(root()).get() }])
 
-export const $merge_ = <T>({ into, on }: { into: WriteonlyCollection<T>; on?: Field<J, T> }) =>
-  asStages<T, never>([{ $merge: into.collectionName, on: on?.str() }])
+export const $merge_ = <T>({ into, on }: { into: WriteonlyCollection<T>; on: Field<T, jsonItem> }) =>
+  asStages<T, never>([{ $merge: { into: into.collectionName, on: on.str() } }])
 
 export const $unwind_ = <T, K extends s, U>(k: K): RawStages<T & Rec<K, Arr<U>>, T & Rec<K, U>> =>
   asStages<T & Rec<K, Arr<U>>, T & Rec<K, U>>([{ $unwind: `$${k}` }])

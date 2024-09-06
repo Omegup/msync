@@ -34,7 +34,7 @@ export type PreDelta<T, K extends BA = BA, E = unknown> = Rec<K, T> & E
 export type Delta<T, K extends BA = BA, E = unknown> = PreDelta<T | null, K, E>
 export type Before<T> = PreDelta<T, 'before'>
 export type After<T> = Delta<T, 'after'>
-export type UDelta<T> = O & Partial<Delta<T | null, BA, ID>> & { readonly updated: boolean }
+export type UDelta<T> = O & ID & Partial<Delta<T | null, BA, ID>> & { readonly updated: boolean }
 
 // this type of streams is based on the separation between
 // • last snapshot which is the last data successfully synced

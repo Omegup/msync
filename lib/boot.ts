@@ -1,4 +1,4 @@
-import type { ChangeStream, Timestamp } from 'mongodb'
+import type { ChangeStream, Collection, Timestamp } from 'mongodb'
 import type { JsonObj, N, O, View, doc } from '../types'
 import { $match_, $merge_, $project_, $replaceWith_, $set_ } from './aggregate/mongo-stages'
 import { concatStages, link } from './aggregate/prefix'
@@ -27,7 +27,7 @@ import type { AggregateCommand } from './types/aggregate'
 import { set, to } from './update'
 import { makeWatchStream } from './watch'
 
-type D = O<{ deletedAt: Timestamp | undefined }>
+type D = O<{ deletedAt: Timestamp | undefined; _id: string }>
 export type TS = D & { touchedAt: Timestamp }
 
 const executes = <T extends doc, Result extends JsonObj, V extends T & TS>(
@@ -38,6 +38,10 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS>(
   const { collection, projection, hardMatch, match } = view
   const db = collection.s.db,
     coll = collection.collectionName
+  db.command({
+    collMod: coll,
+    changeStreamPreAndPostImages: { enabled: true },
+  })
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
   // TODO create indexes (if snapshot is in sources)
@@ -78,18 +82,18 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS>(
     const step3 = ({ data: lastTS }: { data: { _id: string; ts: Timestamp } | null }): It => {
       const hardQuery = $and(lastTS && root<TS>().of('touchedAt').has($gteTs(lastTS.ts)), hardMatch)
       const notDeleted = root<D>().of('deletedAt').has($ne<Timestamp | N>(null))
-      const replaceRaw: RawStages<T & D, After<T> & { updated: true }> = $replaceWith_(
-        field<After<T> & { updated: true }, T & D>({
+      const replaceRaw: RawStages<T & D, After<T> & { updated: true; _id: string }> = $replaceWith_(
+        field<After<T> & { updated: true; _id: string }, T & D>({
           after: ite($and(notDeleted, match).expr, root<T>().expr(), val(null)),
           updated: val(true),
+          _id: root<T & D>().of('_id').expr(),
         }),
       )
-      console.log(hardQuery)
       const cloneIntoNew = link<V>()
         .with($match_(hardQuery))
         .with(projectInput)
         .with(replaceRaw)
-        .with($merge_<UDelta<T>>({ into: snapshotCollection })).stages
+        .with($merge_({ into: snapshotCollection, on: root<UDelta<T>>().of('_id') })).stages
       const next = work(
         aggregate<T>(c => c({ coll: collection, stages: cloneIntoNew })),
         true,
@@ -116,7 +120,7 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS>(
               c<UDelta<T>>({
                 coll: snapshotCollection,
                 stages: link<UDelta<T>>()
-                  .with($match_(isNew(false)))
+                  .with($match_(isNew(true)))
                   .with(
                     $set_<UDelta<T>, UDelta<T> & Delta<T>>(
                       set({
@@ -198,7 +202,9 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS>(
           stop,
           data: l.aggResult.cursor.firstBatch,
           next: work(l.stream.tryNext(), undefined),
-          cont: doc => (doc ? stop() : step8(l)()),
+          cont: ({ data: doc }) => {
+            return doc ? stop() : step8(l)()
+          },
         })
     }
 
@@ -220,8 +226,6 @@ type Params<T extends doc, V extends T & TS & JsonObj> = readonly [
 ]
 
 export const from =
-  <T extends doc, V extends T & TS>(
-    ...[view, streamName]: Params<T, V>
-  ): SnapshotStream<T> =>
+  <T extends doc, V extends T & TS>(...[view, streamName]: Params<T, V>): SnapshotStream<T> =>
   input =>
     executes(view, input, streamName)

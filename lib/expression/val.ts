@@ -14,7 +14,7 @@ export const val = <T extends rawItem>(val: T): Expr<T, unknown> =>
   })
 
 export const now: Expr<Timestamp, unknown> = asExpr({
-  raw: () => asExprRaw<Timestamp, unknown, unknown>('$$NOW'),
+  raw: () => asExprRaw<Timestamp, unknown, unknown>('$$CLUSTER_TIME'),
 })
 
 export const nil = val(null)

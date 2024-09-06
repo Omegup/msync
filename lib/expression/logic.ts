@@ -64,7 +64,7 @@ export const ne =
     })
 
 export const $ifNull = <R, D, C>(
-  ...expr: [...Expr<R | null | undefined, D, C>[], Expr<R | null | undefined, D, C>]
+  ...expr: [...Expr<R | null | undefined, D, C>[], Expr<R, D, C>]
 ) =>
   asExpr<R, D, C>({
     raw: f => asExprRaw({ $ifNull: expr.map(e => e.raw(f).get()) }),

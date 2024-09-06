@@ -12,7 +12,14 @@ export const aggregate = <Result extends JsonObj>(input: Stages<Result>) =>
       readConcern: { level: 'snapshot' },
     }
     log('exec', req)
-    return coll.s.db.command(req).then(result => {
-      return result as AggregateCommand<Result>
-    })
+    return coll.s.db.command(req).then(
+      result => {
+        log('execed', req)
+        return result as AggregateCommand<Result>
+      },
+      err => {
+        log('err', req)
+        throw new Error(err)
+      },
+    )
   })
