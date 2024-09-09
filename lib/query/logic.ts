@@ -1,4 +1,4 @@
-import type { JsonObj, N, rawItem } from '../../types'
+import type { J, N, rawItem } from '../../types'
 import { asExpr, asExprRaw } from '../expression/expr-base'
 import type { Query } from '../types'
 import { defined } from '../utils/json'
@@ -6,8 +6,8 @@ import { defined } from '../utils/json'
 type Many<T> = readonly (T | N)[]
 type Result<Dom> = Dom | { readonly [_: string]: readonly Dom[] }
 type Combiner = {
-  <T extends JsonObj, C>(first: Query<T, C>, ...args: Many<Query<T, C>>): Query<T, C>
-  <T extends JsonObj, C>(...args: Many<Query<T, C>>): Query<T, C> | undefined
+  <T extends J, C>(first: Query<T, C>, ...args: Many<Query<T, C>>): Query<T, C>
+  <T extends J, C>(...args: Many<Query<T, C>>): Query<T, C> | undefined
 }
 type Maker = <T>(
   op: string,
@@ -22,7 +22,7 @@ const make = (alter: Alter): Maker => {
 }
 export const combine =
   (op: string, make: Maker): Combiner =>
-  <T extends JsonObj, C>(...args: Many<Query<T, C>>): Query<T, C> => {
+  <T extends J, C>(...args: Many<Query<T, C>>): Query<T, C> => {
     const q = make<Query<T, C>>(op, args)
     return (
       q! && {

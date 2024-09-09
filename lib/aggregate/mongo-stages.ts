@@ -1,45 +1,109 @@
-import type { Arr, JsonObj, ReadonlyCollection, Rec, WriteonlyCollection, jsonItem } from '../../types'
+import type {
+  App,
+  Arr,
+  HKT,
+  IdHKT,
+  J,
+  ReadonlyCollection,
+  Rec,
+  StrKey,
+  WriteonlyCollection,
+  jsonItem,
+} from '../../types'
 import { Field, root } from '../field'
 import type { Expr, Query, RawStages } from '../types'
 import type { Updater } from '../update'
+import { dbcoll } from '../utils/coll'
+import { id } from '../utils/json'
 import { asStages } from './prefix'
 
 type s = string
-type J = JsonObj
+
+export const $match1 =
+  <T extends J, C = unknown>(query?: Query<T, C>) =>
+  <F extends HKT<J, J>>(f: <T extends J>() => Field<App<F, T>, T>) =>
+    asStages<App<F, T>, App<F, T>, C>(query ? [{ $match: query.raw(f<T>()) }] : [])
 
 export const $match_ = <T extends J, C = unknown>(query?: Query<T, C>) =>
-  asStages<T, T, C>(query ? [{ $match: query.raw(root()) }] : [])
+  $match1(query)<IdHKT<J>>(root)
 
-export const $set_ = <T, V, C = unknown>(updater: Updater<T, T, V, C>) =>
-  asStages<T, V, C>([{ $set: Object.fromEntries(updater.raw.map(([k, v]) => [k.slice(1), v])) }])
+export const $set1 =
+  <T extends J, V extends J, C = unknown>(updater: Updater<T, T, V, C>) =>
+  <F extends HKT<J, J>>(f: <T extends J>() => Field<App<F, T>, T>) =>
+    asStages<App<F, T>, App<F, V>, C>([
+      { $set: Object.fromEntries(updater.raw(f<T>()).map(([k, v]) => [k.slice(1), v])) },
+    ])
 
-export const $project_ = <T>(projection: Record<string & keyof T, 1>) =>
+export const $set_ = <T extends J, V extends J, C = unknown>(updater: Updater<T, T, V, C>) =>
+  $set1(updater)<IdHKT<J>>(root)
+
+export const $project1 =
+  <T extends J>(projection: Record<StrKey<T>, 1>) =>
+  <F extends HKT<J, J>>(f: <T extends J>() => Field<App<F, T>, T>) =>
+    asStages<App<F, T>, App<F, T>>([
+      {
+        $project: Object.fromEntries(
+          Object.entries(projection).map(([k, v]) => [f<T>().of(k).str(), v]),
+        ),
+      },
+    ])
+
+export const $project_ = <T>(projection: Record<StrKey<T>, 1>) =>
   asStages<T, T>([{ $project: projection }])
 
-export const $replaceWith_ = <T extends J, V>(expr: Expr<V, T>) =>
-  asStages<T, V>([{ $replaceWith: expr.raw(root()).get() }])
+export const $replaceWith1 =
+  <T extends J, V extends J, C = unknown>(expr: Expr<V, T, C>) =>
+  <F extends HKT<J, J>>(f: <T extends J>() => Field<App<F, T>, T>) => {
+    const parts = f<T>().str().split('.').filter(id)
+    return asStages<App<F, T>, App<F, V>, C>([
+      { $replaceWith: parts.reduce((v, k) => ({ [k]: v }), expr.raw(f<T>()).get()) },
+    ])
+  }
 
-export const $merge_ = <T>({ into, on }: { into: WriteonlyCollection<T>; on: Field<T, jsonItem> }) =>
-  asStages<T, never>([{ $merge: { into: into.collectionName, on: on.str() } }])
+export const $replaceWith_ = <T extends J, V extends J, C = unknown>(expr: Expr<V, T, C>) =>
+  $replaceWith1(expr)<IdHKT<J>>(root)
 
-export const $unwind_ = <T, K extends s, U>(k: K): RawStages<T & Rec<K, Arr<U>>, T & Rec<K, U>> =>
-  asStages<T & Rec<K, Arr<U>>, T & Rec<K, U>>([{ $unwind: `$${k}` }])
+export const $unwind1 =
+  <T, K extends s, U>(k: K) =>
+  <F extends HKT<J, J>>(f: <T extends J>() => Field<App<F, T>, T>) =>
+    asStages<App<F, T & Rec<K, Arr<U>>>, App<F, T & Rec<K, U>>>([
+      { $unwind: `$${f<Rec<K, Arr<U>>>().of(k).str()}` },
+    ])
+
+export const $unwind_ = <T, K extends s, U>(k: K) => $unwind1<T, K, U>(k)<IdHKT<J>>(root)
+
+export const $simpleLookup1 =
+  <T extends J, U extends J, R, K extends s, Ctx, C>(args: {
+    coll: ReadonlyCollection<R>
+    pipeline: RawStages<R, U, Ctx & C>
+    vars: { readonly [P in keyof Ctx]: Expr<Ctx[P], T, C> }
+    k: K
+  }) =>
+  <F extends HKT<J, J>>(f: <T extends J>() => Field<App<F, T>, T>) => {
+    const { coll, k, pipeline, vars } = args
+    return asStages<App<F, T>, App<F, T & Rec<K, Arr<U>>>, C>([
+      {
+        $lookup: {
+          from: coll.collectionName,
+          as: f<Rec<K, Arr<U>>>().of(k).str(),
+          let: Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, v.raw(f<T>()).get()])),
+          pipeline,
+        },
+      },
+    ])
+  }
 
 export const $simpleLookup_ = <T extends J, U extends J, R, K extends s, Ctx, C>(args: {
   coll: ReadonlyCollection<R>
   pipeline: RawStages<R, U, Ctx & C>
   vars: { readonly [P in keyof Ctx]: Expr<Ctx[P], T, C> }
   k: K
-}) => {
-  const { coll, k, pipeline, vars } = args
-  return asStages<T, T & Rec<K, Arr<U>>>([
-    {
-      $lookup: {
-        from: coll.collectionName,
-        as: k,
-        let: Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, v.raw(root()).get()])),
-        pipeline,
-      },
-    },
-  ])
-}
+}) => $simpleLookup1(args)<IdHKT<J>>(root)
+
+export const $merge_ = <T>({
+  into,
+  on,
+}: {
+  into: WriteonlyCollection<T>
+  on: Field<T, jsonItem>
+}) => asStages<T, never>([{ $merge: { into: dbcoll(into), on: on.str() } }])

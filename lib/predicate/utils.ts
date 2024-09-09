@@ -1,4 +1,4 @@
-import type { App, HKT, JsonObj, rawItem } from '../../types'
+import type { App, HKT, J, rawItem } from '../../types'
 import { asExpr, asExprRaw } from '../expression/expr-base'
 import type { Field } from '../field'
 import type { Predicate } from '../types'
@@ -17,7 +17,7 @@ export const operator =
     type V = App<App<G, D2>, T>
     return {
       raw: { [op]: operand },
-      expr: <D extends JsonObj, C>(field: Field<D, V, C>) =>
+      expr: <D extends J, C>(field: Field<D, V, C>) =>
         asExpr<boolean, D, C>({
           raw: f => asExprRaw({ [op]: [field.expr().raw(f).get(), operand] }),
         }),

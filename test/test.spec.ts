@@ -1,9 +1,8 @@
-import { Timestamp } from 'mongodb'
 import { $mergeDelta, type Merge } from '../lib/aggregate/$merge-delta'
 import { link } from '../lib/aggregate/prefix'
 import { from, type TS } from '../lib/boot'
-import type { Before, Delta } from '../lib/types'
-import type { O } from '../types'
+import type { Delta } from '../lib/types'
+import type { App, HKT, J, O } from '../types'
 import { prepare, run } from './mongo'
 
 const client = await prepare('test')
@@ -16,8 +15,9 @@ const r = db.collection<Merge<D1>>('r')
 
 const t = from<D1, D1 & TS>({ collection: c1, projection: { _id: 1, deletedAt: 1, link: 1 } }, 'n1')
 
-const stream = t({ delta: link<Delta<D1>>().stages, raw: link<Before<D1>>().stages }).run(
-  $mergeDelta(r),
-)
+const stream = t({
+  delta: link<Delta<D1>>().stages,
+  raw: <F extends HKT<J>>() => link<App<F, D1>>().stages,
+}).run($mergeDelta(r))
 
 run(stream)

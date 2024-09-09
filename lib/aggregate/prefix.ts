@@ -1,9 +1,9 @@
-import type { HKT, JsonObj, RawObj } from '../../types'
+import type { HKT, J, RawObj } from '../../types'
 import type { RawStages, TStages, Stream } from '../types'
 
 export const fromStages =
-  <T extends JsonObj, V extends JsonObj>(stages: RawStages<T, V>) =>
-  <F extends HKT<JsonObj>>(source: Stream<T, F>): Stream<V, F> =>
+  <T extends J, V extends J>(stages: RawStages<T, V>) =>
+  <F extends HKT<J>>(source: Stream<T, F>): Stream<V, F> =>
   input =>
     source(concatStages(stages, input))
 

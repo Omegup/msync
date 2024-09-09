@@ -1,5 +1,5 @@
 import type { Timestamp } from 'mongodb'
-import type { jsonItem, rawItem } from '../../types'
+import type { StrKey, jsonItem, rawItem } from '../../types'
 import type { Expr } from '../types'
 import { asExpr, asExprRaw } from './expr-base'
 
@@ -19,7 +19,7 @@ export const now: Expr<Timestamp, unknown> = asExpr({
 
 export const nil = val(null)
 
-export const $getField = <T, K extends string & keyof T, D, C = unknown>(
+export const $getField = <T, K extends StrKey<T>, D, C = unknown>(
   expr: Expr<T | null, D, C>,
   field: K,
 ) =>

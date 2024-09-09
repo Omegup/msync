@@ -1,4 +1,4 @@
-import type { Arr, ID, JsonObj, N, RORec, Rec, doc } from '../../types'
+import type { Arr, ID, J, N, RORec, Rec, doc } from '../../types'
 import { $filter } from '../expression/array'
 import { field } from '../expression/concat'
 import { eq } from '../expression/logic'
@@ -13,7 +13,7 @@ import { $match_, $simpleLookup_ } from './mongo-stages'
 import { concatStages, link } from './prefix'
 
 type s = string
-export const $lookupDelta = <T extends JsonObj, U extends doc, R, S, K1 extends s, K2 extends s>(
+export const $lookupDelta = <T extends J, U extends doc, R, S, K1 extends s, K2 extends s>(
   { field1, field2 }: { field1: Path<T, S>; field2: Path<U, S> },
   { stages, coll }: TStages<R, Before<U>>,
   k1: K1,

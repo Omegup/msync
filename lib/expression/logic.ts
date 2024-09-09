@@ -1,4 +1,4 @@
-import type { App, HKT, JsonObj, jsonItem, rawItem } from '../../types'
+import type { App, HKT, J, jsonItem, rawItem } from '../../types'
 import type { Field, Path } from '../field'
 import type { BoolExpr, Expr } from '../types'
 import { asBoolExpr, asExpr, asExprRaw } from './expr-base'
@@ -10,7 +10,7 @@ export const ite = (<T, D1, D2, C>(
   orelse: Expr<T, D2 | D2, C>,
 ) =>
   asExpr<T, D1 | D2, C>({
-    raw: <DeltaD extends JsonObj, Ctx>(f: Field<DeltaD, D1 | D2, Ctx>) =>
+    raw: <DeltaD extends J, Ctx>(f: Field<DeltaD, D1 | D2, Ctx>) =>
       asExprRaw<T, DeltaD, C & Ctx>({
         $cond: {
           if: cond.raw(f).get(),
@@ -38,7 +38,7 @@ export const eq =
       raw: f => asExprRaw({ $eq: [a.raw(f).get(), b.raw(f).get()] }),
     })
 
-export const sub = <T, D, Ctx, P extends JsonObj>(a: Expr<T, D, Ctx>, f: Path<P, D, Ctx>) =>
+export const sub = <T, D, Ctx, P extends J>(a: Expr<T, D, Ctx>, f: Path<P, D, Ctx>) =>
   asExpr<T, P, Ctx>({ raw: g => asExprRaw(a.raw(g.with(f)).get()) })
 
 export const eqTyped = <
@@ -52,7 +52,7 @@ export const eqTyped = <
   b: Expr<T1, App<F, T1 | T2>, C>,
 ): BoolExpr<App<F, T1>, App<F, T2>, C> =>
   asBoolExpr({
-    raw: <DeltaD extends JsonObj>(f: Field<DeltaD, App<F, T1> | App<F, T2>>) =>
+    raw: <DeltaD extends J>(f: Field<DeltaD, App<F, T1> | App<F, T2>>) =>
       asExprRaw<never, DeltaD, C>({ $eq: [a.raw(f).get(), b.raw(f).get()] }),
   })
 

@@ -1,7 +1,7 @@
 import type { Long, Timestamp } from 'mongodb'
-import type { JsonObj } from '../../types'
+import type { J } from '../../types'
 
-export type AggregateCommand<T extends JsonObj> = {
+export type AggregateCommand<T extends J> = {
   cursor: {
     id: Long | number
     firstBatch: T[]

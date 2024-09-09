@@ -1,4 +1,4 @@
-import type { App, HKT, I, JsonObj, RORec, Rec, jsonItem } from '../../types'
+import type { App, HKT, I, J, RORec, Rec, jsonItem } from '../../types'
 import { eqTyped, ite, sub } from '../expression/logic'
 import { nil } from '../expression/val'
 import { root } from '../field'
@@ -6,7 +6,6 @@ import type { BA, Delta, Expr, RawStages } from '../types'
 import { set, to } from '../update'
 import { $set_ } from './mongo-stages'
 
-type J = JsonObj
 interface ParDeltaHKT<K extends BA, T extends J, E> extends HKT<jsonItem> {
   readonly out: RORec<K, I<jsonItem, this>> & Delta<T> & E
 }

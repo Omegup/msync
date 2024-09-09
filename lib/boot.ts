@@ -1,5 +1,5 @@
-import type { ChangeStream, Collection, Timestamp } from 'mongodb'
-import type { JsonObj, N, O, View, doc } from '../types'
+import type { ChangeStream, Timestamp } from 'mongodb'
+import type { J, N, O, View, doc } from '../types'
 import { $match_, $merge_, $project_, $replaceWith_, $set_ } from './aggregate/mongo-stages'
 import { concatStages, link } from './aggregate/prefix'
 import { field } from './expression/concat'
@@ -25,12 +25,13 @@ import type {
 } from './types'
 import type { AggregateCommand } from './types/aggregate'
 import { set, to } from './update'
+import { asBefore } from './utils/before'
 import { makeWatchStream } from './watch'
 
 type D = O<{ deletedAt: Timestamp | undefined; _id: string }>
 export type TS = D & { touchedAt: Timestamp }
 
-const executes = <T extends doc, Result extends JsonObj, V extends T & TS>(
+const executes = <T extends doc, Result extends J, V extends T & TS>(
   view: View<T & D, V>,
   input: DeltaStages<T, Result>,
   streamName: string,
@@ -50,7 +51,7 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS>(
   const isNew = (isNew: boolean): Query<UDelta<T>> =>
     root<UDelta<T>>().of('updated').has($eq<boolean>(isNew))
 
-  const run = <Result2 extends JsonObj>(
+  const run = <Result2 extends J>(
     finalInput: RawStages<Delta<Result>, Result2>,
   ): Runner<readonly Result2[], Working> => {
     const work = <T>(x: Promise<T>, work: true | undefined) => x.then(data => ({ data, work }))
@@ -214,13 +215,16 @@ const executes = <T extends doc, Result extends JsonObj, V extends T & TS>(
     stages: c =>
       c({
         coll: snapshotCollection,
-        stages: concatStages($match_(isNew(false)) as RawStages<UDelta<T>, Before<T>>, input.raw),
+        stages: concatStages(
+          $match_(isNew(false)) as RawStages<UDelta<T>, Before<T>>,
+          asBefore(input.raw),
+        ),
       }),
     run,
   }
 }
 
-type Params<T extends doc, V extends T & TS & JsonObj> = readonly [
+type Params<T extends doc, V extends T & TS & J> = readonly [
   view: View<T & D, V>,
   streamName: string,
 ]
