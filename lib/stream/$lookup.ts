@@ -1,7 +1,7 @@
 import type { J, O, doc, notArr } from '../../types'
 import { $lookupDelta } from '../aggregate/$lookup-delta'
 import { $lookupRaw } from '../aggregate/$lookup-raw'
-import { concatStages, concatTStages } from '../aggregate/prefix'
+import { concatStages, concatTStages, emptyDelta } from '../aggregate/prefix'
 import type { Field } from '../field'
 import type {
   Before,
@@ -68,15 +68,26 @@ const join = <T extends doc, U extends doc, S extends notArr, Result extends J, 
   }
 }
 
-type Params<T extends J, U extends J, S extends notArr> = {
+type Params1<T extends J, U extends J, S extends notArr> = {
   lField: Field<T, S>
   rField: Field<U, S>
-  left: SnapshotStreamExecutionResult<T>
   right: SnapshotStreamExecutionResult<U>
 }
-export const $lookup =
+type Params<T extends J, U extends J, S extends notArr> = Params1<T, U, S> & {
+  left: SnapshotStreamExecutionResult<T>
+}
+export const $lookup1 =
   <T extends doc, U extends doc, S extends notArr>(
     p: Params<T, U, S>,
   ): SnapshotStream<O<{ left: T; right: U }>> =>
   <Result extends J>(input: DeltaStages<O<{ left: T; right: U }>, Result>) =>
     p.left.stages(lStages => p.right.stages(rStages => join(p, lStages, rStages, input)))
+export const $lookup =
+  <T extends doc, U extends doc, S extends notArr>(p: Params1<T, U, S>) =>
+  (l: SnapshotStream<T>): SnapshotStream<O<{ left: T; right: U }>> =>
+  <Result extends J>(input: DeltaStages<O<{ left: T; right: U }>, Result>) => {
+    const left = l(emptyDelta())
+    return left.stages(lStages =>
+      p.right.stages(rStages => join({ left, ...p }, lStages, rStages, input)),
+    )
+  }

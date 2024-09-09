@@ -1,4 +1,4 @@
-import type { Arr, J, N, O, RORec, StrKey } from '../../types'
+import type { Arr, J, N, O, RORec, StrKey, U, Undef } from '../../types'
 import { asExpr, asExprRaw } from '../expression/expr-base'
 import type { Expr, ExprRaw, Query } from '../types'
 import type { Predicate } from '../types/predicate'
@@ -31,40 +31,40 @@ export class Field<in R, out V, in C = unknown> {
       const concat: Concat = (_, f2) => new Field(f2.field, f2.raw, f2.concat)
       return new Field<unknown, T, RORec<K, T>>(k, s => `$$${s}`, concat)
     }
-  public of<V, K extends keyof V, _ extends 0>(
+  public of<V, K extends keyof V, _ extends 0 = 0>(
     this: Field<R, Arr<V>, C>,
     k: K,
   ): Field<R, Arr<V[K]>, C>
-  public of<V, K extends keyof V, _ extends 1>(
-    this: Field<R, Arr<V> | N>,
+  public of<V, K extends keyof V, _ extends 1 = 1>(this: Field<R, O<V>, C>, k: K): Field<R, V[K], C>
+  public of<V, K extends keyof V, I extends U = never, _ extends 2 = 2>(
+    this: Field<R, Arr<V> | Undef<I>, C>,
     k: K,
-  ): Field<R, Arr<V[K]> | N, C>
-  public of<V, K extends keyof V, _ extends 2>(this: Field<R, O<V>, C>, k: K): Field<R, V[K], C>
-  public of<V, K extends keyof V, _ extends 3>(
-    this: Field<R, O<V> | N, C>,
+  ): Field<R, Arr<V[K]> | I, C>
+  public of<V, K extends keyof V, I extends U = never, _ extends 3 = 3>(
+    this: Field<R, O<V> | Undef<I>, C>,
     k: K,
-  ): Field<R, V[K] | N, C>
+  ): Field<R, V[K] | I, C>
 
   public of<K extends StrKey<V>>(k: K): Field<R, V[K] | Arr<V[K]> | N, C> {
     return new Field([this.field, k].filter(id).join('.'), this.raw, this.concat)
   }
 
-  public with<V, W, _ extends 4, C2 = unknown>(
+  public with<V, W, C2 = unknown, _ extends 0 = 0>(
     this: Field<R, O<V>, C>,
     k: Field<O<V>, W, C2>,
   ): Field<R, W, C & C2>
-  public with<V, W, _ extends 5, C2 = unknown>(
-    this: Field<R, O<V> | N, C>,
-    k: Field<O<V>, W, C2>,
-  ): Field<R, W | N, C & C2>
-  public with<V, W, _ extends 6, C2 = unknown>(
-    this: Field<R, O<V>, C>,
-    k: Field<O<V>, W, C2>,
-  ): Field<R, W, C & C2>
-  public with<V, W, _ extends 7, C2 = unknown>(
-    this: Field<R, Arr<V> | N, C>,
+  public with<V, W, C2 = unknown, _ extends 1 = 1>(
+    this: Field<R, Arr<V>, C>,
     k: Field<O<V>, Arr<W> | O<W>, C2>,
-  ): Field<R, Arr<W> | N, C & C2>
+  ): Field<R, Arr<W>, C & C2>
+  public with<V, W, I extends U = never, C2 = unknown, _ extends 2 = 2>(
+    this: Field<R, O<V> | Undef<I>, C>,
+    k: Field<O<V>, W, C2>,
+  ): Field<R, W | I, C & C2>
+  public with<V, W, I extends U = never, C2 = unknown, _ extends 3 = 3>(
+    this: Field<R, Arr<V> | Undef<I>, C>,
+    k: Field<O<V>, Arr<W> | O<W>, C2>,
+  ): Field<R, Arr<W> | I, C & C2>
   public with<W>(k: Field<O<V>, W, C>): Field<R, W, C> {
     return k.concat<R, O<V>, W, C, C>(this as Field<R, O<V>, C>, k)
   }
@@ -76,9 +76,11 @@ export class Field<in R, out V, in C = unknown> {
     return asExprRaw(this.raw(this.field))
   }
   expr<R, V, C = unknown>(this: Field<R, V, C>): Expr<V, R, C>
-  expr<R extends J, V, C = unknown>(this: Field<R, V, C>): Expr<V, R, C> {
-    return asExpr<V, R, C>({
-      raw: f => f.with<R, V, 4, C>(this).exprRaw(),
+  expr<R extends J, V, Ctx = unknown>(this: Field<R, V, Ctx>): Expr<V, R, Ctx> {
+    return asExpr<V, R, Ctx>({
+      raw: <DeltaD extends J, I extends U, C = unknown>(
+        f: Field<DeltaD, R | Undef<I>, C>,
+      ): ExprRaw<V | I, DeltaD, Ctx & C> => f.with<R, V, I, Ctx, 2>(this).exprRaw(),
     })
   }
 }

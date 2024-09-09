@@ -1,4 +1,4 @@
-import type { J, O, RORec, StrKey, rawItem } from '../../types'
+import type { J, O, RORec, StrKey, U, Undef, rawItem } from '../../types'
 import type { Field } from '../field'
 import type { Expr } from '../types'
 import { map } from '../utils/map-object'
@@ -28,7 +28,7 @@ export const fieldM = <
   m: Pick<M, Dom>,
 ) =>
   asExpr<O<{ readonly [K in Dom]: T[M[K]] }>, D, C>({
-    raw: <DeltaD extends J, Ctx>(f: Field<DeltaD, D, Ctx>) =>
+    raw: <DeltaD extends J, I extends U, Ctx>(f: Field<DeltaD, D | Undef<I>, Ctx>) =>
       asExprRaw<O<{ readonly [K in Dom]: T[M[K]] }>, DeltaD, Ctx & C>(
         Object.fromEntries(
           Object.entries(m).map(<K extends Dom>([dom, ref]: readonly [K, M[K]]) => [

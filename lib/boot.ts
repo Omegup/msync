@@ -1,7 +1,7 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
 import type { J, N, O, View, doc } from '../types'
 import { $match_, $merge_, $project_, $replaceWith_, $set_ } from './aggregate/mongo-stages'
-import { concatStages, link } from './aggregate/prefix'
+import { concatStages, emptyDelta, link, pipe } from './aggregate/prefix'
 import { field } from './expression/concat'
 import { $ifNull, ite } from './expression/logic'
 import { nil, val } from './expression/val'
@@ -18,7 +18,6 @@ import type {
   Query,
   RawStages,
   Runner,
-  SnapshotStream,
   SnapshotStreamExecutionResult,
   UDelta,
   Working,
@@ -224,12 +223,5 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
   }
 }
 
-type Params<T extends doc, V extends T & TS & J> = readonly [
-  view: View<T & D, V>,
-  streamName: string,
-]
-
-export const from =
-  <T extends doc, V extends T & TS>(...[view, streamName]: Params<T, V>): SnapshotStream<T> =>
-  input =>
-    executes(view, input, streamName)
+export const from = <T extends doc, V extends T & TS>(view: View<T & D, V>, streamName: string) =>
+  pipe<V, V>(input => executes(view, input, streamName), emptyDelta())

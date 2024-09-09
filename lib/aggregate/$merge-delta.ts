@@ -6,6 +6,7 @@ import {
   type ID,
   type O,
   type RORec,
+  type U,
   type WriteonlyCollection,
   type doc,
 } from '../../types'
@@ -34,7 +35,7 @@ export const $mergeDelta = <T extends doc>(
     eqTyped<null, T, AfterHKT<T | null>>(root<Delta<T>>().of('after').expr(), nil),
     field<Del, Delta<T>>({
       deletedAt: now,
-      _id: $ifNull(root<Delta<T>>().of('before').of('_id').expr(), val('')),
+      _id: $ifNull(root<Delta<T>>().of('before').of<T, '_id', U, 3>('_id').expr(), val('')),
       touchedAt: now,
     }),
     $mergeObjects<T, D & TS, App<AfterHKT<T>, T>>(

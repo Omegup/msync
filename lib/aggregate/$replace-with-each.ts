@@ -3,7 +3,7 @@ import { eqTyped, ite, sub } from '../expression/logic'
 import { nil } from '../expression/val'
 import { root } from '../field'
 import type { BA, Delta, Expr, RawStages } from '../types'
-import { set, to } from '../update'
+import { set, subU, to, weaken, type Updater } from '../update'
 import { $set_ } from './mongo-stages'
 
 interface ParDeltaHKT<K extends BA, T extends J, E> extends HKT<jsonItem> {
@@ -23,19 +23,29 @@ const deltaExpr =
     )
   }
 
+export const $setEach = <T extends jsonItem, V extends jsonItem, E = unknown, C = unknown>(
+  updater: <K extends BA>(k: K) => Updater<Delta<T> & E, T | null, V | null, C>,
+) => {
+  return $set_<Delta<T> & E, Delta<V>, C>(
+    set({
+      after: updater('after'),
+      before: updater('before'),
+    }),
+  )
+}
+
 export const $replaceWithEach = <T extends J, V extends jsonItem, E>(
   expr: <K extends BA>(field: K) => Expr<V, Rec<K, T> & Delta<T> & E>,
 ): RawStages<Delta<T> & E, Delta<V>> => {
   const t = deltaExpr<T, V, E>(expr)
-  return $set_<Delta<T> & E, Delta<V>>(
-    set({
-      after: to(t('after')),
-      before: to(t('before')),
-    }),
-  )
+  return $setEach<T, V, E>(k => to(t(k)))
 }
 
 export const $replaceWithDelta = <T extends J, V extends jsonItem>(expr: Expr<V, T>) =>
   $replaceWithEach<T, V, unknown>(<K extends BA>(field: K) =>
     sub(expr, root<App<ParDeltaHKT<K, T, unknown>, T>>().of(field)),
   )
+
+export const $setWithDelta = <T extends J, V extends J, C = unknown>(
+  updater: Updater<T, T, V, C>,
+) => $setEach(k => subU(weaken(updater), root<Delta<T>>().of(k)))

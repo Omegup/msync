@@ -1,4 +1,4 @@
-import type { J, Type, rawItem } from '../../types'
+import type { J, Type, U, Undef, rawItem } from '../../types'
 import type { Field } from '../field'
 
 declare const Expr: unique symbol
@@ -12,7 +12,9 @@ export type ExprRaw<out T, in Doc, in Ctx = unknown> = {
 export type Expr<out T, in Doc, in Ctx = unknown> = {
   [Type]?(x: typeof Expr): void
   [Expr](doc: Doc, ctx: Ctx): T
-  raw: { <DeltaD extends J, C = unknown>(f: Field<DeltaD, Doc, C>): ExprRaw<T, DeltaD, Ctx & C> }
+  raw: {
+    <DeltaD extends J, I extends U, C = unknown>(f: Field<DeltaD, Doc | Undef<I>, C>): ExprRaw<T | I, DeltaD, Ctx & C>
+  }
 }
 
 export type BoolExpr<in D1, in D2, in Ctx = unknown> = {
@@ -20,8 +22,8 @@ export type BoolExpr<in D1, in D2, in Ctx = unknown> = {
   [Expr](doc: D1, ctx: Ctx): true
   [Expr](doc: D2, ctx: Ctx): false
   raw: {
-    <DeltaD extends J, C = unknown>(f: Field<DeltaD, D1 | D2, C>): ExprRaw<boolean, DeltaD, Ctx & C>
-    <DeltaD extends J, C = unknown>(f: Field<DeltaD, D1, C>): ExprRaw<true, DeltaD, Ctx & C>
-    <DeltaD extends J, C = unknown>(f: Field<DeltaD, D2, C>): ExprRaw<false, DeltaD, Ctx & C>
+    <DeltaD extends J, I extends U, C = unknown>(f: Field<DeltaD, D1 | D2 | Undef<I>, C>): ExprRaw<boolean, DeltaD, Ctx & C>
+    <DeltaD extends J, I extends U, C = unknown>(f: Field<DeltaD, D1 | Undef<I>, C>): ExprRaw<true, DeltaD, Ctx & C>
+    <DeltaD extends J, I extends U, C = unknown>(f: Field<DeltaD, D2 | Undef<I>, C>): ExprRaw<false, DeltaD, Ctx & C>
   }
 }

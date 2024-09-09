@@ -28,8 +28,8 @@ export type SnapshotStreamExecutionResult<V> = {
   readonly stages: Stages<Before<V>>
 }
 
-export type Stream<T extends J, F extends HKT<J>> = <Result extends J>(
-  input: RawStages<T, Result>,
+export type Stream<F extends HKT<J>, T extends J> = <Result extends J>(
+  input: DeltaStages<T, Result>,
 ) => App<F, Result>
 
 export type BA = 'before' | 'after'
