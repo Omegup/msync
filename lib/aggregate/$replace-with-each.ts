@@ -3,7 +3,7 @@ import { eqTyped, ite, sub } from '../expression/logic'
 import { nil } from '../expression/val'
 import { root } from '../field'
 import type { BA, Delta, Expr, RawStages } from '../types'
-import { set, subU, to, weaken, type Updater } from '../update'
+import { set, subUpdater, to, weaken, type Updater } from '../update'
 import { $set_ } from './mongo-stages'
 
 interface ParDeltaHKT<K extends BA, T extends J, E> extends HKT<jsonItem> {
@@ -48,4 +48,4 @@ export const $replaceWithDelta = <T extends J, V extends jsonItem>(expr: Expr<V,
 
 export const $setWithDelta = <T extends J, V extends J, C = unknown>(
   updater: Updater<T, T, V, C>,
-) => $setEach(k => subU(weaken(updater), root<Delta<T>>().of(k)))
+) => $setEach(k => subUpdater(weaken(updater), root<Delta<T>>().of(k)))

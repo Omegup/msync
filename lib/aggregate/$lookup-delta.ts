@@ -50,7 +50,7 @@ export const $lookupDelta = <T extends J, U extends doc, R, S, K1 extends s, K2 
         ): Expr<Rec<K1, T> & Rec<K2, Arr<U>>, Rec<K, Rec<K1, T>> & Rec<K2, Arr<BU>>> => {
           return field<RORec<K1, T> & RORec<K2, Arr<U>>, Rec<K, Rec<K1, T>> & Rec<K2, Arr<BU>>>(
             Object.fromEntries([
-              [k1, root<Rec<K, Rec<K1, T>>>().of(f).of(k1)],
+              [k1, root<Rec<K, Rec<K1, T>>>().of(f).of(k1).expr()],
               [
                 k2,
                 $filter<U, Rec<K, Rec<K1, T>> & Rec<K2, Arr<BU>>, 'before'>({

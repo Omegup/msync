@@ -8,7 +8,7 @@ export type Updater<in R, in T, out V, in C = unknown> = {
   readonly raw: <D extends J>(f: Field<D, R | N>) => readonly (readonly [string, rawItem])[]
 }
 
-export const subU = <P extends J, D, T, V, Ctx>(
+export const subUpdater = <P extends J, D, T, V, Ctx>(
   a: Updater<D, T, V, Ctx>,
   f: Path<P, D | null>,
 ): Updater<P, T, V, Ctx> => ({ raw: <R extends J>(g: Field<R, P | N>) => a.raw(g.with(f)) })
