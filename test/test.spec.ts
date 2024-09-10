@@ -16,7 +16,7 @@ const r2 = db.collection<Merge<LeftWrite<D1, D2>>>('r2')
 
 const stream = from<D1, D1 & TS>(
   { collection: c1, projection: { _id: 1, deletedAt: 1, link: 1 } },
-  'p1',
+  'q1',
 )
   .with(
     $lookup({
@@ -25,7 +25,7 @@ const stream = from<D1, D1 & TS>(
           collection: c2,
           projection: { _id: 1, deletedAt: 1, link: 1 },
         },
-        'p2',
+        'q2',
       ).get(),
       lField: root<D1>().of('link'),
       rField: root<D2>().of('link'),

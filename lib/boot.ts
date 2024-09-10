@@ -15,6 +15,7 @@ import type {
   Delta,
   DeltaStages,
   Iterator,
+  NextData,
   Query,
   RawStages,
   Runner,
@@ -26,6 +27,7 @@ import type { AggregateCommand } from './types/aggregate'
 import { set, to } from './update'
 import { asBefore } from './utils/before'
 import { makeWatchStream } from './watch'
+import { addTeardown } from './utils/tear-down'
 
 type D = O<{ deletedAt: Timestamp | undefined; _id: string }>
 export type TS = D & { touchedAt: Timestamp }
@@ -36,6 +38,7 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
   streamName: string,
 ): SnapshotStreamExecutionResult<Result> => {
   const { collection, projection, hardMatch, match } = view
+  const work = {}
   const db = collection.s.db,
     coll = collection.collectionName
   db.command({
@@ -53,33 +56,31 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
   const run = <Result2 extends J>(
     finalInput: RawStages<Delta<Result>, Result2>,
   ): Runner<readonly Result2[], Working> => {
-    const work = <T>(x: Promise<T>, work: true | undefined) => x.then(data => ({ data, work }))
     type It = Iterator<readonly Result2[], Working>
+    type NextD = NextData<readonly Result2[], Working>
+    type Next = Promise<NextD>
+    const withStop = (next: () => Next, tr?: () => void): It => {
+      return addTeardown(() => ({ stop, next: next() }), tr)
+    }
+    const next = (next: () => Next, tr?: () => void): NextD => ({
+      cont: withStop(next, tr),
+      data: [],
+      info: { work },
+    })
+
     // Step 0 : declare we are starting a work
-    const step0 = (): It => c =>
-      c({
-        ...d,
-        next: work(Promise.resolve(), true),
-        cont: step1,
-      })
-    const d = { data: [], stop: step0 }
+    const step0 = (): Next => Promise.resolve(next(step1))
+    const stop: It = withStop(step0)
+
     // Step 1 : empty new collection
-    const step1 = (): It => c =>
-      c({
-        ...d,
-        next: work(snapshotCollection.deleteMany({ updated: true }), true),
-        cont: step2,
-      })
+    const step1 = (): Next =>
+      snapshotCollection.deleteMany({ updated: true }).then(() => next(step2))
 
     // Step 2 : get last update
-    const step2 = (): It => c =>
-      c({
-        ...d,
-        next: work(last.findOne({ _id: streamName }), true),
-        cont: step3,
-      })
+    const step2 = (): Next => last.findOne({ _id: streamName }).then(ts => next(step3(ts)))
+
     // Step 3 : clone into new collection
-    const step3 = ({ data: lastTS }: { data: { _id: string; ts: Timestamp } | null }): It => {
+    const step3 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const hardQuery = $and(lastTS && root<TS>().of('touchedAt').has($gteTs(lastTS.ts)), hardMatch)
       const notDeleted = root<D>().of('deletedAt').has($ne<Timestamp | N>(null))
       const replaceRaw: RawStages<T & D, After<T> & { updated: true; _id: string }> = $replaceWith_(
@@ -94,121 +95,78 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
         .with(projectInput)
         .with(replaceRaw)
         .with($merge_({ into: snapshotCollection, on: root<UDelta<T>>().of('_id') })).stages
-      const next = work(
-        aggregate<T>(c => c({ coll: collection, stages: cloneIntoNew })),
-        true,
-      )
 
-      return c =>
-        c({
-          ...d,
-          next,
-          cont: step4,
-        })
+      const r = await aggregate<T>(c => c({ coll: collection, stages: cloneIntoNew }))
+      return next(step4(r))
     }
 
-    const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
     // Step 4 : run the aggregation // idempotent
+    const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
+    const step4 = (result: AggregateCommand<T>) => async (): Next => {
+      const aggResult = await aggregate<Result2>(c =>
+        c<UDelta<T>>({
+          coll: snapshotCollection,
+          stages: link<UDelta<T>>()
+            .with($match_(isNew(true)))
+            .with(
+              $set_<UDelta<T>, UDelta<T> & Delta<T>>(
+                set({
+                  before: to($ifNull(root<UDelta<T>>().of('before').expr(), nil)),
+                  after: to($ifNull(root<UDelta<T>>().of('after').expr(), nil)),
+                }),
+              ),
+            )
+            .with(input.delta)
+            .with(finalInput).stages,
+        }),
+      )
+      const stream = makeStream(result.cursor.atClusterTime)
+      return next(step5({ result, aggResult, stream }), () => stream.close())
+    }
 
-    const step4 =
-      ({ data: result }: { data: AggregateCommand<T> }): It =>
-      c =>
-        c({
-          ...d,
-          next: work(
-            aggregate<Result2>(c =>
-              c<UDelta<T>>({
-                coll: snapshotCollection,
-                stages: link<UDelta<T>>()
-                  .with($match_(isNew(true)))
-                  .with(
-                    $set_<UDelta<T>, UDelta<T> & Delta<T>>(
-                      set({
-                        before: to($ifNull(root<UDelta<T>>().of('before').expr(), nil)),
-                        after: to($ifNull(root<UDelta<T>>().of('after').expr(), nil)),
-                      }),
-                    ),
-                  )
-                  .with(input.delta)
-                  .with(finalInput).stages,
-              }),
-            ),
-            true,
-          ).then(x => ({ ...x, stream: makeStream(result.cursor.atClusterTime) })),
-          cont: step5(result),
-        })
     // Step 5 : remove handled deleted updated
-    const step5 =
-      (result: AggregateCommand<T>) =>
-      ({
-        data: aggResult,
-        stream,
-      }: {
-        data: AggregateCommand<Result2>
-        stream: ChangeStream
-      }): It => {
-        return c =>
-          c({
-            ...d,
-            next: work(snapshotCollection.deleteMany({ updated: true, after: null }), true),
-            cont: step6({ aggResult, result, stream }),
-          })
-      }
+    const step5 = (l: L) => async (): Next => {
+      await snapshotCollection.deleteMany({ updated: true, after: null })
+      return next(step6(l))
+    }
     type L = {
       aggResult: AggregateCommand<Result2>
       result: AggregateCommand<T>
       stream: ChangeStream
     }
-    // Step 6 : update snapshot aggregation
-    const step6 = (l: L) => (): It => c =>
-      c({
-        ...d,
-        next: work(
-          snapshotCollection.updateMany({ updated: true }, [
-            {
-              $set: {
-                updated: false,
-                after: null,
-                before: '$after',
-              },
-            },
-          ]),
-          true,
-        ),
-        cont: step7(l),
-      })
-    // Step 7 : update __last
-    const step7 = (l: L) => (): It => c =>
-      c({
-        ...d,
-        next: work(
-          last.updateOne(
-            { _id: streamName },
-            { $set: { ts: l.result.cursor.atClusterTime } },
-            { upsert: true },
-          ),
-          true,
-        ),
-        cont: step8(l),
-      })
 
-    const step8 = (l: L) => (): It => {
-      const stop = () => {
-        l.stream.close()
-        return step0()
-      }
-      return c =>
-        c({
-          stop,
-          data: l.aggResult.cursor.firstBatch,
-          next: work(l.stream.tryNext(), undefined),
-          cont: ({ data: doc }) => {
-            return doc ? stop() : step8(l)()
+    // Step 6 : update snapshot aggregation
+    const step6 = (l: L) => async (): Next => {
+      await snapshotCollection.updateMany({ updated: true }, [
+        {
+          $set: {
+            updated: false,
+            after: null,
+            before: '$after',
           },
-        })
+        },
+      ])
+      return next(step7(l))
     }
 
-    return step0()
+    // Step 7 : update __last
+    const step7 = (l: L) => async (): Next => {
+      await last.updateOne(
+        { _id: streamName },
+        { $set: { ts: l.result.cursor.atClusterTime } },
+        { upsert: true },
+      )
+      return step8(l)
+    }
+    // Step 8 : wait for change
+    const step8 = (l: L): NextD => {
+      return {
+        data: l.aggResult.cursor.firstBatch,
+        info: { work: undefined },
+        cont: withStop(() => l.stream.tryNext().then(doc => (doc ? next(step1) : step8(l)))),
+      }
+    }
+    return stop
   }
   return {
     stages: c =>

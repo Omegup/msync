@@ -1,5 +1,4 @@
-import type { App, HKT, I } from '../../types'
-import type { Continuation, Exists, IteratorResult, IteratorResultHKT, Working } from '../types'
+import type { Iterator, IteratorResult, NextData, Working } from '../types'
 import { map } from './map-object'
 
 export async function* merge<T>(
@@ -20,94 +19,67 @@ export async function* merge<T>(
   }
 }
 
-type Sources<K extends string, S extends Dom, Result, Dom extends Record<K, unknown>> = {
-  readonly [P in K]: IteratorResult<readonly Result[], S[P], Dom[P]>
+type SourceIteratorResults<K extends string, Result, Dom extends Record<K, unknown>> = {
+  readonly [P in K]: IteratorResult<readonly Result[], Dom[P]>
 }
 
-type NestedApp<
-  X extends Record<K, unknown>,
-  F extends { readonly [P in K]: HKT<X[P]> },
-  K extends string,
-> = { readonly [P in K]: App<F[P], X[P]> }
-interface NestedAppHKT<
-  F extends { readonly [P in K]: HKT<Dom[P]> },
-  K extends string,
-  Dom extends Record<K, unknown>,
-> extends HKT<Dom> {
-  readonly out: NestedApp<I<Dom, this>, F, K>
-}
-
-export const all =
-  <
-    K extends string,
-    Dom extends Record<K, unknown>,
-    F extends { readonly [P in K]: HKT<Dom[P]> },
-  >(m: { readonly [P in K]: Exists<F[P], Dom[P]> }): Exists<NestedAppHKT<F, K, Dom>, Dom> =>
-  consume => {
-    const object = Object.fromEntries<{ [P in K]: App<F[P], Dom[P]> }>([])
-    Object.entries(m).forEach(([k, v]) => v(x => (object[k] = x)))
-    return consume(object)
-  }
-
-type SourceResults<K extends string, S extends Record<K, unknown>> = {
-  readonly [P in K]: { source: P; value: S[P] } & Working
+type SourceResults<K extends string, Dom extends Record<K, Working>> = {
+  readonly [P in K]: { source: P; value: Dom[P]; work: Dom[P]['work'] }
+}[K]
+type SourceNextData<K extends string, Result, Dom extends Record<K, Working>> = {
+  readonly [P in K]: { source: P; next: NextData<readonly Result[], Dom[P]> }
 }[K]
 
-export const mergeItResults = <
-  K extends string,
-  S extends Dom,
-  Result,
-  Dom extends Record<K, unknown>,
->(
-  sources: Sources<K, S, Result, Dom>,
-  isExclusive?: (x: S[K]) => true | undefined,
-  working?: PromiseLike<Dom[K]>,
-): IteratorResult<readonly Result[], SourceResults<K, S>, SourceResults<K, Dom>> => {
-  type Next<S2 extends Dom = S> = SourceResults<K, S2>
-  type NDom = Next<Dom>
-  const run = (): IteratorResult<readonly Result[], Next, NDom> => {
-    const cont: Continuation<readonly Result[], Next, NDom> =
-      (prev: Next) =>
-      <E>(consume: <N extends NDom>(next: IteratorResult<readonly Result[], N, NDom>) => E): E => {
-        const f = <P extends K>({ source, value, work }: SourceResults<P, S>) =>
-          sources[source].cont(value)(
-            <N extends Dom[P]>(nextResult: IteratorResult<readonly Result[], N, Dom[P]>) => {
-              const patched = {
-                ...sources,
-                ...Object.fromEntries([[source, nextResult]]),
-              } as Sources<K, S & Record<P, N>, Result, Dom>
-              return consume(mergeItResults(patched, isExclusive, work && nextResult.next))
-            },
-          )
-        return f(prev)
-      }
+type Iterators<K extends string, T, Dom extends Record<K, unknown>> = {
+  readonly [P in K]: Iterator<T, Dom[P]>
+}
 
-    const promises: readonly PromiseLike<Next<S>>[] = Object.entries(sources).map(([k, v]) =>
-      v.next.then((x): Next<S> => ({ source: k, value: x, work: isExclusive?.(x) })),
+const withWork = <D, T>(info: D, x: PromiseLike<T>) => info && x.then(y => [y, info] as const)
+
+export const mergeItResults = <K extends string, Result, Dom extends Record<K, Working>>(
+  sources: SourceIteratorResults<K, Result, Dom>,
+  working?: PromiseLike<readonly [NextData<readonly Result[], Dom[K]>, [Working['work'], K]]>,
+): IteratorResult<readonly Result[], SourceResults<K, Dom>> => {
+  const stop = () =>
+    mergeIterators(
+      map<typeof sources, K, Iterators<K, readonly Result[], Dom>>(sources, x => () => x.stop()),
     )
-    // type Iter = { readonly [P in K]: Iterator<readonly Result[], Dom[P]> }
-    type Iter = { readonly [P in K]: Exists<IteratorResultHKT<Dom[P], readonly Result[]>, Dom[P]> }
-    const next = Promise.race<readonly Next[], 0>(promises)
+  type Next = SourceNextData<K, Result, Dom>
+  const nextData = ({ next, source }: Next): NextData<readonly Result[], SourceResults<K, Dom>> => {
+    const result = next.cont()
+    type It = IteratorResult<readonly Result[], Dom[K]>
+    const patch: Record<K, It> = Object.fromEntries([[source, result]])
     return {
-      data: Object.entries(sources).flatMap(([, v]) => v.data),
-      next: working?.then(() => next) ?? next,
-      cont,
-      stop: () => mergeIterators(map<K, Sources<K, S, Result, Dom>, Iter>(sources, x => x.stop())),
+      cont: () =>
+        mergeItResults({ ...sources, ...patch }, withWork([next.info.work, source], result.next)),
+      data: next.data,
+      info: { source, value: next.info, work: next.info.work },
     }
   }
-  return run()
+  const run = async (): Promise<NextData<readonly Result[], SourceResults<K, Dom>>> => {
+    const val = await working
+    if (val) {
+      const [next, [work, source]] = val
+      if (work === next.info.work) {
+        return nextData({ next, source })
+      }
+    }
+    const promises: readonly PromiseLike<Next>[] = Object.values<PromiseLike<Next>>(
+      map<typeof sources, K, Record<K, PromiseLike<Next>>>(sources, ({ next }, source) =>
+        next.then((next): Next => ({ source, next })),
+      ),
+    )
+    return Promise.race<readonly Next[], 0>(promises).then(nextData)
+  }
+  return {
+    stop,
+    next: run(),
+  }
 }
 
-export const mergeIterators = <
-  K extends string,
-  Result,
-  Dom extends Record<K, unknown>,
->(iterators: {
-  readonly [P in K]: Exists<IteratorResultHKT<Dom[P], readonly Result[]>, Dom[P]>
-}) => {
-  type IteratorResultHKTs = { readonly [P in K]: IteratorResultHKT<Dom[P], readonly Result[]> }
-  type NDom = SourceResults<K, Dom>
-  const iterator = all<K, Dom, IteratorResultHKTs>(iterators)
-  return <E>(consume: <N extends NDom>(result: IteratorResult<readonly Result[], N, NDom>) => E) =>
-    iterator(sources => consume(mergeItResults(sources)))
-}
+export const mergeIterators = <K extends string, Result, Dom extends Record<K, Working>>(
+  iterators: Iterators<K, readonly Result[], Dom>,
+) =>
+  mergeItResults(
+    map<typeof iterators, K, SourceIteratorResults<K, Result, Dom>>(iterators, v => v()),
+  )

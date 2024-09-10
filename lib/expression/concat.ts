@@ -45,8 +45,6 @@ export const field = <T extends object, D, C = unknown>(expr: Exprs<T, D, C>) =>
   asExpr<O<T>, D, C>({
     raw: f =>
       asExprRaw(
-        map<StrKey<T>, Exprs<T, D, C>, Record<StrKey<T>, rawItem>>(expr, e =>
-          e.raw(f).get(),
-        ),
+        map<Exprs<T, D, C>, StrKey<T>, Record<StrKey<T>, rawItem>>(expr, e => e.raw(f).get()),
       ),
   })

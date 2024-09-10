@@ -20,20 +20,17 @@ import { mergeItResults } from '../utils/merge'
 
 type Next<L, R> = ({ source: 'L'; value: L } | { source: 'R'; value: R }) & Working
 
-const merge = <L extends LD, R extends RD, Result, LD extends Working, RD extends Working>({
+const merge = <Result, LD extends Working, RD extends Working>({
   lsource,
   rsource,
 }: {
-  lsource: IteratorResult<readonly Result[], L, LD>
-  rsource: IteratorResult<readonly Result[], R, RD>
-}): IteratorResult<readonly Result[], Next<L, R>, Next<LD, RD>> =>
-  mergeItResults<'L' | 'R', { L: L; R: R }, Result, { L: LD; R: RD }>(
-    {
-      L: lsource,
-      R: rsource,
-    },
-    x => x.work,
-  )
+  lsource: IteratorResult<readonly Result[], LD>
+  rsource: IteratorResult<readonly Result[], RD>
+}): IteratorResult<readonly Result[], Next<LD, RD>> =>
+  mergeItResults<'L' | 'R', Result, { L: LD; R: RD }>({
+    L: lsource,
+    R: rsource,
+  })
 
 const join = <T extends doc, U extends doc, S extends notArr, Result extends J, R, L>(
   { lField, rField, left, right }: Params<T, U, S>,
@@ -63,7 +60,8 @@ const join = <T extends doc, U extends doc, S extends notArr, Result extends J, 
       const rRunnerInput = concatStages(joinL_Delta, stagesUntilNextLookup.delta)
       const lRunner = left.run(concatStages(lRunnerInput, finalInput))
       const rRunner = right.run(concatStages(rRunnerInput, finalInput))
-      return consume => lRunner(lsource => rRunner(rsource => consume(merge({ lsource, rsource }))))
+
+      return () => merge({ lsource: lRunner(), rsource: rRunner() })
     },
   }
 }
@@ -77,7 +75,7 @@ type Params<T extends J, U extends J, S extends notArr> = Params1<T, U, S> & {
   left: SnapshotStreamExecutionResult<T>
 }
 
-export type LeftWrite<T, V> = O<{ readonly left: T; readonly  right: V } & ID>
+export type LeftWrite<T, V> = O<{ readonly left: T; readonly right: V } & ID>
 
 export const $lookup1 =
   <T extends doc, U extends doc, S extends notArr>(

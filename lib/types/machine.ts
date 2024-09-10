@@ -1,31 +1,30 @@
 // first emission means every descendent is done first aggregation
 
-import type { App, HKT, I } from '../../types'
+import type { App, HKT } from '../../types'
 
-// type Iter = AsyncIterator<void, never, never>
-export type RunnerSource<T, S extends Dom, Dom> = () => IteratorResult<T, S, Dom>
-
-export type Working = { work: true | undefined }
+export type Working = { work: object | undefined }
 export type Runner<T, Dom extends Working> = Iterator<T, Dom>
 
 export type Machine<T, Dom = unknown> = Iterator<T, Dom>
 
-export type IteratorResult<out T, in out S extends Dom, out Dom> = {
+export type NextAsync<T, Dom> = PromiseLike<NextData<T, Dom>>
+
+export type NextData<T, Dom> = {
   data: T
-  next: PromiseLike<S>
-  cont: Continuation<T, S, Dom>
-  stop: () => Iterator<T, Dom>
+  info: Dom
+  cont: Iterator<T, Dom>
 }
+
+
+export type IteratorResult<out T, out Dom> = {
+  next: NextAsync<T, Dom>
+  stop: Iterator<T, Dom>
+}
+
 export type Exists<in out F extends HKT<Dom>, out Dom = unknown> = <E>(
   consume: <T extends Dom>(data: App<F, T>) => E,
 ) => E
 
-export type Continuation<out T, in S extends Dom, out Dom> = (prev: S) => Iterator<T, Dom>
-
-export interface IteratorResultHKT<Dom, T> extends HKT<Dom> {
-  readonly out: IteratorResult<T, I<Dom, this>, Dom>
-}
-
-export type Iterator<out T, out Dom> = Exists<IteratorResultHKT<Dom, T>, Dom>
+export type Iterator<out T, out Dom> = () => IteratorResult<T, Dom>
 
 export type AsynIter<T> = readonly [T, () => PromiseLike<AsynIter<T>>]
