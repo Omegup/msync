@@ -1,6 +1,6 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
 import type { J, N, O, View, doc } from '../types'
-import { $match_, $merge_, $project_, $replaceWith_, $set_ } from './aggregate/mongo-stages'
+import { $match_, $project_, $replaceWith_, $set_ } from './aggregate/mongo-stages'
 import { concatStages, emptyDelta, link, pipe } from './aggregate/prefix'
 import { field } from './expression/concat'
 import { $ifNull, ite } from './expression/logic'
@@ -28,6 +28,7 @@ import { set, to } from './update'
 import { asBefore } from './utils/before'
 import { makeWatchStream } from './watch'
 import { addTeardown } from './utils/tear-down'
+import { $merge_ } from './aggregate/out'
 
 type D = O<{ deletedAt: Timestamp | undefined; _id: string }>
 export type TS = D & { touchedAt: Timestamp }

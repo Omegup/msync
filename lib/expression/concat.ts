@@ -33,7 +33,7 @@ export const fieldM = <
         Object.fromEntries(
           Object.entries(m).map(<K extends Dom>([dom, ref]: readonly [K, M[K]]) => [
             dom,
-            expr[ref].raw(f),
+            expr[ref].raw(f).get(),
           ]),
         ),
       ),

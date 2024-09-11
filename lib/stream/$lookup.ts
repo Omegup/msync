@@ -1,6 +1,5 @@
 import type { ID, J, O, doc, notArr } from '../../types'
-import { $lookupDelta } from '../aggregate/$lookup-delta'
-import { $lookupRaw } from '../aggregate/$lookup-raw'
+import { $lookupDelta, $lookupRaw } from '../aggregate/lookup'
 import { concatStages, concatTStages, emptyDelta } from '../aggregate/prefix'
 import type { Field } from '../field'
 import type {

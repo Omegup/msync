@@ -16,8 +16,9 @@ import { $ifNull, eqTyped, ite } from '../expression/logic'
 import { nil, now, val } from '../expression/val'
 import { root } from '../field'
 import type { Delta, RawStages } from '../types'
-import { $merge_, $replaceWith_ } from './mongo-stages'
+import { $replaceWith_ } from './mongo-stages'
 import { link } from './prefix'
+import { $merge_ } from './out'
 
 interface AfterHKT<T> extends HKT {
   readonly out: Delta<T> & RORec<'after', I<unknown, this>>
