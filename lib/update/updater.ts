@@ -14,13 +14,13 @@ export const subUpdater = <P extends J, D, T, V, Ctx>(
 ): Updater<P, T, V, Ctx> => ({ raw: <R extends J>(g: Field<R, P | N>) => a.raw(g.with(f)) })
 
 type FDom<R, C> = { readonly [P: string]: Updater<R, never, unknown, C> }
-type Par<K extends string> = { [P in K]?: unknown }
+type Par<K extends string> = { readonly [P in K]?: unknown }
 export const set = <
   R,
   Old extends Par<K>,
   F extends FDom<R, C>,
   K extends StrKey<F> = StrKey<F>,
-  C = unknown,
+  C = unknown
 >(
   fields: F,
 ): Updater<

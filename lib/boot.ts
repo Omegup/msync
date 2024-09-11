@@ -56,28 +56,30 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
   const run = <Result2 extends J>(
     finalInput: RawStages<Delta<Result>, Result2>,
   ): Runner<readonly Result2[], Working> => {
-    type It = Iterator<readonly Result2[], Working>
-    type NextD = NextData<readonly Result2[], Working>
+    type W = Working & { debug: string }
+    type It = Iterator<readonly Result2[], W>
+    type NextD = NextData<readonly Result2[], W>
     type Next = Promise<NextD>
     const withStop = (next: () => Next, tr?: () => void): It => {
       return addTeardown(() => ({ stop, next: next() }), tr)
     }
-    const next = (next: () => Next, tr?: () => void): NextD => ({
+    const next = (next: () => Next, debug: string, tr?: () => void): NextD => ({
       cont: withStop(next, tr),
       data: [],
-      info: { work },
+      info: { work, debug },
     })
 
     // Step 0 : declare we are starting a work
-    const step0 = (): Next => Promise.resolve(next(step1))
+    const step0 = (): Next => Promise.resolve(next(step1, 'empty new collection'))
     const stop: It = withStop(step0)
 
     // Step 1 : empty new collection
     const step1 = (): Next =>
-      snapshotCollection.deleteMany({ updated: true }).then(() => next(step2))
+      snapshotCollection.deleteMany({ updated: true }).then(() => next(step2, 'get last update'))
 
     // Step 2 : get last update
-    const step2 = (): Next => last.findOne({ _id: streamName }).then(ts => next(step3(ts)))
+    const step2 = (): Next =>
+      last.findOne({ _id: streamName }).then(ts => next(step3(ts), 'clone into new collection'))
 
     // Step 3 : clone into new collection
     const step3 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
@@ -97,7 +99,7 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
         .with($merge_({ into: snapshotCollection, on: root<UDelta<T>>().of('_id') })).stages
 
       const r = await aggregate<T>(c => c({ coll: collection, stages: cloneIntoNew }))
-      return next(step4(r))
+      return next(step4(r), 'run the aggregation')
     }
 
     // Step 4 : run the aggregation // idempotent
@@ -121,13 +123,15 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
         }),
       )
       const stream = makeStream(result.cursor.atClusterTime)
-      return next(step5({ result, aggResult, stream }), () => stream.close())
+      return next(step5({ result, aggResult, stream }), 'remove handled deleted updated', () =>
+        stream.close(),
+      )
     }
 
     // Step 5 : remove handled deleted updated
     const step5 = (l: L) => async (): Next => {
       await snapshotCollection.deleteMany({ updated: true, after: null })
-      return next(step6(l))
+      return next(step6(l), 'update snapshot aggregation')
     }
     type L = {
       aggResult: AggregateCommand<Result2>
@@ -146,7 +150,7 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
           },
         },
       ])
-      return next(step7(l))
+      return next(step7(l), 'update __last')
     }
 
     // Step 7 : update __last
@@ -162,8 +166,10 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
     const step8 = (l: L): NextD => {
       return {
         data: l.aggResult.cursor.firstBatch,
-        info: { work: undefined },
-        cont: withStop(() => l.stream.tryNext().then(doc => (doc ? next(step1) : step8(l)))),
+        info: { work: undefined, debug: 'wait for change' },
+        cont: withStop(() =>
+          l.stream.tryNext().then(doc => (doc ? next(step1, 'restart') : step8(l))),
+        ),
       }
     }
     return stop

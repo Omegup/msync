@@ -1,4 +1,5 @@
-import type { App, AppMap, AppMapRW, HKT, PromiseHKT, RORec } from '.'
+import type { App, AppMap, AppMapRW, HKT, PromiseHKT } from './hkt'
+import type { RORec } from './json'
 
 export type AsNum<R> = R extends `${infer A extends number}` ? A : never
 export type GetDom<Dom = unknown> = readonly [readonly Dom[], keyof any]

@@ -86,9 +86,4 @@ export const $lookup1 =
 export const $lookup =
   <T extends doc, U extends doc, S extends notArr>(p: Params1<T, U, S>) =>
   (l: SnapshotStream<T>): SnapshotStream<LeftWrite<T, U>> =>
-  <Result extends J>(input: DeltaStages<LeftWrite<T, U>, Result>) => {
-    const left = l(emptyDelta())
-    return left.stages(lStages =>
-      p.right.stages(rStages => join({ left, ...p }, lStages, rStages, input)),
-    )
-  }
+    $lookup1({ ...p, left: l(emptyDelta()) })

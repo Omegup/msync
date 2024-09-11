@@ -26,7 +26,7 @@ const deltaExpr =
 export const $setEach = <T extends jsonItem, V extends jsonItem, E = unknown, C = unknown>(
   updater: <K extends BA>(k: K) => Updater<Delta<T> & E, T | null, V | null, C>,
 ) => {
-  return $set_<Delta<T> & E, Delta<V>, C>(
+  return $set_<Delta<T> & E, Delta<V> & Omit<E, BA>, C>(
     set({
       after: updater('after'),
       before: updater('before'),
@@ -36,7 +36,7 @@ export const $setEach = <T extends jsonItem, V extends jsonItem, E = unknown, C 
 
 export const $replaceWithEach = <T extends J, V extends jsonItem, E>(
   expr: <K extends BA>(field: K) => Expr<V, Rec<K, T> & Delta<T> & E>,
-): RawStages<Delta<T> & E, Delta<V>> => {
+): RawStages<Delta<T> & E, Delta<V> & Omit<E, BA>> => {
   const t = deltaExpr<T, V, E>(expr)
   return $setEach<T, V, E>(k => to(t(k)))
 }

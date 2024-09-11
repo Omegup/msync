@@ -13,12 +13,14 @@ import { $match_, $simpleLookup_ } from './mongo-stages'
 import { concatStages, link } from './prefix'
 
 type s = string
-export const $lookupDelta = <T extends J, U extends doc, R, S, K1 extends s, K2 extends s>(
+export const $lookupDelta = <T extends J, U extends doc, R, S, KK1 extends s, KK2 extends s>(
   { field1, field2 }: { field1: Path<T, S>; field2: Path<U, S> },
   { stages, coll }: TStages<R, Before<U>>,
-  k1: K1,
-  k2: K2,
-): RawStages<Delta<T>, Delta<Rec<K1, T> & Rec<K2, U> & ID>> => {
+  k1: Exclude<KK1, BA>,
+  k2: Exclude<KK2, BA>,
+): RawStages<Delta<T>, Delta<Rec<Exclude<KK1, BA>, T> & Rec<Exclude<KK2, BA>, U> & ID>> => {
+  type K1 = Exclude<KK1, BA>
+  type K2 = Exclude<KK2, BA>
   type BU = Before<U>
   type DeltaS = RORec<BA, S | N>
   const f2: Expr<S, BU> = root<BU>().of('before').with(field2).expr()
