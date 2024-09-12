@@ -1,7 +1,7 @@
-import type { Arr, ID, Rec, doc } from '../../types'
-import type { Delta, RawStages } from '../types'
-import { $unwind_ } from './mongo-stages'
-import { asStages, link } from './prefix'
+import type { Arr, ID, Rec, doc } from '../../../types'
+import type { Delta, RawStages } from '../../types'
+import { $unwind_ } from '../mongo-stages'
+import { asStages, link } from '../prefix'
 
 type s = string
 

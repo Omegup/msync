@@ -7,10 +7,11 @@ import { $expr } from '../../predicate/$expr'
 import { $or } from '../../query/logic'
 import type { BA, Before, Delta, Expr, RawStages, TStages } from '../../types'
 import { map1 } from '../../utils/json'
-import { $replaceWithDelta, $replaceWithEach } from '../$replace-with-each'
-import { $unwindDelta } from '../$unwind-delta'
+import { $replaceWithEach } from '../set'
+import { $unwindDelta } from '../unwind'
 import { $match_, $simpleLookup_ } from '../mongo-stages'
 import { concatStages, link } from '../prefix'
+import { $replaceWithDelta } from '../set'
 
 type s = string
 export const $lookupDelta = <T extends J, U extends doc, R, S, KK1 extends s, KK2 extends s>(

@@ -1,4 +1,4 @@
-import type { App, HKT, ID, J, O, RawObj, ReadonlyCollection, Rec, Type } from '../../types'
+import type { App, HKT, ID, J, RawObj, ReadonlyCollection, Rec, Type } from '../../types'
 import type { Field } from '../field'
 import type { Runner, Working } from './machine'
 
@@ -9,13 +9,13 @@ export interface RawStages<in S, out R, in C = unknown> extends RawArr {
   [Type]?(_: typeof RawStage, source: S, ctx: C): readonly [typeof RawStage, R]
 }
 
-export type FRawStages<S extends J, R extends J> = <F extends HKT<J, J>>(
+export type FRawStages<S extends J, R extends J, C = unknown> = <F extends HKT<J, J>>(
   f: <T extends J>() => Field<App<F, T>, T>,
-) => RawStages<App<F, S>, App<F, R>>
+) => RawStages<App<F, S>, App<F, R>, C>
 
-export type DeltaStages<S extends J, R extends J> = {
-  delta: RawStages<Delta<S>, Delta<R>>
-  raw: FRawStages<S, R>
+export type DeltaStages<S extends J, R extends J, C = unknown> = {
+  delta: RawStages<Delta<S>, Delta<R>, C>
+  raw: FRawStages<S, R, C>
 }
 export type TStages<in out S, out R> = {
   stages: RawStages<S, R>
