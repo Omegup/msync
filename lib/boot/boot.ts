@@ -1,14 +1,14 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
-import type { J, N, O, View, doc } from '../types'
-import { $match_, $project_, $replaceWith_, $set_ } from './aggregate/mongo-stages'
-import { concatStages, emptyDelta, link, pipe } from './aggregate/prefix'
-import { field } from './expression/concat'
-import { $ifNull, ite } from './expression/logic'
-import { nil, val } from './expression/val'
-import { root } from './field'
-import { $eq, $gteTs, $ne } from './predicate'
-import { $and } from './query/logic'
-import { aggregate } from './stream/aggregate'
+import type { HKT, I, J, N, O, View, doc } from '../../types'
+import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
+import { concatStages, emptyDelta, link, pipe } from '../aggregate/prefix'
+import { field } from '../expression/concat'
+import { $ifNull, ite } from '../expression/logic'
+import { nil, val } from '../expression/val'
+import { root } from '../field'
+import { $eq, $gteTs, $ne } from '../predicate'
+import { $and } from '../query/logic'
+import { aggregate } from '../stream/aggregate'
 import type {
   After,
   Before,
@@ -22,13 +22,13 @@ import type {
   SnapshotStreamExecutionResult,
   UDelta,
   Working,
-} from './types'
-import type { AggregateCommand } from './types/aggregate'
-import { set, to } from './update'
-import { asBefore } from './utils/before'
-import { makeWatchStream } from './watch'
-import { addTeardown } from './utils/tear-down'
-import { $merge_ } from './aggregate/out'
+} from '../types'
+import type { AggregateCommand } from '../types/aggregate'
+import { set, to } from '../update'
+import { asBefore } from '../utils/before'
+import { makeWatchStream } from '../watch'
+import { addTeardown } from '../utils/tear-down'
+import { $merge_ } from '../aggregate/out'
 
 type D = O<{ deletedAt: Timestamp | undefined; _id: string }>
 export type TS = D & { touchedAt: Timestamp }
@@ -115,7 +115,6 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
               $set_<UDelta<T>, UDelta<T> & Delta<T>>(
                 set({
                   before: to($ifNull(root<UDelta<T>>().of('before').expr(), nil)),
-                  after: to($ifNull(root<UDelta<T>>().of('after').expr(), nil)),
                 }),
               ),
             )
@@ -188,5 +187,9 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
   }
 }
 
+interface SnapshotStreamHKT extends HKT<J> {
+  readonly out: SnapshotStreamExecutionResult<I<J, this>>
+}
+
 export const from = <T extends doc, V extends T & TS>(view: View<T & D, V>, streamName: string) =>
-  pipe<V, V>(input => executes(view, input, streamName), emptyDelta())
+  pipe<V, V, SnapshotStreamHKT>(input => executes(view, input, streamName), emptyDelta())

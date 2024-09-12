@@ -1,10 +1,9 @@
-import type { App, HKT, I, J, RawObj } from '../../types'
+import type { App, HKT, J, RawObj } from '../../types'
 import type {
   Delta,
   DeltaStages,
   RawStages,
-  SnapshotStream,
-  SnapshotStreamExecutionResult,
+  SnapshotStreamF,
   Stream,
   TStages
 } from '../types'
@@ -33,12 +32,12 @@ type DeltaPipe<G extends HKT<J>, T extends J> = {
   get: () => App<G, T>
 }
 
-interface SnapshotStreamHKT extends HKT<J> {
-  readonly out: SnapshotStreamExecutionResult<I<J, this>>
-}
 
-export const pipe = <S extends J, T extends J>(stream: SnapshotStream<S>, s: DeltaStages<S, T>) => {
-  const acc: DeltaPipe<SnapshotStreamHKT, T> = {
+export const pipe = <S extends J, T extends J, F extends HKT<J>>(
+  stream: SnapshotStreamF<S, F>,
+  s: DeltaStages<S, T>,
+) => {
+  const acc: DeltaPipe<F, T> = {
     with: map =>
       pipe(
         map(i => stream(concatDelta(s, i))),
