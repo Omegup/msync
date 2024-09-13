@@ -10,7 +10,7 @@ export type Updater<in R, in T, out V, in C = unknown> = {
 
 export const subUpdater = <P extends J, D, T, V, Ctx>(
   a: Updater<D, T, V, Ctx>,
-  f: Path<P, D | null>,
+  f: Path<P, D | N>,
 ): Updater<P, T, V, Ctx> => ({ raw: <R extends J>(g: Field<R, P | N>) => a.raw(g.with(f)) })
 
 type FDom<R, C> = { readonly [P: string]: Updater<R, never, unknown, C> }
@@ -28,8 +28,8 @@ export const set = <
   Old,
   Omit<Old, K> &
     O & {
-      readonly [P in K]: F[K] extends Updater<R, infer O extends Old[K], infer A, C>
-        ? A | Exclude<Old[K], O>
+      readonly [P in K]: F[P] extends Updater<R, infer O extends Old[P], infer A, C>
+        ? A | Exclude<Old[P], O>
         : never
     },
   C

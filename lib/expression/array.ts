@@ -1,4 +1,4 @@
-import type { App, Arr, HKT, RORec, notArr } from '../../types'
+import type { App, Arr, HKT, N, RORec, notArr } from '../../types'
 import type { Expr } from '../types'
 import { asBoolExpr, asExpr, asExprRaw } from './expr-base'
 
@@ -58,7 +58,7 @@ export const $concat = <T, D, C>(...exprs: Expr<Arr<T>, D, C>[])=> asExpr<Arr<T>
   raw: f => asExprRaw({ $concatArrays: exprs.map(x => x.raw(f).get()) }),
 })
 
-export const $first = <T, D, C>(expr: Expr<Arr<T>, D, C>) => asExpr<T | null, D, C> ({
+export const $first = <T, D, C>(expr: Expr<Arr<T>, D, C>) => asExpr<T | N, D, C> ({
   raw: f => asExprRaw({ $first: expr.raw(f).get() }),
 })
 export const $mergeObjects = <T1, T2, D, C = unknown>(

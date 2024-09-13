@@ -13,8 +13,8 @@ type D3 = O<{ _id: string; link2: string }>
 const c1 = db.collection<D1 & TS>('c1')
 const c2 = db.collection<D2 & TS>('c2')
 const c3 = db.collection<D3 & TS>('c3')
-const r = db.collection<Merge<D1>>('r')
-const r2 = db.collection<Merge<LeftWrite<D1, D2>>>('r2')
+// const r = db.collection<Merge<D1>>('r')
+// const r2 = db.collection<Merge<LeftWrite<D1, D2>>>('r2')
 const r3 = db.collection<Merge<LeftWrite<LeftWrite<D1, D2>, D3>>>('r3')
 
 const stream = from<D1, D1 & TS>(

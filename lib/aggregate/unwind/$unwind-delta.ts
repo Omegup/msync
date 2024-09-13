@@ -29,16 +29,13 @@ export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extend
                       after: {
                         $ifNull: [
                           {
-                            $arrayElemAt: [
-                              {
-                                $filter: {
-                                  input: `$after.${k2}`,
-                                  as: 'a',
-                                  cond: { $eq: ['$$a._id', '$$b._id'] },
-                                },
+                            $first: {
+                              $filter: {
+                                input: `$after.${k2}`,
+                                as: 'a',
+                                cond: { $eq: ['$$a._id', '$$b._id'] },
                               },
-                              0,
-                            ],
+                            },
                           },
                           null,
                         ],
@@ -88,7 +85,13 @@ export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extend
                 if: { $or: [{ $eq: [`$${k1}.before`, null] }, { $eq: [`$${k2}.before`, null] }] },
                 then: null,
                 else: {
-                  _id: { $concat: [`$${[k1, k2].sort()[0]}.before._id`, '.', `$${[k1, k2].sort()[1]}.before._id`] },
+                  _id: {
+                    $concat: [
+                      `$${[k1, k2].sort()[0]}.before._id`,
+                      '.',
+                      `$${[k1, k2].sort()[1]}.before._id`,
+                    ],
+                  },
                   [k1]: `$${k1}.before`,
                   [k2]: `$${k2}.before`,
                 },
@@ -99,7 +102,13 @@ export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extend
                 if: { $or: [{ $eq: [`$${k1}.after`, null] }, { $eq: [`$${k2}.after`, null] }] },
                 then: null,
                 else: {
-                  _id: { $concat: [`$${[k1, k2].sort()[0]}.after._id`, '.', `$${[k1, k2].sort()[1]}.after._id`] },
+                  _id: {
+                    $concat: [
+                      `$${[k1, k2].sort()[0]}.after._id`,
+                      '.',
+                      `$${[k1, k2].sort()[1]}.after._id`,
+                    ],
+                  },
                   [k1]: `$${k1}.after`,
                   [k2]: `$${k2}.after`,
                 },

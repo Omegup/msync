@@ -1,28 +1,31 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
-import type { HKT, I, ID, J, N, O, View, doc } from '../../types'
-import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
-import { emptyDelta, link, pipe } from '../aggregate/prefix'
+import type { Arr, HKT, I, ID, J, N, O, RORec, Rec, View, doc } from '../../types'
+import {
+  $documents_,
+  $match_,
+  $project_,
+  $replaceWith_,
+  $simpleLookup_,
+} from '../aggregate/mongo-stages'
+import { concatStages, link, pipe } from '../aggregate/prefix'
+import { $array, $first } from '../expression/array'
 import { field } from '../expression/concat'
 import { $ifNull, ite } from '../expression/logic'
-import { nil, val } from '../expression/val'
-import { root } from '../field'
+import { val } from '../expression/val'
+import { ctx, root } from '../field'
 import { $gteTs, $ne } from '../predicate'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
 import type {
-  Delta,
-  DeltaStages,
   Iterator,
   NextData,
+  OutInput,
   RawStages,
   Runner,
-  SnapshotStreamExecutionResult,
   StreamRunner,
-  UDelta,
   Working,
 } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
-import { set, to } from '../update'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 
@@ -31,9 +34,9 @@ export type TS = D & { touchedAt: Timestamp }
 
 const executes = <T extends doc, Result extends J, V extends T & TS>(
   view: View<T & D, V>,
-  input: DeltaStages<T, Result>,
+  input: RawStages<T, Result, unknown, 1>,
   streamName: string,
-): SnapshotStreamExecutionResult<Result>['run'] => {
+): StreamRunner<OutInput<Result>> => {
   const { collection, projection, hardMatch, match } = view
   const work = {}
   const db = collection.s.db,
@@ -47,7 +50,7 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
   const projectInput = $project_<T & D>({ ...projection, deletedAt: 1 })
 
   const run = <Result2 extends J>(
-    finalInput: RawStages<Delta<Result>, Result2>,
+    finalInput: RawStages<OutInput<Result>, Result2>,
   ): Runner<readonly Result2[], Working> => {
     type W = Working & { debug: string }
     type It = Iterator<readonly Result2[], W>
@@ -75,10 +78,10 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const hardQuery = $and(lastTS && root<TS>().of('touchedAt').has($gteTs(lastTS.ts)), hardMatch)
       const notDeleted = root<D>().of('deletedAt').has($ne<Timestamp | N>(null))
-      type R = UDelta<T, {}>
+      type R = Rec<'item', Arr<T>>
       const replaceRaw: RawStages<T & D, R & ID> = $replaceWith_(
-        field<Delta<T | null, 'after', ID>, T & D>({
-          after: ite($and(notDeleted, match).expr, root<T>().expr(), val(null)),
+        field<R & ID, T & D>({
+          item: ite($and(notDeleted, match).expr, $array(root<T>().expr()), $array()),
           _id: root<T & D>().of('_id').expr(),
         }),
       )
@@ -87,21 +90,34 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
         .with(projectInput)
         .with<R & ID>(replaceRaw)
 
+      type Ctx = RORec<'after', Arr<T>>
+      type R2 = Rec<'after', Arr<Result>> & ID
+
       const aggResult = await aggregate<Result2>(c =>
         c<V>({
           coll: collection,
           stages: cloneIntoNew
+            .with<R2>(
+              $simpleLookup_<R & ID, Result, null, 'after', Ctx>({
+                pipeline: link<null, Ctx>()
+                  .with<T>($documents_(ctx<Arr<T>>()('after').expr()))
+                  .with<Result>(input).stages,
+                k: 'after',
+                vars: { after: root<R>().of('item').expr() },
+              }),
+            )
             .with(
-              $set_<UDelta<T, {}>, Delta<T>>(
-                set({
-                  before: to($ifNull(root<R>().of('before').expr(), nil)),
+              $replaceWith_<R2, OutInput<Result>>(
+                field({
+                  after: $ifNull($first(root<R2>().of('after').expr()), val(null)),
+                  before: field<O<ID>, R2>({ _id: root<R2>().of('_id').expr() }),
                 }),
               ),
             )
-            .with(input.delta)
             .with(finalInput).stages,
         }),
       )
+
       const stream = makeStream(aggResult.cursor.atClusterTime)
       return next(step7({ aggResult, result: aggResult, stream }), 'update __last', () =>
         stream.close(),
@@ -138,8 +154,16 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
   return run
 }
 interface StreamRunnerHKT extends HKT<J> {
-  readonly out: StreamRunner<I<J, this>>
+  readonly out: StreamRunner<OutInput<I<J, this>>>
+}
+type J2 = readonly [J, J]
+interface StagesHKT extends HKT<J2> {
+  readonly out: RawStages<I<J2, this>[0], I<J2, this>[1], unknown, 1>
 }
 
 export const from = <T extends doc, V extends T & TS>(view: View<T & D, V>, streamName: string) =>
-  pipe<V, V, StreamRunnerHKT>(input => executes(view, input, streamName), emptyDelta())
+  pipe<V, V, StreamRunnerHKT, StagesHKT>(
+    input => executes(view, input, streamName),
+    link<V, unknown, 1>().stages,
+    concatStages,
+  )

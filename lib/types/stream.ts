@@ -1,19 +1,24 @@
-import type { App, HKT, ID, J, RawObj, ReadonlyCollection, Rec, Type } from '../../types'
+import type { App, HKT, ID, J, O, RawObj, ReadonlyCollection, Rec, Type } from '../../types'
 import type { Field } from '../field'
 import type { Runner, Working } from './machine'
 
 declare const RawStage: unique symbol
 
 type RawArr = readonly RawObj[]
-export interface RawStages<in S, out R, in C = unknown> extends RawArr {
-  [Type]?(_: typeof RawStage, source: S, ctx: C): readonly [typeof RawStage, R]
+export interface RawStages<in S, out R, in C = unknown, out M = number> extends RawArr {
+  [Type]?(_: typeof RawStage, source: S, ctx: C): readonly [typeof RawStage, R, M]
 }
 
-export type FRawStages<S extends J, R extends J, C = unknown> = <F extends HKT<J, J>>(
+export type FRawStages<
+  in S extends J,
+  out R extends J,
+  in C = unknown,
+  out M extends number = number,
+> = <F extends HKT<J, J>>(
   f: <T extends J>() => Field<App<F, T>, T>,
-) => RawStages<App<F, S>, App<F, R>, C>
+) => RawStages<App<F, S>, App<F, R>, C, M>
 
-export type DeltaStages<S extends J, R extends J, C = unknown> = {
+export type DeltaStages<in S extends J, out R extends J, in C = unknown> = {
   delta: RawStages<Delta<S>, Delta<R>, C>
   raw: FRawStages<S, R, C>
 }
@@ -25,17 +30,23 @@ export type Stages<out R> = <E>(consume: <S>(value: TStages<S, R>) => E) => E
 
 export type StreamRunner<V> = <Result extends J>(
   // this is the final input that should end with a merge stage
-  input: RawStages<Delta<V>, Result>,
+  input: RawStages<V, Result>,
 ) => Runner<readonly Result[], Working>
 
 export type SnapshotStreamExecutionResult<V> = {
-  readonly run: StreamRunner<V>
+  readonly run: StreamRunner<Delta<V>>
   readonly stages: Stages<Before<V>>
 }
 
-export type Stream<F extends HKT<J>, T extends J> = <Result extends J>(
-  input: DeltaStages<T, Result>,
+export type Stream<F extends HKT<J>, T extends J, G extends HKT<[J, J]>> = <Result extends J>(
+  input: App<G, [T, Result]>,
 ) => App<F, Result>
+
+export type OutInput<T> = Rec<'before', O<ID> | null> & Rec<'after', T | null>
+
+export type SimpleStream<T extends J> = <Result extends J>(
+  input: RawStages<T, Result, unknown, 1>,
+) => StreamRunner<OutInput<Result>>
 
 export type BA = 'before' | 'after'
 export type PreDelta<T, K extends BA = BA, E = unknown> = Rec<K, T> & E
@@ -55,6 +66,8 @@ export type SnapshotStream<T extends J> = <Result extends J>(
   input: DeltaStages<T, Result>,
 ) => SnapshotStreamExecutionResult<Result>
 
-export type SnapshotStreamF<T extends J, F extends HKT<J>> = <Result extends J>(
-  input: DeltaStages<T, Result>,
+export type SnapshotStreamF<T extends J, F extends HKT<J>, G extends HKT<readonly [J, J]>> = <
+  Result extends J,
+>(
+  input: App<G, [T, Result]>,
 ) => App<F, Result>

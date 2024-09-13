@@ -1,8 +1,9 @@
-import type { IdHKT, J, ReadonlyCollection, StrKey } from '../../types'
+import type { IdHKT, J, StrKey } from '../../types'
 import { root } from '../field'
 import type { Expr, Query, RawStages } from '../types'
 import type { Updater } from '../update'
 import { $match1, $project1, $replaceWith1, $set1, $simpleLookup1, $unwind1 } from './raws'
+import type { LookupArgs } from './raws'
 export * from './raws'
 
 type s = string
@@ -21,9 +22,6 @@ export const $unwind_ = <T, K extends s, U>(k: K) => $unwind1<T, K, U>(k)<IdHKT<
 export const $project_ = <T extends J>(projection: Record<StrKey<T>, 1>): RawStages<T, T> =>
   $project1<T>(projection)<IdHKT<J>>(root)
 
-export const $simpleLookup_ = <T extends J, U extends J, R, K extends s, Ctx, C>(args: {
-  coll: ReadonlyCollection<R>
-  pipeline: RawStages<R, U, Ctx & C>
-  vars: { readonly [P in keyof Ctx]: Expr<Ctx[P], T, C> }
-  k: K
-}) => $simpleLookup1(args)<IdHKT<J>>(root)
+export const $simpleLookup_ = <T extends J, U extends J, R, K extends s, Ctx, C = unknown>(
+  args: LookupArgs<T, U, R, K, Ctx, C>,
+) => $simpleLookup1(args)<IdHKT<J>>(root)
