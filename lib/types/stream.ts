@@ -22,6 +22,9 @@ export type DeltaStages<in S extends J, out R extends J, in C = unknown> = {
   delta: RawStages<Delta<S>, Delta<R>, C>
   raw: FRawStages<S, R, C>
 }
+export type LinStages<in S extends J, out R extends J, in C = unknown> = {
+  lin: RawStages<S, R, C, 1>
+}
 export type TStages<in out S, out R> = {
   stages: RawStages<S, R>
   coll: ReadonlyCollection<S>
@@ -34,7 +37,7 @@ export type StreamRunner<V> = <Result extends J>(
 ) => Runner<readonly Result[], Working>
 
 export type SnapshotStreamExecutionResult<V> = {
-  readonly run: StreamRunner<Delta<V>>
+  readonly out: StreamRunner<Delta<V>>
   readonly stages: Stages<Before<V>>
 }
 

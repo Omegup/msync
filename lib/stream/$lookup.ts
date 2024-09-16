@@ -49,7 +49,7 @@ const join = <T extends doc, U extends doc, S extends notArr, Result extends J, 
   return {
     stages: consume =>
       consume(concatTStages(resultingSnapshot, asBefore(stagesUntilNextLookup.raw))),
-    run: <Final extends J>(
+    out: <Final extends J>(
       finalInput: RawStages<Delta<Result>, Final>,
     ): Runner<readonly Final[], Working> => {
       const leftJoinField = { field1: rField, field2: lField }
@@ -57,8 +57,8 @@ const join = <T extends doc, U extends doc, S extends notArr, Result extends J, 
       const joinR_Delta = $lookupDelta(rightJoinField, rightSnapshot, 'left', 'right')
       const lRunnerInput = concatStages(joinR_Delta, stagesUntilNextLookup.delta)
       const rRunnerInput = concatStages(joinL_Delta, stagesUntilNextLookup.delta)
-      const lRunner = left.run(concatStages(lRunnerInput, finalInput))
-      const rRunner = right.run(concatStages(rRunnerInput, finalInput))
+      const lRunner = left.out(concatStages(lRunnerInput, finalInput))
+      const rRunner = right.out(concatStages(rRunnerInput, finalInput))
 
       return () => merge({ lsource: lRunner(), rsource: rRunner() })
     },

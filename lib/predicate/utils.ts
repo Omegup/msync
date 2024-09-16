@@ -1,5 +1,7 @@
 import type { App, HKT, J, rawItem } from '../../types'
 import { asExpr, asExprRaw } from '../expression/expr-base'
+import { $ifNull } from '../expression/logic'
+import { val } from '../expression/val'
 import type { Field } from '../field'
 import type { Predicate } from '../types'
 
@@ -19,7 +21,7 @@ export const operator =
       raw: { [op]: operand },
       expr: <D extends J, C>(field: Field<D, V, C>) =>
         asExpr<boolean, D, C>({
-          raw: f => asExprRaw({ [op]: [field.expr().raw(f).get(), operand] }),
+          raw: f => asExprRaw({ [op]: [$ifNull(field.expr(), val(null)).raw(f).get(), operand] }),
         }),
     }
   }

@@ -23,7 +23,7 @@ type Concat<T, V, C, M extends number = number> = {
 }
 type DeltaPipe<F extends HKT<J>, T extends J, G extends HKT<readonly [J, J]>> = {
   with: <V extends J>(map: (a: Stream<F, T, G>) => Stream<F, V, G>) => DeltaPipe<F, V, G>
-  then: <V extends J>(next: DeltaStages<T, V>) => DeltaPipe<F, V, G>
+  then: <V extends J>(next: App<G, [T, V]>) => DeltaPipe<F, V, G>
   get: () => App<F, T>
 }
 

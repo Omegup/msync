@@ -13,7 +13,7 @@ import { field } from '../expression/concat'
 import { $ifNull, ite } from '../expression/logic'
 import { val } from '../expression/val'
 import { ctx, root } from '../field'
-import { $gteTs, $ne } from '../predicate'
+import { $eq, $gteTs } from '../predicate'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
 import type {
@@ -36,7 +36,7 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
   view: View<T & D, V>,
   input: RawStages<T, Result, unknown, 1>,
   streamName: string,
-): StreamRunner<OutInput<Result>> => {
+): RORec<'out', StreamRunner<OutInput<Result>>> => {
   const { collection, projection, hardMatch, match } = view
   const work = {}
   const db = collection.s.db,
@@ -77,7 +77,7 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
     const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const hardQuery = $and(lastTS && root<TS>().of('touchedAt').has($gteTs(lastTS.ts)), hardMatch)
-      const notDeleted = root<D>().of('deletedAt').has($ne<Timestamp | N>(null))
+      const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
       type R = Rec<'item', Arr<T>>
       const replaceRaw: RawStages<T & D, R & ID> = $replaceWith_(
         field<R & ID, T & D>({
@@ -151,19 +151,22 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
     }
     return stop
   }
-  return run
+  return { out: run }
 }
 interface StreamRunnerHKT extends HKT<J> {
-  readonly out: StreamRunner<OutInput<I<J, this>>>
+  readonly out: RORec<'out', StreamRunner<OutInput<I<J, this>>>>
 }
 type J2 = readonly [J, J]
 interface StagesHKT extends HKT<J2> {
-  readonly out: RawStages<I<J2, this>[0], I<J2, this>[1], unknown, 1>
+  readonly out: RORec<'lin', RawStages<I<J2, this>[0], I<J2, this>[1], unknown, 1>>
 }
 
-export const from = <T extends doc, V extends T & TS>(view: View<T & D, V>, streamName: string) =>
+export const from = <T extends doc, V extends T & TS = T & TS>(
+  view: View<T & D, V>,
+  streamName: string,
+) =>
   pipe<V, V, StreamRunnerHKT, StagesHKT>(
-    input => executes(view, input, streamName),
-    link<V, unknown, 1>().stages,
-    concatStages,
+    input => executes(view, input.lin, streamName),
+    { lin: link<V, unknown, 1>().stages },
+    ({ lin: a }, { lin: b }) => ({ lin: concatStages(a, b) }),
   )

@@ -8,7 +8,7 @@ import { asStages } from './prefix'
 type s = string
 
 export const $match1 =
-  <T extends J, C = unknown>(query?: Query<T, C>): FRawStages<T, T, C> =>
+  <T extends J, C = unknown>(query?: Query<T, C>): FRawStages<T, T, C, 1> =>
   f =>
     asStages(query ? [{ $match: query.raw(f<T>()) }] : [])
 

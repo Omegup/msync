@@ -14,13 +14,13 @@ interface AfterHKT<T> extends HKT {
   readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
 }
 
-type D = { readonly deletedAt: null }
+type ND = { readonly deletedAt: null }
 type Del = O<{ readonly deletedAt: Timestamp; readonly _id: string } & TS>
 type TS = { readonly touchedAt: Timestamp }
-export type Merge<T extends doc> = (T & D & TS) | Del
+export type Merge<T extends doc> = (T & ND & TS) | Del
 
 
-export const $mergeDelta = <T extends doc>(
+export const $merge = <T extends doc>(
   out: WriteonlyCollection<Merge<T>>,
 ): RawStages<OutInput<T>, never> => {
   const replacer = ite<Merge<T>, null, T, AfterHKT<T | null>>(
@@ -30,7 +30,7 @@ export const $mergeDelta = <T extends doc>(
       _id: $ifNull(root<OutInput<T>>().of('before').of<ID, '_id', U, 3>('_id').expr(), val('')),
       touchedAt: now,
     }),
-    $mergeObjects<T, D & TS, App<AfterHKT<T>, T>>(
+    $mergeObjects<T, ND & TS, App<AfterHKT<T>, T>>(
       root<App<AfterHKT<T>, T>>().of('after').expr(),
       field({ deletedAt: nil, touchedAt: now }),
     ),
@@ -39,3 +39,5 @@ export const $mergeDelta = <T extends doc>(
     .with<Merge<T>>($replaceWith_(replacer))
     .with<never>($merge_({ into: out, on: root<O<ID>>().of('_id') })).stages
 }
+
+
