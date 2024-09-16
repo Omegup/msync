@@ -1,12 +1,12 @@
-import type { Arr, J, ReadonlyCollection, Rec, StrKey } from '../../types'
-import { root } from '../field'
-import type { Expr, FRawStages, Query, RawStages } from '../types'
+import type { App, Arr, HKT, J, RORec, RawObj, Rec, StrKey, jsonItem } from '../../types'
+import { Field } from '../field'
+import type { Accumulator, Accumulators, Expr, FRawStages, LookupArgs, Query, RawStages } from '../types'
 import type { Updater } from '../update'
 import { id } from '../utils/json'
+import { map } from '../utils/map-object'
 import { asStages } from './prefix'
 
 type s = string
-
 export const $match1 =
   <T extends J, C = unknown>(query?: Query<T, C>): FRawStages<T, T, C, 1> =>
   f =>
@@ -44,27 +44,34 @@ export const $replaceWith1 =
   }
 
 export const $unwind1 =
-  <T, K extends s, U>(k: K): FRawStages<T & Rec<K, Arr<U>>, T & Rec<K, U>> =>
+  <T extends J, K extends s, U>(k: K): FRawStages<T & Rec<K, Arr<U>>, T & Rec<K, U>> =>
   f =>
     asStages([{ $unwind: `$${f<Rec<K, Arr<U>>>().of(k).str()}` }])
 
-export const $documents_ = <T extends J, C>(
-  docs: Expr<Arr<T>, null, C>,
-): RawStages<null, T, C, 1> => asStages([{ $documents: docs.raw(root<never>()).get() }])
+export const $group1 =
+  <T extends J, ID extends J, K extends string, V extends RORec<K, jsonItem>, C>(
+    id: Expr<ID, T, C>,
+    args: { readonly [P in K]: Accumulator<T, V[P], C> },
+  ) =>
+  <F extends HKT<J, J>>(
+    f: <T extends J>() => Field<App<F, T>, T>,
+  ): RawStages<App<F, T>, Rec<'_id', ID> & V> =>
+    asStages([
+      {
+        $group: {
+          _id: id.raw(f()).get(),
+          ...map<Accumulators<T, K, V, C>, K, RORec<K, RawObj>>(args, v => v.raw(f<T>())),
+        },
+      },
+    ])
 
-export type LookupArgs<T extends J, U extends J, R, K extends s, Ctx, C> = {
-  vars: { readonly [P in keyof Ctx]: Expr<Ctx[P], T, C> }
-  k: K
-} & (
-  | {
-      coll: ReadonlyCollection<R>
-      pipeline: RawStages<R, U, Ctx & C>
-    }
-  | {
-      coll?: undefined
-      pipeline: RawStages<null, U, Ctx & C>
-    }
-)
+export const $documents1 =
+  <T extends J, C>(docs: Expr<Arr<T>, null, C>) =>
+  <F extends HKT<J, J>>(
+    f: <T extends J>() => Field<App<F, T>, T>,
+  ): RawStages<null, App<F, T>, C, 1> =>
+    asStages([{ $documents: docs.raw(f<never>()).get() }])
+
 
 export const $simpleLookup1 =
   <T extends J, U extends J, R, K extends s, Ctx, C = unknown>(

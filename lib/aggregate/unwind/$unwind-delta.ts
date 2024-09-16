@@ -75,7 +75,7 @@ export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extend
         },
       ]),
     )
-    .with<Rec<K1, Delta<T>> & Rec<K2, Delta<U>>>($unwind_(k2))
+    .with<Rec<K1, Delta<T>> & Rec<K2, Delta<U>>>($unwind_<Rec<K1, Delta<T>>, K2, Delta<U>>(k2))
     .with<Delta<Rec<K1, T> & Rec<K2, U> & ID>>(
       asStages([
         {
