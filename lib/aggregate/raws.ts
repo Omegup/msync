@@ -15,7 +15,13 @@ export const $match1 =
 export const $set1 =
   <T extends J, V extends J, C = unknown>(updater: Updater<T, T, V, C>): FRawStages<T, V, C, 1> =>
   f =>
-    asStages([{ $set: Object.fromEntries(updater.raw(f<T>()).map(([k, v]) => [k.slice(1), v])) }])
+    asStages([
+      {
+        $set: Object.fromEntries(
+          updater.raw(f<T>()).map(([k, v]) => [f().of(k.slice(1)).str(), v]),
+        ),
+      },
+    ])
 
 export const $project1 =
   <T extends J>(projection: Record<StrKey<T>, 1>): FRawStages<T, T, unknown, 1> =>
