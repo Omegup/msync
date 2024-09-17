@@ -25,14 +25,14 @@ const deltaExpr =
 
 export const $setEach1 = <T extends jsonItem, V extends jsonItem, E = unknown, C = unknown>(
   updater: <K extends BA>(k: K) => Updater<Delta<T> & E, T | null, V | null, C>,
-) => {
-  return $set1<Delta<T> & E, Delta<V> & Omit<E, BA>, C>(
+) =>
+  $set1<Delta<T> & E, Delta<V> & Omit<E, BA>, C>(
     set({
       after: updater('after'),
       before: updater('before'),
     }),
   )
-}
+
 export const $setEach = <T extends jsonItem, V extends jsonItem, E = unknown, C = unknown>(
   updater: <K extends BA>(k: K) => Updater<Delta<T> & E, T | null, V | null, C>,
 ): RawStages<Delta<T> & E, Delta<V> & Omit<E, BA>, C> => $setEach1(updater)<IdHKT<J>>(root)

@@ -1,9 +1,8 @@
-import type { J } from '../../types'
 import type { Stages } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
 import { log } from '../utils/log'
 
-export const aggregate = <Result extends J>(input: Stages<Result>) =>
+export const aggregate = <Result>(input: Stages<Result>) =>
   input(({ coll, stages }) => {
     const req = {
       aggregate: coll.collectionName,

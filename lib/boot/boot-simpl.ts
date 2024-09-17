@@ -22,7 +22,7 @@ import type {
   OutInput,
   RawStages,
   Runner,
-  StreamRunner,
+  SimpleStreamExecutionResult,
   Working,
 } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
@@ -36,7 +36,7 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
   view: View<T & D, V>,
   input: RawStages<T, Result, unknown, 1>,
   streamName: string,
-): RORec<'out', StreamRunner<OutInput<Result>>> => {
+): SimpleStreamExecutionResult<Result> => {
   const { collection, projection, hardMatch, match } = view
   const work = {}
   const db = collection.s.db,
@@ -48,8 +48,9 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   // TODO create indexes (if snapshot is in sources)
   const projectInput = $project_<T & D>({ ...projection, deletedAt: 1 })
+  const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
 
-  const run = <Result2 extends J>(
+  const run = <Result2>(
     finalInput: RawStages<OutInput<Result>, Result2>,
   ): Runner<readonly Result2[], Working> => {
     type W = Working & { debug: string }
@@ -77,7 +78,6 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
     const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const hardQuery = $and(lastTS && root<TS>().of('touchedAt').has($gteTs(lastTS.ts)), hardMatch)
-      const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
       type R = Rec<'item', Arr<T>>
       const replaceRaw: RawStages<T & D, R & ID> = $replaceWith_(
         field<R & ID, T & D>({
@@ -92,7 +92,6 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
 
       type Ctx = RORec<'after', Arr<T>>
       type R2 = Rec<'after', Arr<Result>> & ID
-
       const aggResult = await aggregate<Result2>(c =>
         c<V>({
           coll: collection,
@@ -151,10 +150,16 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
     }
     return stop
   }
-  return { out: run }
+  const stages = link<V>()
+    .with($match_($and(hardMatch, notDeleted, match)))
+    .with<Result>(input).stages
+  return {
+    out: run,
+    stages: c => c({ coll: collection, stages }),
+  }
 }
 interface StreamRunnerHKT extends HKT<J> {
-  readonly out: RORec<'out', StreamRunner<OutInput<I<J, this>>>>
+  readonly out: SimpleStreamExecutionResult<I<J, this>>
 }
 type J2 = readonly [J, J]
 interface StagesHKT extends HKT<J2> {

@@ -1,5 +1,5 @@
 import type { App, Arr, HKT, J, RORec, RawObj, Rec, StrKey, jsonItem } from '../../types'
-import { Field } from '../field'
+import type { Field } from '../field'
 import type { Accumulator, Accumulators, Expr, FRawStages, LookupArgs, Query, RawStages } from '../types'
 import type { Updater } from '../update'
 import { id } from '../utils/json'

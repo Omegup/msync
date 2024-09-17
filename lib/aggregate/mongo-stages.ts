@@ -2,7 +2,8 @@ import type { Arr, IdHKT, J, RORec, StrKey, jsonItem } from '../../types'
 import { root } from '../field'
 import type { Accumulators, Expr, LookupArgs, Query, RawStages } from '../types'
 import type { Updater } from '../update'
-import { $documents1, $group1, $match1, $project1, $replaceWith1, $set1, $simpleLookup1, $unwind1 } from './raws'
+import { $documents1, $group1, $match1, $project1, $replaceWith1, $set1, $unwind1 } from './raws'
+import { $simpleLookup1 } from './raws'
 export * from './raws'
 
 type s = string
@@ -19,7 +20,7 @@ export const $replaceWith_ = <T extends J, V extends J, C = unknown>(expr: Expr<
 
 export const $unwind_ = <T extends J, K extends s, U>(k: K) => $unwind1<T, K, U>(k)<IdHKT<J>>(root)
 
-export const $group_ = <T extends J, ID extends J, K extends string, V extends RORec<K, j>, C>(
+export const $group_ = <T extends J, ID extends J, K extends s, V extends RORec<K, j>, C>(
   id: Expr<ID, T, C>,
   args: Accumulators<T, K, V, C>,
 ) => $group1(id, args)<IdHKT<J>>(root)

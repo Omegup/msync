@@ -22,7 +22,7 @@ export type Merge<T extends doc> = (T & ND & TS) | Del
 
 export const $merge = <T extends doc>(
   out: WriteonlyCollection<Merge<T>>,
-): RawStages<OutInput<T>, never> => {
+): RawStages<OutInput<T>, 'out'> => {
   const replacer = ite<Merge<T>, null, T, AfterHKT<T | null>>(
     eqTyped<null, T, AfterHKT<T | null>>(root<OutInput<T>>().of('after').expr(), nil),
     field<Del, OutInput<T>>({
@@ -37,7 +37,7 @@ export const $merge = <T extends doc>(
   )
   return link<OutInput<T>>()
     .with<Merge<T>>($replaceWith_(replacer))
-    .with<never>($merge_({ into: out, on: root<O<ID>>().of('_id') })).stages
+    .with<'out'>($merge_({ into: out, on: root<O<ID>>().of('_id') })).stages
 }
 
 

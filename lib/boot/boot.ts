@@ -54,7 +54,7 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
   const isNew = (isNew: boolean): Query<UDelta<T>> =>
     root<UDelta<T>>().of('updated').has($eq<boolean>(isNew))
 
-  const run = <Result2 extends J>(
+  const run = <Result2>(
     finalInput: RawStages<Delta<Result>, Result2>,
   ): Runner<readonly Result2[], Working> => {
     type W = Working & { debug: string }
@@ -99,13 +99,13 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
         .with(replaceRaw)
         .with($merge_({ into: snapshotCollection, on: root<UDelta<T>>().of('_id') })).stages
 
-      const r = await aggregate<T>(c => c({ coll: collection, stages: cloneIntoNew }))
+      const r = await aggregate<'out'>(c => c({ coll: collection, stages: cloneIntoNew }))
       return next(step4(r), 'run the aggregation')
     }
 
     // Step 4 : run the aggregation // idempotent
     const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
-    const step4 = (result: AggregateCommand<T>) => async (): Next => {
+    const step4 = (result: AggregateCommand<'out'>) => async (): Next => {
       const aggResult = await aggregate<Result2>(c =>
         c<UDelta<T>>({
           coll: snapshotCollection,
@@ -135,7 +135,7 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
     }
     type L = {
       aggResult: AggregateCommand<Result2>
-      result: AggregateCommand<T>
+      result: AggregateCommand<'out'>
       stream: ChangeStream
     }
 

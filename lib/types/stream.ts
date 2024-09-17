@@ -31,10 +31,15 @@ export type TStages<in out S, out R> = {
 }
 export type Stages<out R> = <E>(consume: <S>(value: TStages<S, R>) => E) => E
 
-export type StreamRunner<V> = <Result extends J>(
+export type StreamRunner<V> = <Result>(
   // this is the final input that should end with a merge stage
   input: RawStages<V, Result>,
 ) => Runner<readonly Result[], Working>
+
+export type SimpleStreamExecutionResult<V> = {
+  readonly out: StreamRunner<OutInput<V>>
+  readonly stages: Stages<V>
+}
 
 export type SnapshotStreamExecutionResult<V> = {
   readonly out: StreamRunner<Delta<V>>
