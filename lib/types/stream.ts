@@ -1,3 +1,4 @@
+import type { Timestamp } from 'mongodb'
 import type { App, HKT, ID, J, O, RawObj, ReadonlyCollection, Rec, Type } from '../../types'
 import type { Field } from '../field'
 import type { Runner, Working } from './machine'
@@ -25,11 +26,13 @@ export type DeltaStages<in S extends J, out R extends J, in C = unknown> = {
 export type LinStages<in S extends J, out R extends J, in C = unknown> = {
   lin: RawStages<S, R, C, 1>
 }
-export type TStages<in out S, out R> = {
-  stages: RawStages<S, R>
+export type TStages<in out S, out R, M extends number = number> = {
+  stages: RawStages<S, R, unknown, M>
   coll: ReadonlyCollection<S>
 }
-export type Stages<out R> = <E>(consume: <S>(value: TStages<S, R>) => E) => E
+export type Stages<out R, M extends number = number> = <E>(
+  consume: <S>(value: TStages<S, R, M>) => E,
+) => E
 
 export type StreamRunner<V> = <Result>(
   // this is the final input that should end with a merge stage
@@ -38,7 +41,7 @@ export type StreamRunner<V> = <Result>(
 
 export type SimpleStreamExecutionResult<V> = {
   readonly out: StreamRunner<OutInput<V>>
-  readonly stages: Stages<V>
+  readonly stages: Stages<V, 1>
 }
 
 export type SnapshotStreamExecutionResult<V> = {
@@ -50,11 +53,15 @@ export type Stream<F extends HKT<J>, T extends J, G extends HKT<[J, J]>> = <Resu
   input: App<G, [T, Result]>,
 ) => App<F, Result>
 
+export type TS = { readonly touchedAt: Timestamp }
+export type D = O<{ readonly deletedAt: Timestamp | undefined } & ID>
+export type Model = D & TS
+
 export type OutInput<T> = Rec<'before', O<ID> | null> & Rec<'after', T | null>
 
 export type SimpleStream<T extends J> = <Result extends J>(
-  input: RawStages<T, Result, unknown, 1>,
-) => StreamRunner<OutInput<Result>>
+  input: LinStages<T, Result>,
+) => SimpleStreamExecutionResult<Result>
 
 export type BA = 'before' | 'after'
 export type PreDelta<T, K extends BA = BA, E = unknown> = Rec<K, T> & E

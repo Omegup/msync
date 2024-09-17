@@ -17,7 +17,9 @@ import { $eq, $gteTs } from '../predicate'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
 import type {
+  D,
   Iterator,
+  Model,
   NextData,
   OutInput,
   RawStages,
@@ -29,10 +31,7 @@ import type { AggregateCommand } from '../types/aggregate'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 
-type D = O<{ deletedAt: Timestamp | undefined; _id: string }>
-export type TS = D & { touchedAt: Timestamp }
-
-const executes = <T extends doc, Result extends J, V extends T & TS>(
+const executes = <T extends doc, Result extends J, V extends T & Model>(
   view: View<T & D, V>,
   input: RawStages<T, Result, unknown, 1>,
   streamName: string,
@@ -77,7 +76,10 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
     // Step 4 : run the aggregation // idempotent
     const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
-      const hardQuery = $and(lastTS && root<TS>().of('touchedAt').has($gteTs(lastTS.ts)), hardMatch)
+      const hardQuery = $and(
+        lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
+        hardMatch,
+      )
       type R = Rec<'item', Arr<T>>
       const replaceRaw: RawStages<T & D, R & ID> = $replaceWith_(
         field<R & ID, T & D>({
@@ -150,7 +152,7 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
     }
     return stop
   }
-  const stages = link<V>()
+  const stages = link<V, unknown, 1>()
     .with($match_($and(hardMatch, notDeleted, match)))
     .with<Result>(input).stages
   return {
@@ -166,7 +168,7 @@ interface StagesHKT extends HKT<J2> {
   readonly out: RORec<'lin', RawStages<I<J2, this>[0], I<J2, this>[1], unknown, 1>>
 }
 
-export const from = <T extends doc, V extends T & TS = T & TS>(
+export const from = <T extends doc, V extends T & Model = T & Model>(
   view: View<T & D, V>,
   streamName: string,
 ) =>

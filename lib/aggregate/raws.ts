@@ -63,7 +63,7 @@ export const $group1 =
   ) =>
   <F extends HKT<J, J>>(
     f: <T extends J>() => Field<App<F, T>, T>,
-  ): RawStages<App<F, T>, Rec<'_id', ID> & V> =>
+  ): RawStages<App<F, T>, Rec<'_id', ID> & V, C, 1> =>
     asStages([
       {
         $group: {

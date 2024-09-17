@@ -49,7 +49,7 @@ const join = <T extends doc, U extends doc, S extends notArr, Result extends J, 
   return {
     stages: consume =>
       consume(concatTStages(resultingSnapshot, asBefore(stagesUntilNextLookup.raw))),
-    out: <Final extends J>(
+    out: <Final>(
       finalInput: RawStages<Delta<Result>, Final>,
     ): Runner<readonly Final[], Working> => {
       const leftJoinField = { field1: rField, field2: lField }

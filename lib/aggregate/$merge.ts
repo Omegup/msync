@@ -5,7 +5,7 @@ import { field } from '../expression/concat'
 import { $ifNull, eqTyped, ite } from '../expression/logic'
 import { nil, now, val } from '../expression/val'
 import { root } from '../field'
-import type { OutInput, RawStages } from '../types'
+import type { OutInput, RawStages, TS } from '../types'
 import { $replaceWith_ } from './mongo-stages'
 import { $merge_ } from './out'
 import { link } from './prefix'
@@ -15,10 +15,8 @@ interface AfterHKT<T> extends HKT {
 }
 
 type ND = { readonly deletedAt: null }
-type Del = O<{ readonly deletedAt: Timestamp; readonly _id: string } & TS>
-type TS = { readonly touchedAt: Timestamp }
+type Del = O<{ readonly deletedAt: Timestamp } & ID & TS>
 export type Merge<T extends doc> = (T & ND & TS) | Del
-
 
 export const $merge = <T extends doc>(
   out: WriteonlyCollection<Merge<T>>,
@@ -39,5 +37,3 @@ export const $merge = <T extends doc>(
     .with<Merge<T>>($replaceWith_(replacer))
     .with<'out'>($merge_({ into: out, on: root<O<ID>>().of('_id') })).stages
 }
-
-

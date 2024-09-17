@@ -1,5 +1,5 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
-import type { HKT, I, J, N, O, View, doc } from '../../types'
+import type { HKT, I, J, N, View, doc } from '../../types'
 import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, concatStages, emptyDelta, link, pipe } from '../aggregate/prefix'
@@ -13,16 +13,18 @@ import { aggregate } from '../stream/aggregate'
 import type {
   After,
   Before,
+  D,
   Delta,
   DeltaStages,
   Iterator,
+  Model,
   NextData,
   Query,
   RawStages,
   Runner,
   SnapshotStreamExecutionResult,
   UDelta,
-  Working,
+  Working
 } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
 import { set, to } from '../update'
@@ -30,10 +32,7 @@ import { asBefore } from '../utils/before'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 
-type D = O<{ deletedAt: Timestamp | undefined; _id: string }>
-export type TS = D & { touchedAt: Timestamp }
-
-const executes = <T extends doc, Result extends J, V extends T & TS>(
+const executes = <T extends doc, Result extends J, V extends T & Model>(
   view: View<T & D, V>,
   input: DeltaStages<T, Result>,
   streamName: string,
@@ -84,7 +83,10 @@ const executes = <T extends doc, Result extends J, V extends T & TS>(
 
     // Step 3 : clone into new collection
     const step3 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
-      const hardQuery = $and(lastTS && root<TS>().of('touchedAt').has($gteTs(lastTS.ts)), hardMatch)
+      const hardQuery = $and(
+        lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
+        hardMatch,
+      )
       const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
       const replaceRaw: RawStages<T & D, After<T> & { updated: true; _id: string }> = $replaceWith_(
         field<After<T> & { updated: true; _id: string }, T & D>({
@@ -195,7 +197,10 @@ interface DeltaHKT extends HKT<J2> {
   readonly out: DeltaStages<I<J2, this>[0], I<J2, this>[1]>
 }
 
-export const from = <T extends doc, V extends T & TS = T & TS>(view: View<T & D, V>, streamName: string) =>
+export const from = <T extends doc, V extends T & Model = T & Model>(
+  view: View<T & D, V>,
+  streamName: string,
+) =>
   pipe<V, V, SnapshotStreamHKT, DeltaHKT>(
     input => executes(view, input, streamName),
     emptyDelta(),

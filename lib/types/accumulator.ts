@@ -8,7 +8,7 @@ export interface AccumulatorRaw<in Doc, out T, in C = unknown> extends RawObj {
   [Type]?(_: typeof AccumulatorRaw, source: Doc, ctx: C): readonly [typeof AccumulatorRaw, T]
 }
 
-export type Accumulators<T, K extends string, V extends RORec<K, jsonItem>, C> = {
+export type Accumulators<T, K extends string, V extends RORec<K, jsonItem>, C = unknown> = {
   readonly [P in K]: Accumulator<T, V[P], C>
 }
 
