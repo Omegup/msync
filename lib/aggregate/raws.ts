@@ -1,6 +1,14 @@
 import type { App, Arr, HKT, J, RORec, RawObj, Rec, StrKey, jsonItem } from '../../types'
 import type { Field } from '../field'
-import type { Accumulator, Accumulators, Expr, FRawStages, LookupArgs, Query, RawStages } from '../types'
+import type {
+  Accumulator,
+  Accumulators,
+  Expr,
+  FRawStages,
+  LookupArgs,
+  Query,
+  RawStages,
+} from '../types'
 import type { Updater } from '../update'
 import { id } from '../utils/json'
 import { map } from '../utils/map-object'
@@ -72,6 +80,10 @@ export const $documents1 =
   ): RawStages<null, App<F, T>, C, 1> =>
     asStages([{ $documents: docs.raw(f<never>()).get() }])
 
+export const rawVars = <T, Ctx, C, V extends J>(
+  vars: { readonly [P in keyof Ctx]: Expr<Ctx[P], T, C> },
+  f: Field<V, T, unknown>,
+) => Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, v.raw(f).get()]))
 
 export const $simpleLookup1 =
   <T extends J, U extends J, R, K extends s, Ctx, C = unknown>(
@@ -84,7 +96,7 @@ export const $simpleLookup1 =
         $lookup: {
           ...(coll && { from: coll.collectionName }),
           as: f<Rec<K, Arr<U>>>().of(k).str(),
-          let: Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, v.raw(f<T>()).get()])),
+          let: rawVars(vars, f<T>()),
           pipeline,
         },
       },
