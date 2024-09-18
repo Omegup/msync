@@ -20,14 +20,14 @@ export async function* merge<T>(
 }
 
 type SourceIteratorResults<K extends string, Result, Dom extends Record<K, unknown>> = {
-  readonly [P in K]: IteratorResult<readonly Result[], Dom[P]>
+  readonly [P in K]: IteratorResult<Result, Dom[P]>
 }
 
 type SourceResults<K extends string, Dom extends Record<K, Working>> = {
   readonly [P in K]: { source: P; value: Dom[P]; work: Dom[P]['work'] }
 }[K]
 type SourceNextData<K extends string, Result, Dom extends Record<K, Working>> = {
-  readonly [P in K]: { source: P; next: NextData<readonly Result[], Dom[P]> }
+  readonly [P in K]: { source: P; next: NextData<Result, Dom[P]> }
 }[K]
 
 type Iterators<K extends string, T, Dom extends Record<K, unknown>> = {
@@ -36,20 +36,16 @@ type Iterators<K extends string, T, Dom extends Record<K, unknown>> = {
 
 export const mergeItResults = <K extends string, Result, Dom extends Record<K, Working>>(
   sources: SourceIteratorResults<K, Result, Dom>,
-  working?: PromiseLike<
-    readonly [NextData<readonly Result[], Dom[K]>, { readonly work: object }, K]
-  >,
-): IteratorResult<readonly Result[], SourceResults<K, Dom>> => {
+  working?: PromiseLike<readonly [NextData<Result, Dom[K]>, { readonly work: object }, K]>,
+): IteratorResult<Result, SourceResults<K, Dom>> => {
   const withWork = <T>({ work, ...r }: Working, k: K, x: PromiseLike<T>) =>
     work && x.then(y => [y, { work, ...r }, k] as const)
   const stop = () =>
-    mergeIterators(
-      map<typeof sources, K, Iterators<K, readonly Result[], Dom>>(sources, x => () => x.stop()),
-    )
+    mergeIterators(map<typeof sources, K, Iterators<K, Result, Dom>>(sources, x => () => x.stop()))
   type Next = SourceNextData<K, Result, Dom>
-  const nextData = ({ next, source }: Next): NextData<readonly Result[], SourceResults<K, Dom>> => {
+  const nextData = ({ next, source }: Next): NextData<Result, SourceResults<K, Dom>> => {
     const result = next.cont()
-    type It = IteratorResult<readonly Result[], Dom[K]>
+    type It = IteratorResult<Result, Dom[K]>
     const patch: Record<K, It> = Object.fromEntries([[source, result]])
     return {
       cont: () =>
@@ -58,7 +54,7 @@ export const mergeItResults = <K extends string, Result, Dom extends Record<K, W
       info: { source, value: next.info, work: next.info.work },
     }
   }
-  const run = async (): Promise<NextData<readonly Result[], SourceResults<K, Dom>>> => {
+  const run = async (): Promise<NextData<Result, SourceResults<K, Dom>>> => {
     const val = await working
     if (val) {
       const [next, work, source] = val
@@ -78,9 +74,8 @@ export const mergeItResults = <K extends string, Result, Dom extends Record<K, W
     next: run(),
   }
 }
-
 export const mergeIterators = <K extends string, Result, Dom extends Record<K, Working>>(
-  iterators: Iterators<K, readonly Result[], Dom>,
+  iterators: Iterators<K, Result, Dom>,
 ) =>
   mergeItResults(
     map<typeof iterators, K, SourceIteratorResults<K, Result, Dom>>(iterators, v => v()),

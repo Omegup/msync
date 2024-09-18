@@ -20,16 +20,13 @@ import { mergeItResults } from '../utils/merge'
 type Next<L, R> = ({ source: 'L'; value: L } | { source: 'R'; value: R }) & Working
 
 const merge = <Result, LD extends Working, RD extends Working>({
-  lsource,
-  rsource,
+  lsource: L,
+  rsource: R,
 }: {
   lsource: IteratorResult<readonly Result[], LD>
   rsource: IteratorResult<readonly Result[], RD>
 }): IteratorResult<readonly Result[], Next<LD, RD>> =>
-  mergeItResults<'L' | 'R', Result, { L: LD; R: RD }>({
-    L: lsource,
-    R: rsource,
-  })
+  mergeItResults<'L' | 'R', readonly Result[], { L: LD; R: RD }>({ L, R })
 
 const join = <T extends doc, U extends doc, S extends notArr, Result extends J, R, L>(
   { lField, rField, left, right }: Params<T, U, S>,
