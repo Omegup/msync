@@ -1,15 +1,15 @@
+import { $sum } from '../lib/accumulators'
 import { $merge, type Merge } from '../lib/aggregate/$merge'
 import { $group } from '../lib/aggregate/group'
-import { asAccumulator } from '../lib/aggregate/prefix'
 import { $set } from '../lib/aggregate/set'
 import { from, simple } from '../lib/boot'
 import { concat } from '../lib/expression/concat'
 import { val } from '../lib/expression/val'
 import { root } from '../lib/field'
 import { $lookup, type LeftWrite } from '../lib/stream/$lookup'
-import type { Accumulator, Expr, Model } from '../lib/types'
+import type { Model } from '../lib/types'
 import { set, to } from '../lib/update'
-import type { ID, J, O, RORec, Rec } from '../types'
+import type { ID, O, RORec, Rec } from '../types'
 import { prepare, run } from './mongo'
 
 const client = await prepare('test')
@@ -58,10 +58,6 @@ const stream = from<D1>({ collection: c1, projection: { _id: 1, deletedAt: 1, li
   .out($merge(r3))
 
 run(stream)
-
-const $sum = <D extends J, C>(expr: Expr<number, D, C>): Accumulator<D, number, C> => ({
-  raw: f => asAccumulator({ $sum: expr.raw(f).get() }),
-})
 
 const stream2 = simple<V>(
   { collection: v, projection: { _id: 1, deletedAt: 1, link: 1, v: 1 } },

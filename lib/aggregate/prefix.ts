@@ -1,6 +1,5 @@
 import type { App, HKT, J, RawObj } from '../../types'
 import type {
-  AccumulatorRaw,
   Delta,
   DeltaStages,
   RawStages,
@@ -12,7 +11,7 @@ import type {
 export const asStages = <T, V, C = unknown, M extends number = number>(
   x: readonly RawObj[],
 ): RawStages<T, V, C, M> => x
-export const asAccumulator = <T, V, C = unknown>(x: RawObj) => x as AccumulatorRaw<T, V, C>
+
 export const concatStages = <T, V, W, C, M extends number = number>(
   part1: RawStages<T, V, C, M>,
   part2: RawStages<V, W, C, M>,
