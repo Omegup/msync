@@ -2,17 +2,29 @@ import type { Arr, J, RORec, Rec, jsonItem } from '../../../types'
 import { eq } from '../../expression/logic'
 import { ctx, root } from '../../field'
 import { $expr } from '../../predicate/$expr'
-import type { Accumulators, Expr, RawStages, SimpleStream, TStages } from '../../types'
+import type {
+  Accumulators,
+  AccumulatorsParam,
+  Expr,
+  RawStages,
+  SimpleStream,
+  TStages
+} from '../../types'
 import { $group_, $match_, $replaceWith_, $simpleLookup_, $unwind_ } from '../mongo-stages'
 import { link } from '../prefix'
 
 export const $group =
-  <T extends J, ID extends J, K extends string, V extends RORec<K, jsonItem>>(
+  <
+    T extends J,
+    ID extends jsonItem,
+    Acc extends Accumulators<T, string & keyof Acc, RORec<string & keyof Acc, jsonItem>>,
+  >(
     id: Expr<ID, T>,
-    args: Accumulators<T, K, V>,
+    args: Acc,
   ) =>
-  (stream: SimpleStream<T>): SimpleStream<Rec<'_id', ID> & V> => {
+  (stream: SimpleStream<T>): SimpleStream<Rec<'_id', ID> & AccumulatorsParam<T, Acc>> => {
     type WID = Rec<'_id', ID>
+    type V = AccumulatorsParam<T, Acc>
     type VID = WID & V
     const stages: RawStages<WID, Rec<'item', Arr<VID>>, unknown, 1> = stream({
       lin: link<T, unknown, 1>().stages,

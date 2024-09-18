@@ -20,9 +20,15 @@ export const $replaceWith_ = <T extends J, V extends J, C = unknown>(expr: Expr<
 
 export const $unwind_ = <T extends J, K extends s, U>(k: K) => $unwind1<T, K, U>(k)<IdHKT<J>>(root)
 
-export const $group_ = <T extends J, ID extends J, K extends s, V extends RORec<K, j>, C>(
+export const $group_ = <
+  T extends J,
+  ID extends j,
+  K extends s,
+  Acc extends Accumulators<T, K, RORec<K, j>, C>,
+  C,
+>(
   id: Expr<ID, T, C>,
-  args: Accumulators<T, K, V, C>,
+  args: Acc,
 ) => $group1(id, args)<IdHKT<J>>(root)
 
 export const $documents_ = <T extends J, C>(docs: Expr<Arr<T>, null, C>) =>

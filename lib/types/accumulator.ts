@@ -5,7 +5,7 @@ declare const AccumulatorRaw: unique symbol
 declare const Accumulator: unique symbol
 
 export interface AccumulatorRaw<in Doc, out T, in C = unknown> extends RawObj {
-  [Type]?(_: typeof AccumulatorRaw, source: Doc, ctx: C): readonly [typeof AccumulatorRaw, T]
+  [Type](_: typeof AccumulatorRaw, source: Doc, ctx: C): readonly [typeof AccumulatorRaw, T]
 }
 
 export type Accumulators<T, K extends string, V extends RORec<K, jsonItem>, C = unknown> = {
@@ -13,10 +13,19 @@ export type Accumulators<T, K extends string, V extends RORec<K, jsonItem>, C = 
 }
 
 export type Accumulator<in Doc, out T, in Ctx = unknown> = {
-  [Type](_: typeof Accumulator): typeof Accumulator
+  [Type]?(_: typeof Accumulator): typeof Accumulator
   raw: {
     <DeltaD extends J, I extends U, C = unknown>(
       f: Field<DeltaD, Doc | Undef<I>, C>,
     ): AccumulatorRaw<T | I, DeltaD, Ctx & C>
   }
+}
+
+export type AccumulatorsParam<
+  T extends J,
+  Acc extends Accumulators<T, K, RORec<K, jsonItem>, C>,
+  C = unknown,
+  K extends string = string & keyof Acc,
+> = {
+  readonly [P in K]: Acc[P] extends Accumulator<T, infer V, C> ? V : jsonItem
 }

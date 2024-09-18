@@ -1,13 +1,24 @@
 import type { App, HKT, J, RawObj } from '../../types'
-import type { Delta, DeltaStages, RawStages, SnapshotStreamF, Stream, TStages } from '../types'
+import type {
+  AccumulatorRaw,
+  Delta,
+  DeltaStages,
+  RawStages,
+  SnapshotStreamF,
+  Stream,
+  TStages,
+} from '../types'
 
 export const asStages = <T, V, C = unknown, M extends number = number>(
   x: readonly RawObj[],
 ): RawStages<T, V, C, M> => x
+export const asAccumulator = <T, V, C = unknown>(x: RawObj) => x as AccumulatorRaw<T, V, C>
 export const concatStages = <T, V, W, C, M extends number = number>(
   part1: RawStages<T, V, C, M>,
   part2: RawStages<V, W, C, M>,
-): RawStages<T, W, C, M> => asStages([...part1, ...part2])
+): RawStages<T, W, C, M> => {
+  return asStages([...part1, ...part2])
+}
 
 export const concatDelta = <T extends J, V extends J, W extends J>(
   part1: DeltaStages<T, V>,
@@ -34,15 +45,16 @@ export const pipe = <S extends J, T extends J, F extends HKT<J>, G extends HKT<r
     part1: App<G, [T, V]>,
     part2: App<G, [V, W]>,
   ) => App<G, [T, W]>,
+  start = s,
 ) => {
   const acc: DeltaPipe<F, T, G> = {
     with: map =>
       pipe(
         map(i => stream(concat(s, i))),
-        emptyDelta(),
+        start,
         concat,
       ),
-    then: x => pipe(stream, concat(s, x), concat),
+    then: x => pipe(stream, concat(s, x), concat, start),
     get: () => stream(s),
   }
   return acc
