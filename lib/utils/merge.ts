@@ -1,5 +1,5 @@
 import type { App, HKT, I, RORec } from '../../types'
-import type { Iterator, IteratorResult, NextAsync, NextData, Working } from '../types'
+import type { IteratorResult, NextAsync, NextData, Working } from '../types'
 import { map } from './map-object'
 
 type SourceIteratorResults<K extends string, Result, Dom extends Record<K, unknown>> = {
@@ -15,10 +15,6 @@ interface WorkHKT extends HKT<Working> {
 type SourceNextData<K extends string, Result, Dom extends Record<K, unknown>> = {
   readonly [P in K]: { source: P; next: NextData<Result, Dom[P]> }
 }[K]
-
-type Iterators<K extends string, T, Dom extends Record<K, unknown>> = {
-  readonly [P in K]: Iterator<T, Dom[P]>
-}
 
 type Chain<T> = (x: () => PromiseLike<T>) => PromiseLike<T>
 const makeMergeItResults = <W, F extends HKT<W>>({
@@ -37,11 +33,11 @@ const makeMergeItResults = <W, F extends HKT<W>>({
 }) => {
   const mergeItResults = <K extends string, Result, Dom extends Record<K, W>>(
     sources: SourceIteratorResults<K, Result, Dom>,
-    inspect?: Chain<SourceNextData<K, Result, Dom>>,
+    inspect: Chain<SourceNextData<K, Result, Dom>> = x => x(),
   ): IteratorResult<Result, FSourceResults<K, W, F, Dom>> => {
     const stop = () =>
-      mergeIterators(
-        map<typeof sources, K, Iterators<K, Result, Dom>>(sources, x => () => x.stop()),
+      mergeItResults(
+        map<typeof sources, K, SourceIteratorResults<K, Result, Dom>>(sources, x => x.stop()),
       )
     type Next = SourceNextData<K, Result, Dom>
     const reiterate = ({ next, source }: Next): NextData<Result, FSourceResults<K, W, F, Dom>> => {
@@ -68,15 +64,9 @@ const makeMergeItResults = <W, F extends HKT<W>>({
     }
     return {
       stop,
-      next: (inspect ?? (x => x()))(raceSources).then(reiterate),
+      next: inspect(raceSources).then(reiterate),
     }
   }
-  const mergeIterators = <K extends string, Result, Dom extends Record<K, W>>(
-    iterators: Iterators<K, Result, Dom>,
-  ) =>
-    mergeItResults(
-      map<typeof iterators, K, SourceIteratorResults<K, Result, Dom>>(iterators, v => v()),
-    )
   return mergeItResults
 }
 
