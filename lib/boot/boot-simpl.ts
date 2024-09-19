@@ -20,7 +20,7 @@ import type {
   D,
   Iterator,
   Model,
-  NextData,
+  Frame,
   OutInput,
   RawStages,
   Runner,
@@ -54,12 +54,12 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
   ): Runner<readonly Result2[], Working> => {
     type W = Working & { debug: string }
     type It = Iterator<readonly Result2[], W>
-    type NextD = NextData<readonly Result2[], W>
-    type Next = Promise<NextD>
+    type FrameD = Frame<readonly Result2[], W>
+    type Next = Promise<FrameD>
     const withStop = (next: () => Next, tr?: () => void): It => {
       return addTeardown(() => ({ stop, next: next() }), tr)
     }
-    const next = (next: () => Next, debug: string, tr?: () => void): NextD => ({
+    const next = (next: () => Next, debug: string, tr?: () => void): FrameD => ({
       cont: withStop(next, tr),
       data: [],
       info: { work, debug },
@@ -141,7 +141,7 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
       return step8(l)
     }
     // Step 8 : wait for change
-    const step8 = (l: L): NextD => {
+    const step8 = (l: L): FrameD => {
       return {
         data: l.aggResult.cursor.firstBatch,
         info: { work: undefined, debug: 'wait for change' },

@@ -5,9 +5,9 @@ export type Runner<T, Dom extends Working> = Iterator<T, Dom>
 
 export type Machine<T, Dom = unknown> = Iterator<T, Dom>
 
-export type NextAsync<T, Dom> = PromiseLike<NextData<T, Dom>>
+export type NextFrame<T, Dom> = PromiseLike<Frame<T, Dom>>
 
-export type NextData<T, Dom> = {
+export type Frame<T, Dom> = {
   data: T
   info: Dom
   cont: Iterator<T, Dom>
@@ -15,7 +15,7 @@ export type NextData<T, Dom> = {
 
 
 export type IteratorResult<out T, out Dom> = {
-  next: NextAsync<T, Dom>
+  next: NextFrame<T, Dom>
   stop: Iterator<T, Dom>
 }
 

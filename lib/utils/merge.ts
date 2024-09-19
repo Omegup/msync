@@ -1,5 +1,5 @@
 import type { App, HKT, I, RORec } from '../../types'
-import type { IteratorResult, NextAsync, NextData, Working } from '../types'
+import type { IteratorResult, NextFrame, Frame, Working } from '../types'
 import { map } from './map-object'
 
 type SourceIteratorResults<K extends string, Result, Dom extends Record<K, unknown>> = {
@@ -13,7 +13,7 @@ interface WorkHKT extends HKT<Working> {
   readonly out: RORec<'work', I<Working, this>['work']>
 }
 type SourceNextData<K extends string, Result, Dom extends Record<K, unknown>> = {
-  readonly [P in K]: { source: P; next: NextData<Result, Dom[P]> }
+  readonly [P in K]: { source: P; frame: Frame<Result, Dom[P]> }
 }[K]
 
 type Chain<T> = (x: () => PromiseLike<T>) => PromiseLike<T>
@@ -24,7 +24,7 @@ const makeMergeItResults = <W, F extends HKT<W>>({
   intercept: <K extends string, Result, Dom extends Record<K, W>>(
     info: Dom[K],
     source: K,
-    nextPromise: NextAsync<Result, Dom[K]>,
+    next: NextFrame<Result, Dom[K]>,
   ) => Chain<SourceNextData<K, Result, Dom>>
   info: <K extends string, Dom extends Record<K, W>>(
     source: K,
@@ -40,28 +40,38 @@ const makeMergeItResults = <W, F extends HKT<W>>({
         map<typeof sources, K, SourceIteratorResults<K, Result, Dom>>(sources, x => x.stop()),
       )
     type Next = SourceNextData<K, Result, Dom>
-    const reiterate = ({ next, source }: Next): NextData<Result, FSourceResults<K, W, F, Dom>> => {
-      const result = next.cont()
+    /**
+     * Reiterates over the results, continuing the iteration process.
+     * - `frame`: The resulting frame from the asynchronous source.
+     * - `source`: The source key of the data.
+     */
+    const reiterate = ({ frame, source }: Next): Frame<Result, FSourceResults<K, W, F, Dom>> => {
+      const result = frame.cont()
       type It = IteratorResult<Result, Dom[K]>
+      // Create a new patch with the updated iterator result.
       const patch: Record<K, It> = Object.fromEntries([[source, result]])
       return {
         cont: () =>
           mergeItResults<K, Result, Dom>(
             { ...sources, ...patch },
-            intercept(next.info, source, result.next),
+            intercept(frame.info, source, result.next),
           ),
-        data: next.data,
-        info: info(source, next.info),
+        data: frame.data,
+        info: info(source, frame.info),
       }
     }
+    /**
+     * Races the asynchronous iterators from all sources and returns the result of the fastest one.
+     */
     const raceSources = async (): Promise<SourceNextData<K, Result, Dom>> => {
       const promises: readonly PromiseLike<Next>[] = Object.values<PromiseLike<Next>>(
         map<typeof sources, K, Record<K, PromiseLike<Next>>>(sources, ({ next }, source) =>
-          next.then((next): Next => ({ source, next })),
+          next.then((frame): Next => ({ source, frame })),
         ),
       )
       return Promise.race<readonly Next[], 0>(promises)
     }
+    // The main `IteratorResult` returned by `mergeItResults`.
     return {
       stop,
       next: inspect(raceSources).then(reiterate),
@@ -73,12 +83,12 @@ const makeMergeItResults = <W, F extends HKT<W>>({
 export const mergeItResults = makeMergeItResults<Working, WorkHKT>({
   info: (source, info) => ({ source, value: info, work: info.work }),
   intercept:
-    ({ work }, source, nextPromise) =>
+    ({ work }, source, next) =>
     async raceSources => {
       if (work) {
-        const next = await nextPromise
-        if (work === next.info.work) {
-          return { next, source }
+        const frame = await next
+        if (work === frame.info.work) {
+          return { frame, source }
         }
       }
       return raceSources()
