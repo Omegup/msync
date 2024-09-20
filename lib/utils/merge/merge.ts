@@ -18,11 +18,9 @@ type RaceWinner<K extends KEYS, Result, Dom extends Record<K, unknown>> = {
   }
 }[K]
 
-type Chain<T, V> = (arg: V) => PromiseLike<T>
-type Interceptor<K extends KEYS, Result, Dom extends Record<K, unknown>, NextExtra> = Chain<
-  RaceWinner<K, Result, Dom> & NextExtra,
-  SourceIteratorResults<K, Result, Dom>
->
+type Race<K extends KEYS, Result, Dom extends Record<K, unknown>, NextExtra> = (
+  arg: SourceIteratorResults<K, Result, Dom>,
+) => PromiseLike<RaceWinner<K, Result, Dom> & NextExtra>
 
 type BuildWinner<in W, NextExtra> = <K extends KEYS, Result, Dom extends Record<K, W>>(p: {
   key: K
@@ -54,20 +52,20 @@ export const racer =
   }
 
 export const makeMergeItResults = <W, F extends HKT<W>, NextExtra = unknown>(params: {
-  interceptor: <K extends KEYS, Result, Dom extends Record<K, W>>(
+  nextWinner: <K extends KEYS, Result, Dom extends Record<K, W>>(
     winner: RaceWinner<K, Result, Dom> & NextExtra,
     nextFrame: NextFrame<Result, Dom[K]>,
-  ) => Interceptor<K, Result, Dom, NextExtra>
+  ) => PromiseLike<RaceWinner<K, Result, Dom> & NextExtra>
   info: <K extends KEYS, Dom extends Record<K, W>>(
     key: K,
     info: Dom[K],
   ) => FSourceResults<K, W, F, Dom>
   buildWinner: BuildWinner<W, NextExtra>
 }) => {
-  const { info, interceptor, buildWinner } = params
+  const { info, nextWinner, buildWinner } = params
   const mergeItResults = <K extends KEYS, Result, Dom extends Record<K, W>>(
     sources: SourceIteratorResults<K, Result, Dom>,
-    intercept: Interceptor<K, Result, Dom, NextExtra> = racer(buildWinner),
+    race: Race<K, Result, Dom, NextExtra> = racer(buildWinner),
   ): IteratorResult<Result, FSourceResults<K, W, F, Dom>> => {
     type Sources = SourceIteratorResults<K, Result, Dom>
     type Winner = RaceWinner<K, Result, Dom> & NextExtra
@@ -81,9 +79,8 @@ export const makeMergeItResults = <W, F extends HKT<W>, NextExtra = unknown>(par
         result = frame.cont()
       return {
         cont: () =>
-          mergeItResults<K, Result, Dom>(
-            patch<Sources, K>(sources, key, result),
-            interceptor(winner, result.next),
+          mergeItResults<K, Result, Dom>(patch<Sources, K>(sources, key, result), sources =>
+            nextWinner({ ...winner, sources }, result.next),
           ),
         data: frame.data,
         info: info(key, frame.info),
@@ -92,7 +89,7 @@ export const makeMergeItResults = <W, F extends HKT<W>, NextExtra = unknown>(par
     // The main `IteratorResult` returned by `mergeItResults`.
     return {
       stop: () => mergeItResults(restart(sources)),
-      next: intercept(sources).then(reiterate),
+      next: race(sources).then(reiterate),
     }
   }
   return mergeItResults
