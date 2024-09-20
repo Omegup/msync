@@ -14,13 +14,19 @@ type RaceWinner<K extends KEYS, Result, Dom extends Record<K, unknown>> = {
   readonly [P in K]: {
     readonly key: P
     readonly frame: Frame<Result, Dom[P]>
-    readonly sources: SourceIteratorResults<K, Result, Dom>
   }
 }[K]
 
-type Race<K extends KEYS, Result, Dom extends Record<K, unknown>, NextExtra> = (
+type RaceWinnerAndSources<K extends KEYS, Result, Dom extends Record<K, unknown>, WinnerExtra> = {
+  readonly winner: RaceWinner<K, Result, Dom> & WinnerExtra
+  readonly sources: SourceIteratorResults<K, Result, Dom>
+}
+export type GRace<W, NextExtra> = <K extends KEYS, Result, Dom extends Record<K, W>>(
   arg: SourceIteratorResults<K, Result, Dom>,
-) => PromiseLike<RaceWinner<K, Result, Dom> & NextExtra>
+) => PromiseLike<RaceWinnerAndSources<K, Result, Dom, NextExtra>>
+type Race<W, K extends KEYS, Result, Dom extends Record<K, W>, NextExtra> = (
+  arg: SourceIteratorResults<K, Result, Dom>,
+) => PromiseLike<RaceWinnerAndSources<K, Result, Dom, NextExtra>>
 
 type BuildWinner<in W, NextExtra> = <K extends KEYS, Result, Dom extends Record<K, W>>(p: {
   key: K
@@ -41,46 +47,51 @@ export const racer =
   async <K extends KEYS, Result, Dom extends Record<K, W>>(
     sources: SourceIteratorResults<K, Result, Dom>,
   ) => {
-    type Winner = RaceWinner<K, Result, Dom> & NextExtra
+    type Winner = RaceWinnerAndSources<K, Result, Dom, NextExtra>
     type Sources = SourceIteratorResults<K, Result, Dom>
     const promises: readonly PromiseLike<Winner>[] = Object.values<PromiseLike<Winner>>(
       map<Sources, K, Record<K, PromiseLike<Winner>>>(sources, ({ next }, key) =>
-        next.then(frame => buildWinner<K, Result, Dom>({ key, sources, frame })),
+        next.then(frame => ({
+          sources,
+          winner: buildWinner<K, Result, Dom>({ key, sources, frame }),
+        })),
       ),
     )
     return Promise.race<readonly Winner[], 0>(promises)
   }
 
-export const makeMergeItResults = <W, F extends HKT<W>, NextExtra = unknown>(params: {
-  nextWinner: <K extends KEYS, Result, Dom extends Record<K, W>>(
-    winner: RaceWinner<K, Result, Dom> & NextExtra,
+export const makeMergeItResults = <W, F extends HKT<W>, WinnerExtra = unknown>(params: {
+  intercept: <K extends KEYS, Result, Dom extends Record<K, W>>(
+    winner: RaceWinner<K, Result, Dom> & WinnerExtra,
     nextFrame: NextFrame<Result, Dom[K]>,
-  ) => PromiseLike<RaceWinner<K, Result, Dom> & NextExtra>
+    sources: SourceIteratorResults<K, Result, Dom>,
+  ) => PromiseLike<RaceWinnerAndSources<K, Result, Dom, WinnerExtra>>
   info: <K extends KEYS, Dom extends Record<K, W>>(
     key: K,
     info: Dom[K],
   ) => FSourceResults<K, W, F, Dom>
-  buildWinner: BuildWinner<W, NextExtra>
+  race: GRace<W, WinnerExtra>
 }) => {
-  const { info, nextWinner, buildWinner } = params
+  const { info, intercept, race: defaultRace } = params
   const mergeItResults = <K extends KEYS, Result, Dom extends Record<K, W>>(
     sources: SourceIteratorResults<K, Result, Dom>,
-    race: Race<K, Result, Dom, NextExtra> = racer(buildWinner),
+    race: Race<W, K, Result, Dom, WinnerExtra> = defaultRace,
   ): IteratorResult<Result, FSourceResults<K, W, F, Dom>> => {
     type Sources = SourceIteratorResults<K, Result, Dom>
-    type Winner = RaceWinner<K, Result, Dom> & NextExtra
+    type WinnerAndSources = RaceWinnerAndSources<K, Result, Dom, WinnerExtra>
+    type CurFrame = Frame<Result, FSourceResults<K, W, F, Dom>>
     /**
      * Reiterates over the results, continuing the iteration process.
      * - `frame`: The resulting frame from the asynchronous source.
      * - `key`: The source key of the data.
      */
-    const reiterate = (winner: Winner): Frame<Result, FSourceResults<K, W, F, Dom>> => {
-      const { frame, key, sources } = winner,
+    const reiterate = ({ winner, sources }: WinnerAndSources): CurFrame => {
+      const { frame, key } = winner,
         result = frame.cont()
       return {
         cont: () =>
           mergeItResults<K, Result, Dom>(patch<Sources, K>(sources, key, result), sources =>
-            nextWinner({ ...winner, sources }, result.next),
+            intercept(winner, result.next, sources),
           ),
         data: frame.data,
         info: info(key, frame.info),
