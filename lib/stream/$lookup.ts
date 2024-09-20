@@ -15,7 +15,7 @@ import type {
   Working,
 } from '../types'
 import { asBefore } from '../utils/before'
-import { mergeItResults } from '../utils/merge'
+import { mergeItResults } from '../utils/mergeIt'
 
 type Next<L, R> = ({ source: 'L'; value: L } | { source: 'R'; value: R }) & Working
 
