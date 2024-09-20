@@ -1,6 +1,6 @@
-import type { App, HKT } from '../../types'
-import type { Frame, IteratorResult, NextFrame } from '../types'
-import { map } from './map-object'
+import type { App, HKT } from '../../../types'
+import type { Frame, IteratorResult, NextFrame } from '../../types'
+import { map } from '../map-object'
 
 type KEYS = string
 type SourceIteratorResults<K extends KEYS, Result, Dom extends Record<K, unknown>> = {
@@ -8,79 +8,91 @@ type SourceIteratorResults<K extends KEYS, Result, Dom extends Record<K, unknown
 }
 
 type FSourceResults<K extends KEYS, W, F extends HKT<W>, Dom extends Record<K, W>> = {
-  readonly [P in K]: { source: P; value: Dom[P] } & App<F, Dom[P]>
+  readonly [P in K]: { readonly key: P; readonly value: Dom[P] } & App<F, Dom[P]>
 }[K]
-type SourceNextData<K extends KEYS, Result, Dom extends Record<K, unknown>> = {
-  readonly [P in K]: { source: P; frame: Frame<Result, Dom[P]> }
+type RaceWinner<K extends KEYS, Result, Dom extends Record<K, unknown>> = {
+  readonly [P in K]: {
+    readonly key: P
+    readonly frame: Frame<Result, Dom[P]>
+    readonly sources: SourceIteratorResults<K, Result, Dom>
+  }
 }[K]
 
-type Chain<T, V> = (x: (x: V) => PromiseLike<T>) => (x: V) => PromiseLike<T>
+type Chain<T, V> = (arg: V) => PromiseLike<T>
 type Interceptor<K extends KEYS, Result, Dom extends Record<K, unknown>, NextExtra> = Chain<
-  SourceNextData<K, Result, Dom> & NextExtra,
+  RaceWinner<K, Result, Dom> & NextExtra,
   SourceIteratorResults<K, Result, Dom>
 >
 
-type MakeNext<in W, NextExtra> = <K extends KEYS, Result, Dom extends Record<K, W>>(
-  source: K,
-) => (frame: Frame<Result, Dom[K]>) => SourceNextData<K, Result, Dom> & NextExtra
+type BuildWinner<in W, NextExtra> = <K extends KEYS, Result, Dom extends Record<K, W>>(p: {
+  key: K
+  sources: SourceIteratorResults<K, Result, Dom>
+  frame: Frame<Result, Dom[K]>
+}) => RaceWinner<K, Result, Dom> & NextExtra
 
-const patch = <T, K extends keyof T>(x: T, k: K, v: T[K]): T => ({ ...x, [k]: v })
-export const makeMergeItResults = <
-  W,
-  F extends HKT<W>,
-  NextExtra = unknown,
->(params: {
+export const patch = <T, K extends keyof T>(x: T, k: K, v: T[K]): T => ({ ...x, [k]: v })
+export const restart = <K extends KEYS, Result, Dom extends Record<K, unknown>>(
+  sources: SourceIteratorResults<K, Result, Dom>,
+) => {
+  type Sources = SourceIteratorResults<K, Result, Dom>
+  return map<Sources, K, Sources>(sources, x => x.stop())
+}
+
+export const racer =
+  <W, NextExtra>(buildWinner: BuildWinner<W, NextExtra>) =>
+  async <K extends KEYS, Result, Dom extends Record<K, W>>(
+    sources: SourceIteratorResults<K, Result, Dom>,
+  ) => {
+    type Winner = RaceWinner<K, Result, Dom> & NextExtra
+    type Sources = SourceIteratorResults<K, Result, Dom>
+    const promises: readonly PromiseLike<Winner>[] = Object.values<PromiseLike<Winner>>(
+      map<Sources, K, Record<K, PromiseLike<Winner>>>(sources, ({ next }, key) =>
+        next.then(frame => buildWinner<K, Result, Dom>({ key, sources, frame })),
+      ),
+    )
+    return Promise.race<readonly Winner[], 0>(promises)
+  }
+
+export const makeMergeItResults = <W, F extends HKT<W>, NextExtra = unknown>(params: {
   interceptor: <K extends KEYS, Result, Dom extends Record<K, W>>(
-    info: Dom[K],
-    source: K,
-    next: NextFrame<Result, Dom[K]>,
+    winner: RaceWinner<K, Result, Dom> & NextExtra,
+    nextFrame: NextFrame<Result, Dom[K]>,
   ) => Interceptor<K, Result, Dom, NextExtra>
   info: <K extends KEYS, Dom extends Record<K, W>>(
-    source: K,
+    key: K,
     info: Dom[K],
   ) => FSourceResults<K, W, F, Dom>
-  makeNext: MakeNext<W, NextExtra>
+  buildWinner: BuildWinner<W, NextExtra>
 }) => {
-  const { info, interceptor, makeNext } = params
+  const { info, interceptor, buildWinner } = params
   const mergeItResults = <K extends KEYS, Result, Dom extends Record<K, W>>(
     sources: SourceIteratorResults<K, Result, Dom>,
-    intercept: Interceptor<K, Result, Dom, NextExtra> = x => x,
+    intercept: Interceptor<K, Result, Dom, NextExtra> = racer(buildWinner),
   ): IteratorResult<Result, FSourceResults<K, W, F, Dom>> => {
     type Sources = SourceIteratorResults<K, Result, Dom>
-    const stop = () => mergeItResults(map<Sources, K, Sources>(sources, x => x.stop()))
-    type Next = SourceNextData<K, Result, Dom> & NextExtra
+    type Winner = RaceWinner<K, Result, Dom> & NextExtra
     /**
      * Reiterates over the results, continuing the iteration process.
      * - `frame`: The resulting frame from the asynchronous source.
-     * - `source`: The source key of the data.
+     * - `key`: The source key of the data.
      */
-    const reiterate = ({ frame, source }: Next): Frame<Result, FSourceResults<K, W, F, Dom>> => {
-      const result = frame.cont()
+    const reiterate = (winner: Winner): Frame<Result, FSourceResults<K, W, F, Dom>> => {
+      const { frame, key, sources } = winner,
+        result = frame.cont()
       return {
         cont: () =>
           mergeItResults<K, Result, Dom>(
-            patch<Sources, K>(sources, source, result),
-            interceptor(frame.info, source, result.next),
+            patch<Sources, K>(sources, key, result),
+            interceptor(winner, result.next),
           ),
         data: frame.data,
-        info: info(source, frame.info),
+        info: info(key, frame.info),
       }
-    }
-    /**
-     * Races the asynchronous iterators from all sources and returns the result of the fastest one.
-     */
-    const raceSources = async (sources: Sources): Promise<Next> => {
-      const promises: readonly PromiseLike<Next>[] = Object.values<PromiseLike<Next>>(
-        map<Sources, K, Record<K, PromiseLike<Next>>>(sources, ({ next }, source) =>
-          next.then(x => makeNext<K, Result, Dom>(source)(x)),
-        ),
-      )
-      return Promise.race<readonly Next[], 0>(promises)
     }
     // The main `IteratorResult` returned by `mergeItResults`.
     return {
-      stop,
-      next: intercept(raceSources)(sources).then(reiterate),
+      stop: () => mergeItResults(restart(sources)),
+      next: intercept(sources).then(reiterate),
     }
   }
   return mergeItResults
