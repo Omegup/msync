@@ -9,7 +9,7 @@ import { root } from '../lib/field'
 import { $lookup, type LeftWrite } from '../lib/stream/$lookup'
 import type { Model } from '../lib/types'
 import { set, to } from '../lib/update'
-import { wrap } from '../lib/utils/wrap'
+import { wrap } from '../lib/utils/merge/wrap'
 import type { ID, O, RORec, Rec } from '../types'
 import { prepare, run } from './mongo'
 

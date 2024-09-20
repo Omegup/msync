@@ -15,9 +15,9 @@ import type {
   Working,
 } from '../types'
 import { asBefore } from '../utils/before'
-import { mergeItResults } from '../utils/mergeIt'
+import { mergeItResults } from '../utils/merge/mergeIt'
 
-type Next<L, R> = ({ source: 'L'; value: L } | { source: 'R'; value: R }) & Working
+type Next<L, R> = ({ key: 'L'; value: L } | { key: 'R'; value: R }) & Working
 
 const merge = <Result, LD extends Working, RD extends Working>({
   lsource: L,

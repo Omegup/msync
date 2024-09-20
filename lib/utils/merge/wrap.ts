@@ -1,17 +1,22 @@
-import type { ConstHKT, RORec } from '../../types'
-import type { Iterator, IteratorResult } from '../types'
-import { makeMergeItResults } from './merge'
+import type { ConstHKT, RORec } from '../../../types'
+import type { Iterator, IteratorResult } from '../../types'
+import { makeMergeItResults, patch, restart } from './merge'
 
 type UnkHKT = ConstHKT<unknown, unknown>
 type First = { readonly first: boolean }
 const combine = makeMergeItResults<unknown, UnkHKT, First>({
-  info: (source, info) => ({ source, value: info }),
-  makeNext: source => frame => ({ source, frame, first: true }),
-  interceptor: (_, source, next) => raceSources => async sources => {
-    if (source === '0') {
+  info: (key, info) => ({ key, value: info }),
+  buildWinner: winner => ({ ...winner, first: true }),
+  interceptor: (winner, next) => raceSources => async sources => {
+    if (winner.key === '0') {
       // If the received iteration is a work, wait for it to complete before doing anything else.
       const frame = await next
-      return { frame, source, first: false }
+      if (winner.first) {
+        const source = sources[winner.key]
+        patch(sources, winner.key, { ...source, stop: () => source })
+        sources = restart(sources)
+      }
+      return { frame, key: winner.key, first: false, sources }
     }
     return raceSources(sources)
   },
