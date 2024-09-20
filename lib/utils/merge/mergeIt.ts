@@ -3,7 +3,7 @@ import type { Working } from '../../types'
 import { id } from '../json'
 import { makeMergeItResults, racer } from './merge'
 
-interface WorkHKT extends HKT<Working> {
+export interface WorkHKT extends HKT<Working> {
   readonly out: RORec<'work', I<Working, this>['work']>
 }
 const race = racer(id)

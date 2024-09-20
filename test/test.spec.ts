@@ -58,6 +58,7 @@ const stream = from<D1>({ collection: c1, projection: { _id: 1, deletedAt: 1, li
   )
   .get()
   .out($merge(r3))
+
 const childStream = simple<LeftWrite<LeftWrite<D1, D2>, D3>>(
   { collection: r3, projection: { _id: 1, deletedAt: 1, left: 1, right: 1 } },
   'xs1',
