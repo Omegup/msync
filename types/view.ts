@@ -1,5 +1,5 @@
 import type { Db } from 'mongodb'
-import type { Query } from '../lib/types'
+import type { Del, Query } from '../lib/types'
 import type { J, StrKey } from './json'
 import type { RawStage } from './mongo'
 
@@ -19,7 +19,7 @@ export interface WriteonlyCollection<in R> extends CommonCollection {
 }
 
 export type View<T extends J, V extends T & J = T> = {
-  collection: ReadonlyCollection<V>
+  collection: ReadonlyCollection<V | Del>
   projection: Record<StrKey<T>, 1>
   match?: Query<T>
   hardMatch?: Query<V>

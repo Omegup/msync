@@ -28,7 +28,7 @@ export type LinStages<in S extends J, out R extends J, in C = unknown> = {
 }
 export type TStages<in out S, out R, M extends number = number> = {
   stages: RawStages<S, R, unknown, M>
-  coll: ReadonlyCollection<S>
+  coll: ReadonlyCollection<S | Del>
 }
 export type Stages<out R, M extends number = number> = <E>(
   consume: <S>(value: TStages<S, R, M>) => E,
@@ -54,7 +54,8 @@ export type Stream<F extends HKT<J>, T extends J, G extends HKT<[J, J]>> = <Resu
 ) => App<F, Result>
 
 export type TS = { readonly touchedAt: Timestamp }
-export type D = O<{ readonly deletedAt: Timestamp | undefined } & ID>
+export type Del = O<{ readonly deletedAt: Timestamp } & ID & TS>
+export type D = O<{ readonly deletedAt: Timestamp | null | undefined } & ID>
 export type Model = D & TS
 
 export type OutInput<T> = Rec<'before', O<ID> | null> & Rec<'after', T | null>

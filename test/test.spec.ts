@@ -9,6 +9,7 @@ import { root } from '../lib/field'
 import { $lookup, type LeftWrite } from '../lib/stream/$lookup'
 import type { Model } from '../lib/types'
 import { set, to } from '../lib/update'
+import { wrap } from '../lib/utils/wrap'
 import type { ID, O, RORec, Rec } from '../types'
 import { prepare, run } from './mongo'
 
@@ -26,6 +27,7 @@ const c3 = db.collection<D3 & Model>('c3')
 const g = db.collection<Merge<ID & Rec<'v', number>>>('g')
 // const r2 = db.collection<Merge<LeftWrite<D1, D2>>>('r2')
 const r3 = db.collection<Merge<LeftWrite<LeftWrite<D1, D2>, D3>>>('r3')
+const r4 = db.collection<Merge<LeftWrite<LeftWrite<D1, D2>, D3>>>('r4')
 
 const stream = from<D1>({ collection: c1, projection: { _id: 1, deletedAt: 1, link: 1 } }, 'q1')
   .with(
@@ -56,8 +58,14 @@ const stream = from<D1>({ collection: c1, projection: { _id: 1, deletedAt: 1, li
   )
   .get()
   .out($merge(r3))
+const childStream = simple<LeftWrite<LeftWrite<D1, D2>, D3>>(
+  { collection: r3, projection: { _id: 1, deletedAt: 1, left: 1, right: 1 } },
+  'xs1',
+)
+  .get()
+  .out($merge(r4))
 
-run(stream)
+run(wrap(stream, childStream))
 
 const stream2 = simple<V>(
   { collection: v, projection: { _id: 1, deletedAt: 1, link: 1, v: 1 } },

@@ -1,11 +1,10 @@
-import type { Timestamp } from 'mongodb'
 import type { App, HKT, I, ID, O, RORec, U, WriteonlyCollection, doc } from '../../types'
 import { $mergeObjects } from '../expression/array'
 import { field } from '../expression/concat'
 import { $ifNull, eqTyped, ite } from '../expression/logic'
 import { nil, now, val } from '../expression/val'
 import { root } from '../field'
-import type { OutInput, RawStages, TS } from '../types'
+import type { Del, OutInput, RawStages, TS } from '../types'
 import { $replaceWith_ } from './mongo-stages'
 import { $merge_ } from './out'
 import { link } from './prefix'
@@ -15,7 +14,6 @@ interface AfterHKT<T> extends HKT {
 }
 
 type ND = { readonly deletedAt: null }
-type Del = O<{ readonly deletedAt: Timestamp } & ID & TS>
 export type Merge<T extends doc> = (T & ND & TS) | Del
 
 export const $merge = <T extends doc>(
