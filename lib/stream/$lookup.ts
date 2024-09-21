@@ -12,14 +12,14 @@ import type {
   SnapshotStream,
   SnapshotStreamExecutionResult,
   TStages,
-  Working,
+  HasJob,
 } from '../types'
 import { asBefore } from '../utils/before'
 import { mergeIterators } from '../utils/merge'
 
-type Next<L, R> = ({ key: 'L'; value: L } | { key: 'R'; value: R }) & Working
+type Next<L, R> = ({ key: 'L'; value: L } | { key: 'R'; value: R }) & HasJob
 
-const merge = <Result, LD extends Working, RD extends Working>({
+const merge = <Result, LD extends HasJob, RD extends HasJob>({
   lsource: L,
   rsource: R,
 }: {
@@ -48,7 +48,7 @@ const join = <T extends doc, U extends doc, S extends notArr, Result extends J, 
       consume(concatTStages(resultingSnapshot, asBefore(stagesUntilNextLookup.raw))),
     out: <Final>(
       finalInput: RawStages<Delta<Result>, Final>,
-    ): Runner<readonly Final[], Working> => {
+    ): Runner<readonly Final[], HasJob> => {
       const leftJoinField = { field1: rField, field2: lField }
       const joinL_Delta = $lookupDelta(leftJoinField, leftSnapshot, 'right', 'left')
       const joinR_Delta = $lookupDelta(rightJoinField, rightSnapshot, 'left', 'right')

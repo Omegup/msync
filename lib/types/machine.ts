@@ -1,7 +1,7 @@
 // first emission means every descendent is done first aggregation
 
-export type Working = { work: object | undefined }
-export type Runner<T, Dom extends Working> = Iterator<T, Dom>
+export type HasJob = { job: object | undefined }
+export type Runner<T, Dom extends HasJob> = Iterator<T, Dom>
 
 export type NextFrame<T, Dom> = PromiseLike<Frame<T, Dom>>
 

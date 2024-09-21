@@ -1,7 +1,7 @@
 import type { Timestamp } from 'mongodb'
 import type { App, HKT, ID, J, O, RawObj, ReadonlyCollection, Rec, Type } from '../../types'
 import type { Field } from '../field'
-import type { Runner, Working } from './machine'
+import type { Runner, HasJob } from './machine'
 
 declare const RawStage: unique symbol
 
@@ -37,7 +37,7 @@ export type Stages<out R, M extends number = number> = <E>(
 export type StreamRunner<V> = <Result>(
   // this is the final input that should end with a merge stage
   input: RawStages<V, Result>,
-) => Runner<readonly Result[], Working>
+) => Runner<readonly Result[], HasJob>
 
 export type SimpleStreamExecutionResult<V> = {
   readonly out: StreamRunner<OutInput<V>>

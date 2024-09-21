@@ -1,26 +1,26 @@
-import type { Iterator, IteratorResult, Working } from './types'
+import type { Iterator, IteratorResult, HasJob } from './types'
 import { firstWorksMerge } from './utils/merge/combiners'
 
 export class Machine<Result> {
-  private sources: Iterator<Result, Working>[]
+  private sources: Iterator<Result, HasJob>[]
 
-  constructor(root?: Iterator<Result, Working>) {
+  constructor(root?: Iterator<Result, HasJob>) {
     this.sources = root ? [root] : []
   }
 
-  add(x: Iterator<Result, Working>): void {
+  add(x: Iterator<Result, HasJob>): void {
     this.sources.push(x)
   }
 
-  runner(): Iterator<Result, Working> {
+  runner(): Iterator<Result, HasJob> {
     const items = this.sources.filter(x => x)
     if (items.length === 1) {
       return items[0]
     }
-    return firstWorksMerge<Result, Working>(this.sources)
+    return firstWorksMerge<Result, HasJob>(this.sources)
   }
 
-  start(cb: (info: Working) => void): Promise<never> {
+  start(cb: (info: HasJob) => void): Promise<never> {
     const run = this.runner()
     return runCont(run(), cb)
   }

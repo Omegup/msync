@@ -25,7 +25,7 @@ import type {
   RawStages,
   Runner,
   SimpleStreamExecutionResult,
-  Working,
+  HasJob,
 } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
 import { addTeardown } from '../utils/tear-down'
@@ -37,7 +37,7 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
   streamName: string,
 ): SimpleStreamExecutionResult<Result> => {
   const { collection, projection, hardMatch, match } = view
-  const work = {}
+  const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
   db.command({
@@ -51,8 +51,8 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
 
   const run = <Result2>(
     finalInput: RawStages<OutInput<Result>, Result2>,
-  ): Runner<readonly Result2[], Working> => {
-    type W = Working & { debug: string }
+  ): Runner<readonly Result2[], HasJob> => {
+    type W = HasJob & { debug: string }
     type It = Iterator<readonly Result2[], W>
     type FrameD = Frame<readonly Result2[], W>
     type Next = Promise<FrameD>
@@ -62,10 +62,10 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
     const next = (next: () => Next, debug: string, tr?: () => void): FrameD => ({
       cont: withStop(next, tr),
       data: [],
-      info: { work, debug },
+      info: { job, debug },
     })
 
-    // Step 0 : declare we are starting a work
+    // Step 0 : declare we are starting a job
     const step0 = (): Next => Promise.resolve(next(step1, 'get last update'))
     const stop: It = withStop(step0)
 
@@ -144,7 +144,7 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
     const step8 = (l: L): FrameD => {
       return {
         data: l.aggResult.cursor.firstBatch,
-        info: { work: undefined, debug: 'wait for change' },
+        info: { job: undefined, debug: 'wait for change' },
         cont: withStop(() =>
           l.stream.tryNext().then(doc => (doc ? next(step1, 'restart') : step8(l))),
         ),

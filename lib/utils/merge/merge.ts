@@ -1,9 +1,9 @@
-import type { Frame, IteratorResult, Working } from '../../types'
+import type { Frame, IteratorResult, HasJob } from '../../types'
 import { nextWinner } from './next-winner'
 import type { KEYS, Race, RaceWinner, SourceIteratorResults, SourceResults } from './types'
 import { patch, race, restart } from './utils'
 
-export const mergeIterators = <K extends KEYS, Result, Dom extends Record<K, Working>>(params: {
+export const mergeIterators = <K extends KEYS, Result, Dom extends Record<K, HasJob>>(params: {
   sources: SourceIteratorResults<K, Result, Dom>
   interrupt?: (key: KEYS) => boolean
   select?: Race<K, Result, Dom>
@@ -28,7 +28,7 @@ export const mergeIterators = <K extends KEYS, Result, Dom extends Record<K, Wor
           select: sources => nextWinner(winner, result.next, sources),
         }),
       data: frame.data,
-      info: { key, value: frame.info, work: interrupt?.(key) ? undefined : frame.info.work },
+      info: { key, value: frame.info, job: interrupt?.(key) ? undefined : frame.info.job },
     }
   }
   // The main `IteratorResult` returned by `mergeItResults`.
