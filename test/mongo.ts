@@ -5,8 +5,8 @@ import type { doc } from '../types'
 import { uri } from './uri'
 import type { CommandStartedEvent } from 'mongodb'
 
-export const run = <T, Dom>(cont: Iterator<T, Dom>) => runCont(cont())
-const runCont = async <T, Dom>({ next }: IteratorResult<T, Dom>): Promise<never> => {
+export const run = <T, Info>(cont: Iterator<T, Info>) => runCont(cont())
+const runCont = async <T, Info>({ next }: IteratorResult<T, Info>): Promise<never> => {
   const { cont, info } = await next
   console.log(info)
   return runCont(cont())

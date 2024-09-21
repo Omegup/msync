@@ -2,11 +2,11 @@ import type { NextFrame, HasJob } from '../../types'
 import type { KEYS, RaceWinner, SourceIteratorResults } from './types'
 import { race } from './utils'
 
-export const nextWinner = async <K extends KEYS, Result, Dom extends Record<K, HasJob>>(
-  previousWinner: RaceWinner<K, Result, Dom>,
-  nextFrame: NextFrame<Result, Dom[K]>,
-  sources: SourceIteratorResults<K, Result, Dom>,
-): Promise<RaceWinner<K, Result, Dom>> => {
+export const nextWinner = async <K extends KEYS, Result, Info extends Record<K, HasJob>>(
+  previousWinner: RaceWinner<K, Result, Info>,
+  nextFrame: NextFrame<Result, Info[K]>,
+  sources: SourceIteratorResults<K, Result, Info>,
+): Promise<RaceWinner<K, Result, Info>> => {
   const { frame: previousFrame, key } = previousWinner
   if (previousFrame.info.job) {
     // If the received iteration is a job, wait for it to complete before doing anything else.

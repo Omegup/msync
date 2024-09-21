@@ -3,14 +3,14 @@ import { nextWinner } from './next-winner'
 import type { KEYS, Race, RaceWinner, SourceIteratorResults, SourceResults } from './types'
 import { patch, race, restart } from './utils'
 
-export const mergeIterators = <K extends KEYS, Result, Dom extends Record<K, HasJob>>(params: {
-  sources: SourceIteratorResults<K, Result, Dom>
+export const mergeIterators = <K extends KEYS, Result, Info extends Record<K, HasJob>>(params: {
+  sources: SourceIteratorResults<K, Result, Info>
   interrupt?: (key: KEYS) => boolean
-  select?: Race<K, Result, Dom>
-}): IteratorResult<Result, SourceResults<K, Dom>> => {
-  type Sources = SourceIteratorResults<K, Result, Dom>
-  type Winner = RaceWinner<K, Result, Dom>
-  type CurFrame = Frame<Result, SourceResults<K, Dom>>
+  select?: Race<K, Result, Info>
+}): IteratorResult<Result, SourceResults<K, Info>> => {
+  type Sources = SourceIteratorResults<K, Result, Info>
+  type Winner = RaceWinner<K, Result, Info>
+  type CurFrame = Frame<Result, SourceResults<K, Info>>
   const { sources, interrupt, select = race } = params
   /**
    * Reiterates over the results, continuing the iteration process.
@@ -22,7 +22,7 @@ export const mergeIterators = <K extends KEYS, Result, Dom extends Record<K, Has
       result = frame.cont()
     return {
       cont: () =>
-        mergeIterators<K, Result, Dom>({
+        mergeIterators<K, Result, Info>({
           sources: patch<Sources, K>(sources, key, result),
           interrupt,
           select: sources => nextWinner(winner, result.next, sources),

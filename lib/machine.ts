@@ -28,9 +28,9 @@ export class Machine<Result> {
 
 export const wrap = <Result>(root: Machine<Result>): Machine<Result> => new Machine(root.runner())
 
-const runCont = async <T, Dom>(
-  { next }: IteratorResult<T, Dom>,
-  cb: (info: Dom) => void,
+const runCont = async <T, Info>(
+  { next }: IteratorResult<T, Info>,
+  cb: (info: Info) => void,
 ): Promise<never> => {
   const { cont, info } = await next
   cb(info)

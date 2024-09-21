@@ -1,22 +1,22 @@
 // first emission means every descendent is done first aggregation
 
 export type HasJob = { job: object | undefined }
-export type Runner<T, Dom extends HasJob> = Iterator<T, Dom>
+export type Runner<T, Info extends HasJob> = Iterator<T, Info>
 
-export type NextFrame<T, Dom> = PromiseLike<Frame<T, Dom>>
+export type NextFrame<T, Info> = PromiseLike<Frame<T, Info>>
 
-export type Frame<T, Dom> = {
+export type Frame<T, Info> = {
   data: T
-  info: Dom
-  cont: Iterator<T, Dom>
+  info: Info
+  cont: Iterator<T, Info>
 }
 
 
-export type IteratorResult<out T, out Dom> = {
-  next: NextFrame<T, Dom>
-  stop: Iterator<T, Dom>
+export type IteratorResult<out T, out Info> = {
+  next: NextFrame<T, Info>
+  stop: Iterator<T, Info>
 }
 
-export type Iterator<out T, out Dom> = () => IteratorResult<T, Dom>
+export type Iterator<out T, out Info> = () => IteratorResult<T, Info>
 
 export type AsynIter<T> = readonly [T, () => PromiseLike<AsynIter<T>>]
