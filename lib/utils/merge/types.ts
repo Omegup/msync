@@ -16,17 +16,7 @@ export type RaceWinner<K extends KEYS, Result, Dom extends Record<K, unknown>> =
   }
 }[K]
 
-export type RaceWinnerAndSources<
-  K extends KEYS,
-  Result,
-  Dom extends Record<K, unknown>,
-> = RaceWinner<K, Result, Dom>
-
 export type Race<K extends KEYS, Result, Dom extends Record<K, Working>> = (
   arg: SourceIteratorResults<K, Result, Dom>,
-) => PromiseLike<RaceWinnerAndSources<K, Result, Dom>>
+) => PromiseLike<RaceWinner<K, Result, Dom>>
 
-export type InfoBuilder = <K extends string, Dom extends Record<K, Working>>(
-  key: K,
-  info: Dom[K],
-) => SourceResults<K, Dom>

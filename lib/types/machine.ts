@@ -3,8 +3,6 @@
 export type Working = { work: object | undefined }
 export type Runner<T, Dom extends Working> = Iterator<T, Dom>
 
-export type Machine<T, Dom = unknown> = Iterator<T, Dom>
-
 export type NextFrame<T, Dom> = PromiseLike<Frame<T, Dom>>
 
 export type Frame<T, Dom> = {

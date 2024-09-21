@@ -197,7 +197,7 @@ interface DeltaHKT extends HKT<J2> {
   readonly out: DeltaStages<I<J2, this>[0], I<J2, this>[1]>
 }
 
-export const from = <T extends doc, V extends T & Model = T & Model>(
+export const staging = <T extends doc, V extends T & Model = T & Model>(
   view: View<T & D, V>,
   streamName: string,
 ) =>

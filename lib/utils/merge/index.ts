@@ -1,1 +1,2 @@
-export { wrap, mergeItResults } from './combiners'
+export { firstWorksMerge, mergeIterators } from './combiners'
+export { Machine, wrap } from '../../machine'

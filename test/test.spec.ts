@@ -2,16 +2,16 @@ import { $sum } from '../lib/accumulators'
 import { $merge, type Merge } from '../lib/aggregate/$merge'
 import { $group } from '../lib/aggregate/group'
 import { $set } from '../lib/aggregate/set'
-import { from, simple } from '../lib/boot'
+import { from, staging } from '../lib/boot'
 import { concat } from '../lib/expression/concat'
 import { val } from '../lib/expression/val'
 import { root } from '../lib/field'
+import { Machine, wrap } from '../lib/machine'
 import { $lookup, type LeftWrite } from '../lib/stream/$lookup'
 import type { Model } from '../lib/types'
 import { set, to } from '../lib/update'
-import { wrap } from '../lib/utils/merge/combiners'
 import type { ID, O, RORec, Rec } from '../types'
-import { prepare, run } from './mongo'
+import { prepare } from './mongo'
 
 const client = await prepare('test')
 const db = client.db('msync')
@@ -29,52 +29,60 @@ const g = db.collection<Merge<ID & Rec<'v', number>>>('g')
 const r3 = db.collection<Merge<LeftWrite<LeftWrite<D1, D2>, D3>>>('r3')
 const r4 = db.collection<Merge<LeftWrite<LeftWrite<D1, D2>, D3>>>('r4')
 
-const stream = from<D1>({ collection: c1, projection: { _id: 1, deletedAt: 1, link: 1 } }, 'q1')
-  .with(
-    $lookup({
-      right: from<D2, D2 & Model>(
-        {
-          collection: c2,
-          projection: { _id: 1, deletedAt: 1, link: 1, link2: 1 },
-        },
-        'q2',
-      ).get(),
-      lField: root<D1>().of('link'),
-      rField: root<D2>().of('link'),
-    }),
-  )
-  .with(
-    $lookup({
-      right: from<D3, D3 & Model>(
-        {
-          collection: c3,
-          projection: { _id: 1, deletedAt: 1, link2: 1 },
-        },
-        'q3',
-      ).get(),
-      lField: root<LeftWrite<D1, D2>>().of('right').of('link2'),
-      rField: root<D3>().of('link2'),
-    }),
-  )
-  .get()
-  .out($merge(r3))
-
-const childStream = simple<LeftWrite<LeftWrite<D1, D2>, D3>>(
-  { collection: r3, projection: { _id: 1, deletedAt: 1, left: 1, right: 1 } },
-  'xs1',
+let machine1 = new Machine()
+machine1.add(
+  staging<D1>({ collection: c1, projection: { _id: 1, deletedAt: 1, link: 1 } }, 'q1')
+    .with(
+      $lookup({
+        right: staging<D2, D2 & Model>(
+          {
+            collection: c2,
+            projection: { _id: 1, deletedAt: 1, link: 1, link2: 1 },
+          },
+          'q2',
+        ).get(),
+        lField: root<D1>().of('link'),
+        rField: root<D2>().of('link'),
+      }),
+    )
+    .with(
+      $lookup({
+        right: staging<D3, D3 & Model>(
+          {
+            collection: c3,
+            projection: { _id: 1, deletedAt: 1, link2: 1 },
+          },
+          'q3',
+        ).get(),
+        lField: root<LeftWrite<D1, D2>>().of('right').of('link2'),
+        rField: root<D3>().of('link2'),
+      }),
+    )
+    .get()
+    .out($merge(r3)),
 )
-  .get()
-  .out($merge(r4))
 
-run(wrap(stream, childStream))
+machine1 = wrap(machine1)
 
-const stream2 = simple<V>(
-  { collection: v, projection: { _id: 1, deletedAt: 1, link: 1, v: 1 } },
-  's1',
+machine1.add(
+  from<LeftWrite<LeftWrite<D1, D2>, D3>>(
+    { collection: r3, projection: { _id: 1, deletedAt: 1, left: 1, right: 1 } },
+    'xs1',
+  )
+    .get()
+    .out($merge(r4)),
 )
-  .then($set(set({ link: to(concat(root<V>().of('link').expr(), val('..'))) })))
-  .with($group(root<V>().of('link').expr(), { v: $sum(root<V>().of('v').expr()) }))
-  .get()
-  .out($merge(g))
 
-run(stream2)
+machine1.start(console.log)
+
+const machine2 = new Machine()
+
+machine2.add(
+  from<V>({ collection: v, projection: { _id: 1, deletedAt: 1, link: 1, v: 1 } }, 's1')
+    .then($set(set({ link: to(concat(root<V>().of('link').expr(), val('..'))) })))
+    .with($group(root<V>().of('link').expr(), { v: $sum(root<V>().of('v').expr()) }))
+    .get()
+    .out($merge(g)),
+)
+
+machine2.start(console.log)

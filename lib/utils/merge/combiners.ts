@@ -1,22 +1,19 @@
-import { merge } from './merge'
+import { mergeIterators } from '.'
 import type { RORec } from '../../../types'
 import type { Iterator, IteratorResult, Working } from '../../types'
 
-export const mergeItResults = merge((key, info) => ({ key, value: info, work: info.work }))
+export { mergeIterators } from './merge'
 
-const combine = merge((key, info) => ({
-  key,
-  value: info,
-  work: key === '0' ? info.work : undefined,
-}))
-
-export const wrap = <Result, Dom extends Working>(
-  ...iters: Iterator<Result, Dom>[]
-): Iterator<Result, { readonly key: string; readonly value: Dom }> => {
+export const firstWorksMerge = <Result, Dom extends Working>(
+  iters: Iterator<Result, Dom>[],
+): Iterator<Result, { readonly key: string; readonly value: Dom } & Working> => {
   const iterator = () => {
-    const sources = iters.map(iter => iter())
-    const asObject: RORec<number, IteratorResult<Result, Dom>> = { ...sources }
-    return combine<string, Result, RORec<string, Dom>>(asObject)
+    const results = iters.map(iter => iter())
+    const sources: RORec<number, IteratorResult<Result, Dom>> = { ...results }
+    return mergeIterators<string, Result, RORec<string, Dom>>({
+      sources,
+      interrupt: key => key !== '0',
+    })
   }
   return iterator
 }

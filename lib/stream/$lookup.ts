@@ -15,7 +15,7 @@ import type {
   Working,
 } from '../types'
 import { asBefore } from '../utils/before'
-import { mergeItResults } from '../utils/merge/mergeIt'
+import { mergeIterators } from '../utils/merge'
 
 type Next<L, R> = ({ key: 'L'; value: L } | { key: 'R'; value: R }) & Working
 
@@ -26,7 +26,7 @@ const merge = <Result, LD extends Working, RD extends Working>({
   lsource: IteratorResult<readonly Result[], LD>
   rsource: IteratorResult<readonly Result[], RD>
 }): IteratorResult<readonly Result[], Next<LD, RD>> =>
-  mergeItResults<'L' | 'R', readonly Result[], { L: LD; R: RD }>({ L, R })
+  mergeIterators<'L' | 'R', readonly Result[], { L: LD; R: RD }>({ sources: { L, R } })
 
 const join = <T extends doc, U extends doc, S extends notArr, Result extends J, R, L>(
   { lField, rField, left, right }: Params<T, U, S>,

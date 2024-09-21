@@ -1,2 +1,2 @@
-export { from } from './boot'
-export { from as simple } from './boot-simpl'
+export { staging } from './boot'
+export { from } from './boot-simpl'
