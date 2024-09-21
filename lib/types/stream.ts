@@ -28,7 +28,7 @@ export type LinStages<in S extends J, out R extends J, in C = unknown> = {
 }
 export type TStages<in out S, out R, M extends number = number> = {
   stages: RawStages<S, R, unknown, M>
-  coll: ReadonlyCollection<S | Del>
+  coll: ReadonlyCollection<S>
 }
 export type Stages<out R, M extends number = number> = <E>(
   consume: <S>(value: TStages<S, R, M>) => E,

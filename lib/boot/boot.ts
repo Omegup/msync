@@ -24,7 +24,8 @@ import type {
   Runner,
   SnapshotStreamExecutionResult,
   UDelta,
-  HasJob
+  HasJob,
+  Del,
 } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
 import { set, to } from '../update'
@@ -95,8 +96,8 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
           _id: root<T & D>().of('_id').expr(),
         }),
       )
-      const cloneIntoNew = link<V>()
-        .with($match_(hardQuery))
+      const cloneIntoNew = link<V | Del>()
+        .with($match_(hardQuery) as RawStages<V | Del, V>)
         .with(projectInput)
         .with(replaceRaw)
         .with($merge_({ into: snapshotCollection, on: root<UDelta<T>>().of('_id') })).stages

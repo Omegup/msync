@@ -26,6 +26,7 @@ import type {
   Runner,
   SimpleStreamExecutionResult,
   HasJob,
+  Del,
 } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
 import { addTeardown } from '../utils/tear-down'
@@ -87,15 +88,15 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
           _id: root<T & D>().of('_id').expr(),
         }),
       )
-      const cloneIntoNew = link<V>()
-        .with($match_(hardQuery))
+      const cloneIntoNew = link<V | Del>()
+        .with($match_(hardQuery) as RawStages<V | Del, V>)
         .with(projectInput)
         .with<R & ID>(replaceRaw)
 
       type Ctx = RORec<'after', Arr<T>>
       type R2 = Rec<'after', Arr<Result>> & ID
       const aggResult = await aggregate<Result2>(c =>
-        c<V>({
+        c({
           coll: collection,
           stages: cloneIntoNew
             .with<R2>(
@@ -152,8 +153,8 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
     }
     return stop
   }
-  const stages = link<V, unknown, 1>()
-    .with($match_($and(hardMatch, notDeleted, match)))
+  const stages = link<V | Del, unknown, 1>()
+    .with($match_($and(hardMatch, notDeleted, match)) as RawStages<V | Del, V, unknown, 1>)
     .with<Result>(input).stages
   return {
     out: run,
