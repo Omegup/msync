@@ -1,1 +1,1 @@
-export * from './merge'
+export { wrap, mergeItResults } from './combiners'

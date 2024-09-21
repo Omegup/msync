@@ -1,13 +1,12 @@
-import type { App, HKT } from '../../../types'
-import type { Frame, IteratorResult } from '../../types'
+import type { Frame, IteratorResult, Working } from '../../types'
 
 export type KEYS = string
 export type SourceIteratorResults<K extends KEYS, Result, Dom extends Record<K, unknown>> = {
   readonly [P in K]: IteratorResult<Result, Dom[P]>
 }
 
-export type FSourceResults<K extends KEYS, W, F extends HKT<W>, Dom extends Record<K, W>> = {
-  readonly [P in K]: { readonly key: P; readonly value: Dom[P] } & App<F, Dom[P]>
+export type SourceResults<K extends KEYS, Dom extends Record<K, Working>> = {
+  readonly [P in K]: { readonly key: P; readonly value: Dom[P]; readonly work: Dom[P]['work'] }
 }[K]
 
 export type RaceWinner<K extends KEYS, Result, Dom extends Record<K, unknown>> = {
@@ -17,15 +16,17 @@ export type RaceWinner<K extends KEYS, Result, Dom extends Record<K, unknown>> =
   }
 }[K]
 
-export type RaceWinnerAndSources<K extends KEYS, Result, Dom extends Record<K, unknown>, WinnerExtra> = {
-  readonly winner: RaceWinner<K, Result, Dom> & WinnerExtra
-  readonly sources: SourceIteratorResults<K, Result, Dom>
-}
-export type GRace<W, NextExtra> = <K extends KEYS, Result, Dom extends Record<K, W>>(
-  arg: SourceIteratorResults<K, Result, Dom>,
-) => PromiseLike<RaceWinnerAndSources<K, Result, Dom, NextExtra>>
+export type RaceWinnerAndSources<
+  K extends KEYS,
+  Result,
+  Dom extends Record<K, unknown>,
+> = RaceWinner<K, Result, Dom>
 
-export type Race<W, K extends KEYS, Result, Dom extends Record<K, W>, NextExtra> = (
+export type Race<K extends KEYS, Result, Dom extends Record<K, Working>> = (
   arg: SourceIteratorResults<K, Result, Dom>,
-) => PromiseLike<RaceWinnerAndSources<K, Result, Dom, NextExtra>>
+) => PromiseLike<RaceWinnerAndSources<K, Result, Dom>>
 
+export type InfoBuilder = <K extends string, Dom extends Record<K, Working>>(
+  key: K,
+  info: Dom[K],
+) => SourceResults<K, Dom>

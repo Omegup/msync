@@ -1,10 +1,14 @@
+import { merge } from './merge'
 import type { RORec } from '../../../types'
 import type { Iterator, IteratorResult, Working } from '../../types'
-import { mergeIt, type Info } from './mergeIt'
 
+export const mergeItResults = merge((key, info) => ({ key, value: info, work: info.work }))
 
-const info: Info = (key, info) => ({ key, value: info, work: key === '0' ? info.work : undefined })
-export const combine =  mergeIt(info)
+const combine = merge((key, info) => ({
+  key,
+  value: info,
+  work: key === '0' ? info.work : undefined,
+}))
 
 export const wrap = <Result, Dom extends Working>(
   ...iters: Iterator<Result, Dom>[]
