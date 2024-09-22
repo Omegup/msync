@@ -89,20 +89,26 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
         hardMatch,
       )
       const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
-      const replaceRaw: RawStages<T & D, After<T> & { updated: true; _id: string }> = $replaceWith_(
-        field<After<T> & { updated: true; _id: string }, T & D>({
-          after: ite($and(notDeleted, match).expr, root<T>().expr(), val(null)),
-          updated: val(true),
-          _id: root<T & D>().of('_id').expr(),
-        }),
-      )
-      const cloneIntoNew = link<V | Del>()
-        .with($match_(hardQuery) as RawStages<V | Del, V>)
+      const replaceRaw: RawStages<J, T & D, After<T> & { updated: true; _id: string }> =
+        $replaceWith_(
+          field<After<T> & { updated: true; _id: string }, T & D>({
+            after: ite($and(notDeleted, match).expr, root<T>().expr(), val(null)),
+            updated: val(true),
+            _id: root<T & D>().of('_id').expr(),
+          }),
+        )
+      const cloneIntoNew = link<V>()
         .with(projectInput)
         .with(replaceRaw)
         .with($merge_({ into: snapshotCollection, on: root<UDelta<T>>().of('_id') })).stages
 
-      const r = await aggregate<'out'>(c => c({ coll: collection, stages: cloneIntoNew }))
+      const r = await aggregate<'out'>(c =>
+        c({
+          coll: collection,
+          match: $match_(hardQuery) as RawStages<J, V | Del, V>,
+          exec: cloneIntoNew,
+        }),
+      )
       return next(step4(r), 'run the aggregation')
     }
 
@@ -110,12 +116,13 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
     const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
     const step4 = (result: AggregateCommand<'out'>) => async (): Next => {
       const aggResult = await aggregate<Result2>(c =>
-        c<UDelta<T>>({
+        c<UDelta<T>, UDelta<T>>({
           coll: snapshotCollection,
-          stages: link<UDelta<T>>()
+          match: link<UDelta<T>>().stages,
+          exec: link<UDelta<T>>()
             .with($match_(isNew(true)))
             .with(
-              $set_<UDelta<T>, UDelta<T> & Delta<T>>(
+              $set_<UDelta<T>, UDelta<T>, UDelta<T> & Delta<T>>(
                 set({
                   before: to($ifNull(root<UDelta<T>>().of('before').expr(), nil)),
                 }),

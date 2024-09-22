@@ -2,11 +2,11 @@ import type { Stages } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
 import { log } from '../utils/log'
 
-export const aggregate = <Result>(input: Stages<Result>) =>
-  input(({ coll, stages }) => {
+export const aggregate = <Result>(input: Stages<unknown, Result>) =>
+  input(({ coll, exec, match }) => {
     const req = {
       aggregate: coll.collectionName,
-      pipeline: stages,
+      pipeline: [...match, ...exec],
       cursor: {},
       readConcern: { level: 'snapshot' },
     }

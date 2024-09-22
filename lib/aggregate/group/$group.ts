@@ -15,23 +15,25 @@ import { link } from '../prefix'
 
 export const $group =
   <
-    T extends J,
+    Q extends J,
+    T extends Q,
     ID extends jsonItem,
     Acc extends Accumulators<T, string & keyof Acc, RORec<string & keyof Acc, jsonItem>>,
   >(
     id: Expr<ID, T>,
     args: Acc,
   ) =>
-  (stream: SimpleStream<T>): SimpleStream<Rec<'_id', ID> & AccumulatorsParam<T, Acc>> => {
+  (stream: SimpleStream<Q, T>): SimpleStream<J, Rec<'_id', ID> & AccumulatorsParam<T, Acc>> => {
     type WID = Rec<'_id', ID>
     type V = AccumulatorsParam<T, Acc>
     type VID = WID & V
-    const stages: RawStages<WID, Rec<'item', Arr<VID>>, unknown, 1> = stream({
+    const stages: RawStages<J, WID, Rec<'item', Arr<VID>>, unknown, 1> = stream({
       lin: link<T, unknown, 1>().stages,
-    }).stages(<S>({ coll, stages }: TStages<S, T, 1>) => {
+    }).stages(<S, B extends Q>({ coll, exec, match }: TStages<S, Q, B, T, 1>) => {
       type Ctx = RORec<'id', ID>
       const pipeline = link<S, Ctx, 1>()
-        .with(stages)
+        .with(match)
+        .with(exec)
         .with($match_($expr(eq<ID, T, Ctx>(id)(ctx<ID>()('id').expr()))))
         .with($group_(id, args)).stages
       return $simpleLookup_<WID, VID, S, 'item', Ctx>({
@@ -43,10 +45,10 @@ export const $group =
     })
     type I1 = Rec<'item', Arr<VID>>
     type I2 = Rec<'item', VID>
-    const unwind: RawStages<I1, I2> = $unwind_('item')
-    const unwind1 = unwind as RawStages<I1, I2, unknown, 1>
+    const unwind: RawStages<J, I1, I2> = $unwind_('item')
+    const unwind1 = unwind as RawStages<J, I1, I2, unknown, 1>
     const transition = link<T, unknown, 1>()
-      .with<VID>($group_(id, {}))
+      .with<J, VID>($group_(id, {}))
       .with(stages)
       .with(unwind1)
       .with($replaceWith_(root<I2>().of('item').expr()))

@@ -21,8 +21,8 @@ export const concatDelta = <Q extends J, T extends Q, V extends Q, W extends Q>(
   raw: f => concatStages(part1.raw(f), part2.raw(f)),
 })
 
-type Concat<Q, T extends Q, V extends Q, C, M extends n = n> = {
-  with: <W extends Q>(extra: RawStages<Q, V, W, C, M>) => Concat<Q, T, W, C, M>
+type Concat<out Q, in T extends Q, out V extends Q, in out C, in out M extends n = n> = {
+  with: <Q2, W extends Q2>(extra: RawStages<Q | Q2, V, W, C, M>) => Concat<Q | Q2, T, W, C, M>
   stages: RawStages<Q, T, V, C, M>
 }
 type DeltaPipe<
@@ -76,7 +76,7 @@ const concat = <Q, T extends Q, V extends Q, C = unknown, M extends n = n>(
   stages,
 })
 
-type Link = <Q, T extends Q = Q, C = unknown, M extends n = n>() => Concat<Q, T, T, C, M>
+type Link = <T, C = unknown, M extends n = n>() => Concat<T, T, T, C, M>
 
 export const link: Link = () => ({
   with: extra => concat(extra),
@@ -88,7 +88,7 @@ export const emptyDelta = <T extends J>() => ({
   raw: <F extends HKT<J>>() => link<App<F, T>>().stages,
 })
 
-export const concatTStages = <Q, S extends Q, T extends Q, V extends Q>(
-  { coll, stages }: TStages<Q, S, T>,
-  newStages: RawStages<Q, T, V>,
-): TStages<Q, S, V> => ({ coll, stages: concatStages(stages, newStages) })
+export const concatTStages = <Q, S extends Q, B extends Q, T extends Q, V extends Q>(
+  { coll, exec, match }: TStages<S, Q, B, T>,
+  stages: RawStages<Q, T, V>,
+): TStages<S, Q, B, V> => ({ coll, match, exec: concatStages(exec, stages) })

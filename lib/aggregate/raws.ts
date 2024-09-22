@@ -16,7 +16,7 @@ import { asStages } from './prefix'
 
 type s = string
 export const $match1 =
-  <Q extends J, T extends Q, C = unknown>(query?: Query<T, C>): FRawStages<Q, T, T, C, 1> =>
+  <T extends J, C = unknown>(query?: Query<T, C>): FRawStages<T, T, T, C, 1> =>
   f =>
     asStages(query ? [{ $match: query.raw(f<T>()) }] : [])
 
@@ -32,7 +32,7 @@ export const $set1 =
     ])
 
 export const $project1 =
-  <Q extends J, T extends Q>(projection: Record<StrKey<T>, 1>): FRawStages<Q, T, T, unknown, 1> =>
+  <T extends J>(projection: Record<StrKey<T>, 1>): FRawStages<T, T, T, unknown, 1> =>
   f =>
     asStages([
       {
@@ -52,7 +52,7 @@ export const $replaceWith1 =
   }
 
 export const $unwind1 =
-  <Q extends J, T extends Q, K extends s, U>(k: K): FRawStages<Q, T & Rec<K, Arr<U>>, T & Rec<K, U>> =>
+  <T extends J, K extends s, U>(k: K): FRawStages<T, T & Rec<K, Arr<U>>, T & Rec<K, U>> =>
   f =>
     asStages([{ $unwind: `$${f<Rec<K, Arr<U>>>().of(k).str()}` }])
 
@@ -70,7 +70,7 @@ export const $group1 =
   ) =>
   <F extends HKT<J, J>>(
     f: <T extends J>() => Field<App<F, T>, T>,
-  ): RawStages<unknown, App<F, T>, Rec<'_id', ID> & AccumulatorsParam<T, Acc, C, K>, C, 1> =>
+  ): RawStages<J, App<F, T>, Rec<'_id', ID> & AccumulatorsParam<T, Acc, C, K>, C, 1> =>
     asStages([
       {
         $group: {
@@ -93,9 +93,9 @@ export const rawVars = <T, Ctx, C, V extends J>(
 ) => Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, v.raw(f).get()]))
 
 export const $simpleLookup1 =
-  <Q extends J, T extends Q, U extends J, R, K extends s, Ctx, C = unknown>(
+  <T extends J, U extends J, R, K extends s, Ctx, C = unknown>(
     args: LookupArgs<T, U, R, K, Ctx, C>,
-  ): FRawStages<Q, T, T & Rec<K, Arr<U>>, C, 1> =>
+  ): FRawStages<T, T, T & Rec<K, Arr<U>>, C, 1> =>
   f => {
     const { coll, k, pipeline, vars } = args
     return asStages([

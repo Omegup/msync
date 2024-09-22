@@ -1,18 +1,17 @@
 import type { Arr, IdHKT, J, RORec, StrKey, jsonItem } from '../../types'
 import { root } from '../field'
-import type { Accumulators, Expr, LookupArgs, Query, RawStages } from '../types'
+import type { Accumulators, Expr, LookupArgs, Query } from '../types'
 import type { Updater } from '../update'
-import { $documents1, $group1, $match1, $project1, $replaceWith1, $set1, $unwind1 } from './raws'
-import { $simpleLookup1 } from './raws'
+import { $documents1, $group1, $match1, $project1, $replaceWith1, $set1, $simpleLookup1, $unwind1 } from './raws'
 export * from './raws'
 
 type s = string
 type j = jsonItem
 
-export const $match_ = <T extends J, C = unknown>(query?: Query<T, C>) =>
+export const $match_ = <Q extends J, T extends Q, C = unknown>(query?: Query<T, C>) =>
   $match1(query)<IdHKT<J>>(root)
 
-export const $set_ = <T extends J, V extends J, C = unknown>(updater: Updater<T, T, V, C>) =>
+export const $set_ = <Q extends J, T extends Q, V extends Q, C = unknown>(updater: Updater<T, Q, T, V, C>) =>
   $set1(updater)<IdHKT<J>>(root)
 
 export const $replaceWith_ = <T extends J, V extends J, C = unknown>(expr: Expr<V, T, C>) =>
@@ -34,7 +33,7 @@ export const $group_ = <
 export const $documents_ = <T extends J, C>(docs: Expr<Arr<T>, null, C>) =>
   $documents1(docs)<IdHKT<J>>(root)
 
-export const $project_ = <T extends J>(projection: Record<StrKey<T>, 1>): RawStages<T, T> =>
+export const $project_ = <T extends J>(projection: Record<StrKey<T>, 1>) =>
   $project1<T>(projection)<IdHKT<J>>(root)
 
 export const $simpleLookup_ = <T extends J, U extends J, R, K extends s, Ctx, C = unknown>(

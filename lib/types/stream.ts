@@ -19,7 +19,7 @@ export type FRawStages<
   out M extends number = number,
 > = <F extends HKT<J, J>>(
   f: <T extends J>() => Field<App<F, T>, T>,
-) => RawStages<App<F, S>, App<F, Q>, App<F, R>, C, M>
+) => RawStages<App<F, Q>, App<F, S>, App<F, R>, C, M>
 
 export type DeltaStages<out Q extends J, in S extends Q, out R extends Q, in C = unknown> = {
   delta: RawStages<Delta<Q>, Delta<S>, Delta<R>, C>
