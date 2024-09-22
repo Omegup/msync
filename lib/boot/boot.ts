@@ -2,7 +2,7 @@ import type { ChangeStream, Timestamp } from 'mongodb'
 import type { HKT, I, J, N, View, doc } from '../../types'
 import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
-import { concatDelta, concatStages, emptyDelta, link, pipe } from '../aggregate/prefix'
+import { concatDelta, emptyDelta, link, pipe } from '../aggregate/prefix'
 import { field } from '../expression/concat'
 import { $ifNull, ite } from '../expression/logic'
 import { nil, val } from '../expression/val'
@@ -14,18 +14,18 @@ import type {
   After,
   Before,
   D,
+  Del,
   Delta,
   DeltaStages,
+  Frame,
+  HasJob,
   Iterator,
   Model,
-  Frame,
   Query,
   RawStages,
   Runner,
   SnapshotStreamExecutionResult,
   UDelta,
-  HasJob,
-  Del,
 } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
 import { set, to } from '../update'
@@ -33,11 +33,11 @@ import { asBefore } from '../utils/before'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 
-const executes = <T extends doc, Result extends J, V extends T & Model>(
+const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T & Model>(
   view: View<T & D, V>,
-  input: DeltaStages<T, Result>,
+  input: DeltaStages<Q, T, Result>,
   streamName: string,
-): SnapshotStreamExecutionResult<Result> => {
+): SnapshotStreamExecutionResult<Q, Result> => {
   const { collection, projection, hardMatch, match } = view
   const job = {}
   const db = collection.s.db,
@@ -55,7 +55,7 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
     root<UDelta<T>>().of('updated').has($eq<boolean>(isNew))
 
   const run = <Result2>(
-    finalInput: RawStages<Delta<Result>, Result2>,
+    finalInput: RawStages<unknown, Delta<Result>, Result2>,
   ): Runner<readonly Result2[], HasJob> => {
     type W = HasJob & { debug: string }
     type It = Iterator<readonly Result2[], W>
@@ -179,31 +179,31 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
   }
   return {
     stages: c =>
-      c({
+      c<UDelta<T>, Before<T>>({
         coll: snapshotCollection,
-        stages: concatStages(
-          $match_(isNew(false)) as RawStages<UDelta<T>, Before<T>>,
-          asBefore(input.raw),
-        ),
+        match: $match_(isNew(false)) as RawStages<unknown, UDelta<T>, Before<T>>,
+        exec: asBefore(input.raw),
       }),
     out: run,
   }
 }
 
-interface SnapshotStreamHKT extends HKT<J> {
-  readonly out: SnapshotStreamExecutionResult<I<J, this>>
-}
 type J2 = readonly [J, J]
-interface DeltaHKT extends HKT<J2> {
-  readonly out: DeltaStages<I<J2, this>[0], I<J2, this>[1]>
+interface SnapshotStreamHKT extends HKT<J2> {
+  readonly out: SnapshotStreamExecutionResult<I<J2, this>[0], I<J2, this>[1]>
+}
+type J3 = readonly [J, J, J]
+interface DeltaHKT extends HKT<J3> {
+  readonly out: DeltaStages<I<J3, this>[0], I<J3, this>[1], I<J3, this>[2]>
 }
 
 export const staging = <T extends doc, V extends T & Model = T & Model>(
   view: View<T & D, V>,
   streamName: string,
 ) =>
-  pipe<V, V, SnapshotStreamHKT, DeltaHKT>(
+  pipe<V, V, V, SnapshotStreamHKT, DeltaHKT>(
     input => executes(view, input, streamName),
     emptyDelta(),
     concatDelta,
+    emptyDelta,
   )
