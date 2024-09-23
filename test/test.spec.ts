@@ -7,10 +7,10 @@ import { concat } from '../lib/expression/concat'
 import { val } from '../lib/expression/val'
 import { root } from '../lib/field'
 import { Machine, wrap } from '../lib/machine'
-import { $lookup, type LeftWrite } from '../lib/stream/$lookup'
-import type { Model } from '../lib/types'
+import { $lookup, type LeftRight } from '../lib/stream/$lookup'
+import type { Model, SnapshotStream } from '../lib/types'
 import { set, to } from '../lib/update'
-import type { ID, O, RORec, Rec } from '../types'
+import type { ID, J, O, RORec, Rec } from '../types'
 import { prepare } from './mongo'
 
 const client = await prepare('test')
@@ -26,14 +26,19 @@ const c3 = db.collection<D3 & Model>('c3')
 // const r = db.collection<Merge<D1>>('r')
 const g = db.collection<Merge<ID & Rec<'v', number>>>('g')
 // const r2 = db.collection<Merge<LeftWrite<D1, D2>>>('r2')
-const r3 = db.collection<Merge<LeftWrite<LeftWrite<D1, D2>, D3>>>('r3')
-const r4 = db.collection<Merge<LeftWrite<LeftWrite<D1, D2>, D3>>>('r4')
+const r3 = db.collection<Merge<LeftRight<LeftRight<D1, D2>, D3>>>('r3')
+const r4 = db.collection<Merge<LeftRight<LeftRight<D1, D2>, D3>>>('r4')
 
 let machine1 = new Machine()
+
+type DZDF = (
+  a: SnapshotStream<D1 & Model, D1 & Model>,
+) => SnapshotStream<LeftRight<D1, D2>, LeftRight<D1, D2>>
 machine1.add(
   staging<D1>({ collection: c1, projection: { _id: 1, deletedAt: 1, link: 1 } }, 'q1')
-    .with(
-      $lookup({
+    .with<LeftRight<D1, D2>, LeftRight<D1, D2>>(
+      $lookup<'', D1, D2, D2, string>({
+        as: '',
         right: staging<D2, D2 & Model>(
           {
             collection: c2,
@@ -43,7 +48,7 @@ machine1.add(
         ).get(),
         lField: root<D1>().of('link'),
         rField: root<D2>().of('link'),
-      }),
+      }) as {} as DZDF,
     )
     .with(
       $lookup({
@@ -54,7 +59,7 @@ machine1.add(
           },
           'q3',
         ).get(),
-        lField: root<LeftWrite<D1, D2>>().of('right').of('link2'),
+        lField: root<LeftRight<D1, D2>>().of('right').of('link2'),
         rField: root<D3>().of('link2'),
       }),
     )
@@ -65,7 +70,7 @@ machine1.add(
 machine1 = wrap(machine1)
 
 machine1.add(
-  from<LeftWrite<LeftWrite<D1, D2>, D3>>(
+  from<LeftRight<LeftRight<D1, D2>, D3>>(
     { collection: r3, projection: { _id: 1, deletedAt: 1, left: 1, right: 1 } },
     'xs1',
   )

@@ -8,11 +8,11 @@ export * from './raws'
 type s = string
 type j = jsonItem
 
-export const $match_ = <Q extends J, T extends Q, C = unknown>(query?: Query<T, C>) =>
+export const $match_ = <Q, T extends Q & J, C = unknown>(query?: Query<T, C>) =>
   $match1(query)<IdHKT<J>>(root)
 
-export const $set_ = <Q extends J, T extends Q, V extends Q, C = unknown>(updater: Updater<T, Q, T, V, C>) =>
-  $set1(updater)<IdHKT<J>>(root)
+export const $set_ = <Q, T extends Q & J, V extends Q & J, C = unknown>(updater: Updater<T, T, V, C>) =>
+  $set1<Q, T, V, C>(updater)<IdHKT<J>>(root)
 
 export const $replaceWith_ = <T extends J, V extends J, C = unknown>(expr: Expr<V, T, C>) =>
   $replaceWith1(expr)<IdHKT<J>>(root)

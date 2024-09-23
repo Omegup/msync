@@ -28,14 +28,23 @@ const merge = <Result, LD extends HasJob, RD extends HasJob>({
 }): IteratorResult<readonly Result[], Next<LD, RD>> =>
   mergeIterators<'L' | 'R', readonly Result[], { L: LD; R: RD }>({ sources: { L, R } })
 
-const join = <T extends doc, U extends doc, S extends notArr, Result extends J, R, L>(
-  { lField, rField, left, right }: Params<T, U, S>,
-  leftSnapshot: TStages<L, Before<T>>,
-  rightSnapshot: TStages<R, Before<U>>,
-  stagesUntilNextLookup: DeltaStages<
-    O<{ readonly left: T; readonly right: U; readonly _id: string }>,
-    Result
-  >,
+const join = <
+  As extends string,
+  QT extends J,
+  T extends QT,
+  L,
+  BL extends Before<QT>,
+  QU extends J,
+  U extends QU,
+  S extends notArr,
+  R,
+  BR extends Before<QU>,
+  Result extends LeftRight<QT, QU>
+>(
+  { lField, rField, left, right, as }: Params<As, QT, T, QU, U, S>,
+  leftSnapshot: TStages<L, Before<QT>, BL, Before<T>>,
+  rightSnapshot: TStages<R, Before<QU>, BR, Before<U>>,
+  stagesUntilNextLookup: DeltaStages<LeftRight<QT, QU>, LeftRight<T, U>, Result>,
 ): SnapshotStreamExecutionResult<Result> => {
   const rightJoinField = { field1: lField, field2: rField }
   const joinR_Snapshot = $lookupRaw(rightJoinField, rightSnapshot, 'left', 'right', {
@@ -46,9 +55,7 @@ const join = <T extends doc, U extends doc, S extends notArr, Result extends J, 
   return {
     stages: consume =>
       consume(concatTStages(resultingSnapshot, asBefore(stagesUntilNextLookup.raw))),
-    out: <Final>(
-      finalInput: RawStages<Delta<Result>, Final>,
-    ): Runner<readonly Final[], HasJob> => {
+    out: <Final>(finalInput: RawStages<Delta<Result>, Final>): Runner<readonly Final[], HasJob> => {
       const leftJoinField = { field1: rField, field2: lField }
       const joinL_Delta = $lookupDelta(leftJoinField, leftSnapshot, 'right', 'left')
       const joinR_Delta = $lookupDelta(rightJoinField, rightSnapshot, 'left', 'right')
@@ -62,24 +69,36 @@ const join = <T extends doc, U extends doc, S extends notArr, Result extends J, 
   }
 }
 
-type Params1<T extends J, U extends J, S extends notArr> = {
-  lField: Field<T, S>
-  rField: Field<U, S>
-  right: SnapshotStreamExecutionResult<U>
+type Params1<As extends string, QT extends J, QU extends J, U extends QU, S extends notArr> = {
+  lField: Field<QT, S>
+  rField: Field<QU, S>
+  right: SnapshotStreamExecutionResult<QU, U>
+  as: As
 }
-type Params<T extends J, U extends J, S extends notArr> = Params1<T, U, S> & {
-  left: SnapshotStreamExecutionResult<T>
+type Params<
+  As extends string,
+  QT extends J,
+  T extends QT,
+  QU extends J,
+  U extends QU,
+  S extends notArr,
+> = Params1<As, QT, QU, U, S> & {
+  left: SnapshotStreamExecutionResult<QT, T>
 }
 
-export type LeftWrite<T, V> = O<{ readonly left: T; readonly right: V } & ID>
+export type LeftRight<T, V> = O<{ readonly left: T; readonly right: V } & ID>
 
 export const $lookup1 =
-  <T extends doc, U extends doc, S extends notArr>(
-    p: Params<T, U, S>,
-  ): SnapshotStream<LeftWrite<T, U>> =>
-  <Result extends J>(input: DeltaStages<LeftWrite<T, U>, Result>) =>
+  <As extends string, QT extends J, T extends QT, QU extends J, U extends QU, S extends notArr>(
+    p: Params<As, QT, T, QU, U, S>,
+  ): SnapshotStream<LeftRight<QT, QU>, LeftRight<T, U>> =>
+  <Result extends LeftRight<QT, QU>>(
+    input: DeltaStages<LeftRight<QT, QU>, LeftRight<T, U>, Result>,
+  ) =>
     p.left.stages(lStages => p.right.stages(rStages => join(p, lStages, rStages, input)))
 export const $lookup =
-  <T extends doc, U extends doc, S extends notArr>(p: Params1<T, U, S>) =>
-  (l: SnapshotStream<T>): SnapshotStream<LeftWrite<T, U>> =>
+  <As extends string, QT extends J, QU extends J, U extends QU, S extends notArr>(
+    p: Params1<As, QT, QU, U, S>,
+  ) =>
+  <T extends QT>(l: SnapshotStream<QT, T>): SnapshotStream<LeftRight<QT, QU>, LeftRight<T, U>> =>
     $lookup1({ ...p, left: l(emptyDelta()) })

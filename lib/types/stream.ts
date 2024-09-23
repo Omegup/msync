@@ -12,23 +12,29 @@ export interface RawStages<out Q, in S extends Q, out R extends Q, in C = unknow
 }
 
 export type FRawStages<
-  out Q extends J,
-  in S extends Q,
-  out R extends Q,
+  out Q,
+  in S extends Q & J,
+  out R extends Q & J,
   in C = unknown,
   out M extends number = number,
 > = <F extends HKT<J, J>>(
   f: <T extends J>() => Field<App<F, T>, T>,
-) => RawStages<App<F, Q>, App<F, S>, App<F, R>, C, M>
+) => RawStages<App<F, Q & J>, App<F, S>, App<F, R>, C, M>
 
-export type DeltaStages<out Q extends J, in S extends Q, out R extends Q, in C = unknown> = {
+export type DeltaStages<out Q, in S extends Q & J, out R extends Q & J, in C = unknown> = {
   delta: RawStages<Delta<Q>, Delta<S>, Delta<R>, C>
   raw: FRawStages<Q, S, R, C>
 }
-export type LinStages<out Q extends J, in S extends Q, out R extends Q, in C = unknown> = {
+export type LinStages<out Q, in S extends Q, out R extends Q, in C = unknown> = {
   lin: RawStages<Q, S, R, C, 1>
 }
-export type TStages<in out S, out Q, in out B extends Q, out R extends Q, M extends number = number> = {
+export type TStages<
+  in out S,
+  out Q,
+  in out B extends Q,
+  out R extends Q,
+  M extends number = number,
+> = {
   coll: ReadonlyCollection<S>
   input: RawStages<unknown, S, B, unknown, M>
   exec: RawStages<Q, B, R, unknown, M>
@@ -87,8 +93,8 @@ export type UDelta<T, E = { readonly updated: boolean }> = Delta<T | null, 'afte
 // this type of streams is based on the separation between
 // • last snapshot which is the last data successfully synced
 // • and the new incoming data to be synced
-export type SnapshotStream<Q extends J, T extends Q> = <Result extends Q>(
+export type SnapshotStream<out Q extends J, in out T extends Q> = <Q2 extends J, Result extends Q2>(
   // this input doesn't end necessarily with merge stage, cuz it can be used for another lookup
   // so input can be used to construct the stages of the left/rigth join of another lookup
-  input: DeltaStages<Q, T, Result>,
-) => SnapshotStreamExecutionResult<Q, Result>
+  input: DeltaStages<Q2 | T, T, Result>,
+) => SnapshotStreamExecutionResult<Q | Q2, Result>

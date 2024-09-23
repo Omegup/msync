@@ -21,7 +21,7 @@ export const $match1 =
     asStages(query ? [{ $match: query.raw(f<T>()) }] : [])
 
 export const $set1 =
-  <Q extends J, T extends Q, V extends Q, C = unknown>(updater: Updater<T, Q, T, V, C>): FRawStages<Q, T, V, C, 1> =>
+  <Q, T extends Q & J, V extends Q & J, C = unknown>(updater: Updater<T, T, V, C>): FRawStages<Q, T, V, C, 1> =>
   f =>
     asStages([
       {
