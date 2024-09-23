@@ -105,7 +105,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
       const r = await aggregate<'out'>(c =>
         c({
           coll: collection,
-          match: $match_(hardQuery) as RawStages<J, V | Del, V>,
+          input: $match_(hardQuery) as RawStages<J, V | Del, V>,
           exec: cloneIntoNew,
         }),
       )
@@ -118,7 +118,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
       const aggResult = await aggregate<Result2>(c =>
         c<UDelta<T>, UDelta<T>>({
           coll: snapshotCollection,
-          match: link<UDelta<T>>().stages,
+          input: link<UDelta<T>>().stages,
           exec: link<UDelta<T>>()
             .with($match_(isNew(true)))
             .with(
@@ -188,7 +188,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
     stages: c =>
       c<UDelta<T>, Before<T>>({
         coll: snapshotCollection,
-        match: $match_(isNew(false)) as RawStages<unknown, UDelta<T>, Before<T>>,
+        input: $match_(isNew(false)) as RawStages<unknown, UDelta<T>, Before<T>>,
         exec: asBefore(input.raw),
       }),
     out: run,

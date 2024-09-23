@@ -89,6 +89,6 @@ export const emptyDelta = <T extends J>() => ({
 })
 
 export const concatTStages = <Q, S extends Q, B extends Q, T extends Q, V extends Q>(
-  { coll, exec, match }: TStages<S, Q, B, T>,
+  { coll, exec, input }: TStages<S, Q, B, T>,
   stages: RawStages<Q, T, V>,
-): TStages<S, Q, B, V> => ({ coll, match, exec: concatStages(exec, stages) })
+): TStages<S, Q, B, V> => ({ coll, input, exec: concatStages(exec, stages) })

@@ -3,10 +3,10 @@ import type { AggregateCommand } from '../types/aggregate'
 import { log } from '../utils/log'
 
 export const aggregate = <Result>(input: Stages<unknown, Result>) =>
-  input(({ coll, exec, match }) => {
+  input(({ coll, exec, input }) => {
     const req = {
       aggregate: coll.collectionName,
-      pipeline: [...match, ...exec],
+      pipeline: [...input, ...exec],
       cursor: {},
       readConcern: { level: 'snapshot' },
     }

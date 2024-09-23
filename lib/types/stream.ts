@@ -29,9 +29,9 @@ export type LinStages<out Q extends J, in S extends Q, out R extends Q, in C = u
   lin: RawStages<Q, S, R, C, 1>
 }
 export type TStages<in out S, out Q, in out B extends Q, out R extends Q, M extends number = number> = {
-  exec: RawStages<Q, B, R, unknown, M>
-  match: RawStages<unknown, S, B, unknown, M>
   coll: ReadonlyCollection<S>
+  input: RawStages<unknown, S, B, unknown, M>
+  exec: RawStages<Q, B, R, unknown, M>
 }
 export type Stages<out Q, out R extends Q, M extends number = number> = <E>(
   consume: <S, B extends Q>(value: TStages<S, Q, B, R, M>) => E,

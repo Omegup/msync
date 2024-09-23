@@ -98,7 +98,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
       const aggResult = await aggregate<Result2>(c =>
         c<V | Del, V | Del>({
           coll: collection,
-          match: link<V | Del>().stages,
+          input: link<V | Del>().stages,
           exec: cloneIntoNew
             .with<unknown, R2>(
               $simpleLookup_<R & ID, Result, null, 'after', Ctx>({
@@ -163,7 +163,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
     stages: c =>
       c({
         coll: collection,
-        match: matcher as RawStages<V | Del, V | Del, V, unknown, 1>,
+        input: matcher as RawStages<V | Del, V | Del, V, unknown, 1>,
         exec: stages,
       }),
   }

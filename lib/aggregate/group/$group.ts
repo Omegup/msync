@@ -29,10 +29,10 @@ export const $group =
     type VID = WID & V
     const stages: RawStages<J, WID, Rec<'item', Arr<VID>>, unknown, 1> = stream({
       lin: link<T, unknown, 1>().stages,
-    }).stages(<S, B extends Q>({ coll, exec, match }: TStages<S, Q, B, T, 1>) => {
+    }).stages(<S, B extends Q>({ coll, exec, input }: TStages<S, Q, B, T, 1>) => {
       type Ctx = RORec<'id', ID>
       const pipeline = link<S, Ctx, 1>()
-        .with(match)
+        .with(input)
         .with(exec)
         .with($match_($expr(eq<ID, T, Ctx>(id)(ctx<ID>()('id').expr()))))
         .with($group_(id, args)).stages
