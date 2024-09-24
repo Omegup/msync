@@ -1,5 +1,5 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
-import type { Arr, HKT, I, ID, J, N, O, RORec, Rec, View, doc } from '../../types'
+import type { Arr, HKT, I, ID, J, J2, J3, N, O, RORec, Rec, View, doc } from '../../types'
 import {
   $documents_,
   $match_,
@@ -168,11 +168,9 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
       }),
   }
 }
-type J2 = readonly [J, J]
 interface StreamRunnerHKT extends HKT<J2> {
   readonly out: SimpleStreamExecutionResult<I<J2, this>[0], I<J2, this>[1]>
 }
-type J3 = readonly [J, J, J]
 interface StagesHKT extends HKT<J3> {
   readonly out: RORec<'lin', RawStages<I<J3, this>[0], I<J3, this>[1], I<J3, this>[2], unknown, 1>>
 }

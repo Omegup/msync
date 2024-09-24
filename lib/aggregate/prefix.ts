@@ -1,4 +1,4 @@
-import type { App, HKT, J, RawObj } from '../../types'
+import type { App, HKT, J, J2, J3, RawObj } from '../../types'
 import type { Delta, DeltaStages, RawStages, Stream, TStages } from '../types'
 
 type n = number
@@ -25,11 +25,11 @@ type Concat<out Q, in T extends Q, out V extends Q, in out C, in out M extends n
   with: <Q2, W extends Q2>(extra: RawStages<Q | Q2, V, W, C, M>) => Concat<Q | Q2, T, W, C, M>
   stages: RawStages<Q, T, V, C, M>
 }
-type DeltaPipe<
+export type DeltaPipe<
   Q extends J,
   T extends Q,
-  F extends HKT<readonly [J, J]>,
-  G extends HKT<readonly [J, J, J]>,
+  F extends HKT<J2>,
+  G extends HKT<J3>,
 > = {
   with: <Q2 extends J, V extends Q2>(
     map: (a: Stream<Q, T, F, G>) => Stream<Q | Q2, V, F, G>,
@@ -42,8 +42,8 @@ export const pipe = <
   Q extends J,
   S extends Q,
   T extends Q,
-  F extends HKT<readonly [J, J]>,
-  G extends HKT<readonly [J, J, J]>,
+  F extends HKT<J2>,
+  G extends HKT<J3>,
 >(
   stream: Stream<Q, S, F, G>,
   s: App<G, [Q, S, T]>,
@@ -88,7 +88,7 @@ export const emptyDelta = <T extends J>() => ({
   raw: <F extends HKT<J>>() => link<App<F, T>>().stages,
 })
 
-export const concatTStages = <Q, S extends Q, B extends Q, T extends Q, V extends Q>(
+export const concatTStages = <S, Q, B extends Q, T extends Q, V extends Q>(
   { coll, exec, input }: TStages<S, Q, B, T>,
   stages: RawStages<Q, T, V>,
 ): TStages<S, Q, B, V> => ({ coll, input, exec: concatStages(exec, stages) })

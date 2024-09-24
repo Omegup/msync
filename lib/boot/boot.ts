@@ -1,5 +1,5 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
-import type { HKT, I, J, N, View, doc } from '../../types'
+import type { HKT, I, J, J2, J3, N, View, doc } from '../../types'
 import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe } from '../aggregate/prefix'
@@ -195,12 +195,10 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
   }
 }
 
-type J2 = readonly [J, J]
-interface SnapshotStreamHKT extends HKT<J2> {
+export interface SnapshotStreamHKT extends HKT<J2> {
   readonly out: SnapshotStreamExecutionResult<I<J2, this>[0], I<J2, this>[1]>
 }
-type J3 = readonly [J, J, J]
-interface DeltaHKT extends HKT<J3> {
+export interface DeltaHKT extends HKT<J3> {
   readonly out: DeltaStages<I<J3, this>[0], I<J3, this>[1], I<J3, this>[2]>
 }
 
