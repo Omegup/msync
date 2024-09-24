@@ -1,12 +1,14 @@
 import { $sum } from '../lib/accumulators'
 import { $merge, type Merge } from '../lib/aggregate/$merge'
 import { $group } from '../lib/aggregate/group'
+import { $match } from '../lib/aggregate/match'
 import { $set } from '../lib/aggregate/set'
 import { from, staging } from '../lib/boot'
 import { concat } from '../lib/expression/concat'
 import { val } from '../lib/expression/val'
 import { root } from '../lib/field'
 import { Machine, wrap } from '../lib/machine'
+import { $ne } from '../lib/predicate'
 import { $lookup, type LeftWrite } from '../lib/stream/$lookup'
 import type { Model } from '../lib/types'
 import { set, to } from '../lib/update'
@@ -32,6 +34,7 @@ const r4 = db.collection<Merge<LeftWrite<LeftWrite<D1, D2>, D3>>>('r4')
 let machine1 = new Machine()
 machine1.add(
   staging<D1>({ collection: c1, projection: { _id: 1, deletedAt: 1, link: 1 } }, 'q1')
+    .then($match(root<D1>().of('link').has($ne('blabla'))))
     .with(
       $lookup({
         right: staging<D2, D2 & Model>(

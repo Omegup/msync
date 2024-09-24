@@ -69,9 +69,9 @@ declare global {
         value: App<F, V[I] & Dom>,
         index: AsNum<I>,
         array: V,
-      ) => App<G, readonly [V, I]>,
+      ) => App<G, [V, I]>,
       thisArg?: any,
-    ): AppMapRW<G, { [I in keyof V]: readonly [V, I] }, GetDom<Dom>>
+    ): AppMapRW<G, { [I in keyof V]: [V, I] }, GetDom<Dom>>
   }
   interface PromiseConstructor {
     all<T extends readonly unknown[] | []>(values: AppMap<PromiseHKT, T>): Promise<T>
