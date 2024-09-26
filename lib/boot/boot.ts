@@ -1,43 +1,28 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
-import type { HKT, I, J, N, View, doc } from '../../types'
+import type { HKT, I, J, J2, J3, N, View, doc } from '../../types'
 import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
-import { concatDelta, concatStages, emptyDelta, link, pipe } from '../aggregate/prefix'
+import { concatDelta, emptyDelta, link, pipe } from '../aggregate/prefix'
 import { field } from '../expression/concat'
 import { $ifNull, ite } from '../expression/logic'
 import { nil, val } from '../expression/val'
 import { root } from '../field'
-import { $eq, $gteTs } from '../predicate'
+import { $eq, $gteTs, $ne } from '../predicate'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
-import type {
-  After,
-  Before,
-  D,
-  Delta,
-  DeltaStages,
-  Iterator,
-  Model,
-  Frame,
-  Query,
-  RawStages,
-  Runner,
-  SnapshotStreamExecutionResult,
-  UDelta,
-  HasJob,
-  Del,
-} from '../types'
-import type { AggregateCommand } from '../types/aggregate'
+import type { AggregateCommand, Before, SnapshotStreamExecutionResult } from '../types'
+import type { Frame, HasJob, Iterator, Runner } from '../types/machine'
+import type { After, D, Del, Delta, DeltaStages, Model, RawStages, UDelta } from '../types/stream'
 import { set, to } from '../update'
 import { asBefore } from '../utils/before'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 
-const executes = <T extends doc, Result extends J, V extends T & Model>(
+const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T & Model>(
   view: View<T & D, V>,
-  input: DeltaStages<T, Result>,
+  input: DeltaStages<Q, T, Result>,
   streamName: string,
-): SnapshotStreamExecutionResult<Result> => {
+): SnapshotStreamExecutionResult<Q, Result> => {
   const { collection, projection, hardMatch, match } = view
   const job = {}
   const db = collection.s.db,
@@ -51,11 +36,8 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
   // TODO create indexes (if snapshot is in sources)
   const projectInput = $project_<T & D>({ ...projection, deletedAt: 1 })
 
-  const isNew = (isNew: boolean): Query<UDelta<T>> =>
-    root<UDelta<T>>().of('updated').has($eq<boolean>(isNew))
-
   const run = <Result2>(
-    finalInput: RawStages<Delta<Result>, Result2>,
+    finalInput: RawStages<unknown, Delta<Result>, Result2>,
   ): Runner<readonly Result2[], HasJob> => {
     type W = HasJob & { debug: string }
     type It = Iterator<readonly Result2[], W>
@@ -89,20 +71,26 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
         hardMatch,
       )
       const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
-      const replaceRaw: RawStages<T & D, After<T> & { updated: true; _id: string }> = $replaceWith_(
-        field<After<T> & { updated: true; _id: string }, T & D>({
-          after: ite($and(notDeleted, match).expr, root<T>().expr(), val(null)),
-          updated: val(true),
-          _id: root<T & D>().of('_id').expr(),
-        }),
-      )
-      const cloneIntoNew = link<V | Del>()
-        .with($match_(hardQuery) as RawStages<V | Del, V>)
+      const replaceRaw: RawStages<J, T & D, After<T> & { updated: true; _id: string }> =
+        $replaceWith_(
+          field<After<T> & { updated: true; _id: string }, T & D>({
+            after: ite($and(notDeleted, match).expr, root<T>().expr(), val(null)),
+            updated: val(true),
+            _id: root<T & D>().of('_id').expr(),
+          }),
+        )
+      const cloneIntoNew = link<V>()
         .with(projectInput)
         .with(replaceRaw)
         .with($merge_({ into: snapshotCollection, on: root<UDelta<T>>().of('_id') })).stages
 
-      const r = await aggregate<'out'>(c => c({ coll: collection, stages: cloneIntoNew }))
+      const r = await aggregate<'out'>(c =>
+        c({
+          coll: collection,
+          input: $match_(hardQuery) as RawStages<J, V | Del, V>,
+          exec: cloneIntoNew,
+        }),
+      )
       return next(step4(r), 'run the aggregation')
     }
 
@@ -110,12 +98,13 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
     const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
     const step4 = (result: AggregateCommand<'out'>) => async (): Next => {
       const aggResult = await aggregate<Result2>(c =>
-        c<UDelta<T>>({
+        c<UDelta<T>, UDelta<T>>({
           coll: snapshotCollection,
-          stages: link<UDelta<T>>()
-            .with($match_(isNew(true)))
+          input: link<UDelta<T>>().stages,
+          exec: link<UDelta<T>>()
+            .with($match_(root<UDelta<T>>().of('updated').has($eq<boolean>(true))))
             .with(
-              $set_<UDelta<T>, UDelta<T> & Delta<T>>(
+              $set_<UDelta<T>, UDelta<T>, UDelta<T> & Delta<T>>(
                 set({
                   before: to($ifNull(root<UDelta<T>>().of('before').expr(), nil)),
                 }),
@@ -177,33 +166,32 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
     }
     return stop
   }
+  const hasBefore = root<UDelta<T>>().of('before').has($ne<T | N>(null))
   return {
     stages: c =>
-      c({
+      c<UDelta<T>, Before<T>>({
         coll: snapshotCollection,
-        stages: concatStages(
-          $match_(isNew(false)) as RawStages<UDelta<T>, Before<T>>,
-          asBefore(input.raw),
-        ),
+        input: $match_(hasBefore) as RawStages<unknown, UDelta<T>, Before<T>>,
+        exec: asBefore(input.raw),
       }),
     out: run,
   }
 }
 
-interface SnapshotStreamHKT extends HKT<J> {
-  readonly out: SnapshotStreamExecutionResult<I<J, this>>
+export interface SnapshotStreamHKT extends HKT<J2> {
+  readonly out: SnapshotStreamExecutionResult<I<J2, this>[0], I<J2, this>[1]>
 }
-type J2 = readonly [J, J]
-interface DeltaHKT extends HKT<J2> {
-  readonly out: DeltaStages<I<J2, this>[0], I<J2, this>[1]>
+export interface DeltaHKT extends HKT<J3> {
+  readonly out: DeltaStages<I<J3, this>[0], I<J3, this>[1], I<J3, this>[2]>
 }
 
 export const staging = <T extends doc, V extends T & Model = T & Model>(
   view: View<T & D, V>,
   streamName: string,
 ) =>
-  pipe<V, V, SnapshotStreamHKT, DeltaHKT>(
+  pipe<V, V, V, SnapshotStreamHKT, DeltaHKT>(
     input => executes(view, input, streamName),
     emptyDelta(),
     concatDelta,
+    emptyDelta,
   )

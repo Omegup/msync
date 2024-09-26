@@ -1,19 +1,13 @@
-import type { ID, J, O, doc, notArr } from '../../types'
+import type { ID, J, RORec, Rec, doc, notArr } from '../../types'
 import { $lookupDelta, $lookupRaw } from '../aggregate/lookup'
 import { concatStages, concatTStages, emptyDelta } from '../aggregate/prefix'
-import type { Field } from '../field'
-import type {
-  Before,
-  Delta,
-  DeltaStages,
-  IteratorResult,
-  RawStages,
-  Runner,
-  SnapshotStream,
-  SnapshotStreamExecutionResult,
-  TStages,
-  HasJob,
-} from '../types'
+import { $replaceWithDelta } from '../aggregate/set'
+import { $mergeObjects } from '../expression/array'
+import { fieldM } from '../expression/concat'
+import { root, type Field } from '../field'
+import type { Before, Delta, DeltaStages, HasJob, IteratorResult, Runner, TStages } from '../types'
+import type { RawStages, SnapshotStream, SnapshotStreamExecutionResult } from '../types/stream'
+
 import { asBefore } from '../utils/before'
 import { mergeIterators } from '../utils/merge'
 
@@ -28,32 +22,76 @@ const merge = <Result, LD extends HasJob, RD extends HasJob>({
 }): IteratorResult<readonly Result[], Next<LD, RD>> =>
   mergeIterators<'L' | 'R', readonly Result[], { L: LD; R: RD }>({ sources: { L, R } })
 
-const join = <T extends doc, U extends doc, S extends notArr, Result extends J, R, L>(
-  { lField, rField, left, right }: Params<T, U, S>,
-  leftSnapshot: TStages<L, Before<T>>,
-  rightSnapshot: TStages<R, Before<U>>,
-  stagesUntilNextLookup: DeltaStages<
-    O<{ readonly left: T; readonly right: U; readonly _id: string }>,
-    Result
-  >,
-): SnapshotStreamExecutionResult<Result> => {
+const join = <
+  As extends string,
+  LQ extends J,
+  Q2 extends J,
+  LE extends LQ & doc,
+  LS,
+  BLB extends Before<LQ>,
+  RQ extends J,
+  RE extends RQ & doc,
+  S extends notArr,
+  RS,
+  BRB extends Before<RQ>,
+  Result extends Q2,
+>(
+  { lField, rField, left, right, as }: LookupParams<As, LQ, LE, RQ, RE, S>,
+  leftSnapshot: TStages<LS, Before<LQ>, BLB, Before<LE>>,
+  rightSnapshot: TStages<RS, Before<RQ>, BRB, Before<RE>>,
+  stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE>, Result>,
+): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
   const rightJoinField = { field1: lField, field2: rField }
-  const joinR_Snapshot = $lookupRaw(rightJoinField, rightSnapshot, 'left', 'right', {
-    left: 'a',
-    right: 'b',
-  })
-  const resultingSnapshot = concatTStages(leftSnapshot, asBefore(joinR_Snapshot))
+  const joinR_Snapshot: RawStages<
+    Before<LQ | Q2>,
+    Before<LE>,
+    Before<LE & Rec<As, RE> & ID>
+  > = asBefore($lookupRaw(rightJoinField, rightSnapshot, as))
+  const resultingSnapshot = concatTStages(leftSnapshot, joinR_Snapshot)
+  const dict = { [as]: 'a' } as RORec<As, 'a'>
+  const dictId: RORec<As, 'a'> & RORec<'_id', 'b'> = { ...dict, _id: 'b' }
   return {
     stages: consume =>
       consume(concatTStages(resultingSnapshot, asBefore(stagesUntilNextLookup.raw))),
     out: <Final>(
-      finalInput: RawStages<Delta<Result>, Final>,
+      finalInput: RawStages<unknown, Delta<Result>, Final>,
     ): Runner<readonly Final[], HasJob> => {
       const leftJoinField = { field1: rField, field2: lField }
-      const joinL_Delta = $lookupDelta(leftJoinField, leftSnapshot, 'right', 'left')
-      const joinR_Delta = $lookupDelta(rightJoinField, rightSnapshot, 'left', 'right')
-      const lRunnerInput = concatStages(joinR_Delta, stagesUntilNextLookup.delta)
-      const rRunnerInput = concatStages(joinL_Delta, stagesUntilNextLookup.delta)
+      type LeftRight = Rec<'left', LE> & Rec<'right', RE> & ID
+      type JoinStages<RR> = RawStages<unknown, Delta<RR>, Delta<LeftRight>>
+      const joinL_Delta: JoinStages<RE> = $lookupDelta<RQ, RE, LQ, LE, BLB, LS, S, 'right', 'left'>(
+        leftJoinField,
+        leftSnapshot,
+        'right',
+        'left',
+      )
+      const joinR_Delta: JoinStages<LE> = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, 'left', 'right'>(
+        rightJoinField,
+        rightSnapshot,
+        'left',
+        'right',
+      )
+      const zefze = concatStages<
+        unknown,
+        Delta<LeftRight>,
+        Delta<LE & RORec<As, RE>>,
+        Delta<Result>,
+        unknown
+      >(
+        $replaceWithDelta<unknown, LeftRight, LE & RORec<As, RE>>(
+          $mergeObjects<LE, ID & RORec<As, RE>, LeftRight>(
+            root<LeftRight>().of('left').expr(),
+            fieldM<RORec<As, 'a'> & RORec<'_id', 'b'>, { a: RE; b: string }, LeftRight>(
+              { a: root<LeftRight>().of('right').expr(), b: root<LeftRight>().of('_id').expr() },
+              dictId,
+            ),
+          ),
+        ),
+        stagesUntilNextLookup.delta,
+      )
+
+      const lRunnerInput = concatStages(joinR_Delta, zefze)
+      const rRunnerInput = concatStages(joinL_Delta, zefze)
       const lRunner = left.out(concatStages(lRunnerInput, finalInput))
       const rRunner = right.out(concatStages(rRunnerInput, finalInput))
 
@@ -62,24 +100,56 @@ const join = <T extends doc, U extends doc, S extends notArr, Result extends J, 
   }
 }
 
-type Params1<T extends J, U extends J, S extends notArr> = {
-  lField: Field<T, S>
-  rField: Field<U, S>
-  right: SnapshotStreamExecutionResult<U>
+type Params<As extends string, LQ extends J, RQ extends J, RE extends RQ, S extends notArr> = {
+  localField: Field<LQ, S>
+  foreignField: Field<RQ, S>
+  from: SnapshotStreamExecutionResult<RQ, RE>
+  as: As
 }
-type Params<T extends J, U extends J, S extends notArr> = Params1<T, U, S> & {
-  left: SnapshotStreamExecutionResult<T>
+type LookupParams<
+  As extends string,
+  LQ extends J,
+  LE extends LQ,
+  RQ extends J,
+  RE extends RQ,
+  S extends notArr,
+> = {
+  lField: Field<LQ, S>
+  rField: Field<RQ, S>
+  right: SnapshotStreamExecutionResult<RQ, RE>
+  as: As
+  left: SnapshotStreamExecutionResult<LQ, LE>
 }
-
-export type LeftWrite<T, V> = O<{ readonly left: T; readonly right: V } & ID>
 
 export const $lookup1 =
-  <T extends doc, U extends doc, S extends notArr>(
-    p: Params<T, U, S>,
-  ): SnapshotStream<LeftWrite<T, U>> =>
-  <Result extends J>(input: DeltaStages<LeftWrite<T, U>, Result>) =>
-    p.left.stages(lStages => p.right.stages(rStages => join(p, lStages, rStages, input)))
+  <
+    As extends string,
+    LQ extends J,
+    LE extends LQ & doc,
+    RQ extends J,
+    RE extends RQ & doc,
+    S extends notArr,
+  >(
+    p: LookupParams<As, LQ, LE, RQ, RE, S>,
+  ): SnapshotStream<LQ, LE & RORec<As, RE>> =>
+  <Q2 extends J, Result extends Q2>(
+    input: DeltaStages<Q2 | (LE & RORec<As, RE>), LE & RORec<As, RE>, Result>,
+  ) =>
+    p.left.stages(<LS, BLB extends Before<LQ>>(lStages: TStages<LS, Before<LQ>, BLB, Before<LE>>) =>
+      p.right.stages(
+        <RS, BRB extends Before<RQ>>(rStages: TStages<RS, Before<RQ>, BRB, Before<RE>>) =>
+          join<As, LQ, Q2, LE, LS, BLB, RQ, RE, S, RS, BRB, Result>(p, lStages, rStages, input),
+      ),
+    )
 export const $lookup =
-  <T extends doc, U extends doc, S extends notArr>(p: Params1<T, U, S>) =>
-  (l: SnapshotStream<T>): SnapshotStream<LeftWrite<T, U>> =>
-    $lookup1({ ...p, left: l(emptyDelta()) })
+  <As extends string, LQ extends J, RQ extends J, RE extends RQ & doc, S extends notArr>(
+    p: Params<As, LQ, RQ, RE, S>,
+  ) =>
+  <LE extends LQ & doc>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE>> =>
+    $lookup1<As, LQ, LE, RQ, RE, S>({
+      right: p.from,
+      as: p.as,
+      lField: p.localField,
+      rField: p.foreignField,
+      left: l(emptyDelta()),
+    })

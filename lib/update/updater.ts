@@ -13,25 +13,27 @@ export const subUpdater = <P extends J, D, T, V, Ctx>(
   f: Path<P, D | N>,
 ): Updater<P, T, V, Ctx> => ({ raw: <R extends J>(g: Field<R, P | N>) => a.raw(g.with(f)) })
 
-type FDom<R, C> = { readonly [P: string]: Updater<R, never, unknown, C> }
+type FDom<R, C> = {
+  readonly [P in string]: Updater<R, never, unknown, C>
+}
 type Par<K extends string> = { readonly [P in K]?: unknown }
 export const set = <
   R,
   Old extends Par<K>,
   F extends FDom<R, C>,
   K extends StrKey<F> = StrKey<F>,
-  C = unknown
+  C = unknown,
 >(
   fields: F,
 ): Updater<
   R,
   Old,
   Omit<Old, K> &
-    O & {
+    O<{
       readonly [P in K]: F[P] extends Updater<R, infer O extends Old[P], infer A, C>
         ? A | Exclude<Old[P], O>
         : never
-    },
+    }>,
   C
 > => ({
   raw: f => Object.entries(fields).flatMap(([k, v]) => v.raw(f).map(([l, v]) => [`.${k}${l}`, v])),
@@ -40,7 +42,6 @@ export const set = <
 export const weaken = <R, T, V, C = unknown>(
   updater: Updater<R, T, V, C>,
 ): Updater<R, T | null, V | null, C> => ({ raw: f => updater.raw(f) })
-
 
 export const to = <R, V, C = unknown>(expr: Expr<V, R, C>): Updater<R, notArr, V, C> => ({
   raw: f => [['', expr.raw(f).get()]],

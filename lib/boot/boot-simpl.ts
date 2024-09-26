@@ -1,5 +1,5 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
-import type { Arr, HKT, I, ID, J, N, O, RORec, Rec, View, doc } from '../../types'
+import type { Arr, HKT, I, ID, J, J2, J3, N, O, RORec, Rec, View, doc } from '../../types'
 import {
   $documents_,
   $match_,
@@ -32,11 +32,11 @@ import type { AggregateCommand } from '../types/aggregate'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 
-const executes = <T extends doc, Result extends J, V extends T & Model>(
+const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T & Model>(
   view: View<T & D, V>,
-  input: RawStages<T, Result, unknown, 1>,
+  input: RawStages<Q, T, Result, unknown, 1>,
   streamName: string,
-): SimpleStreamExecutionResult<Result> => {
+): SimpleStreamExecutionResult<Q, Result> => {
   const { collection, projection, hardMatch, match } = view
   const job = {}
   const db = collection.s.db,
@@ -51,7 +51,7 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
   const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
 
   const run = <Result2>(
-    finalInput: RawStages<OutInput<Result>, Result2>,
+    finalInput: RawStages<unknown, OutInput<Result>, Result2>,
   ): Runner<readonly Result2[], HasJob> => {
     type W = HasJob & { debug: string }
     type It = Iterator<readonly Result2[], W>
@@ -82,28 +82,29 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
         hardMatch,
       )
       type R = Rec<'item', Arr<T>>
-      const replaceRaw: RawStages<T & D, R & ID> = $replaceWith_(
+      const replaceRaw: RawStages<unknown, T & D, R & ID> = $replaceWith_(
         field<R & ID, T & D>({
           item: ite($and(notDeleted, match).expr, $array(root<T>().expr()), $array()),
           _id: root<T & D>().of('_id').expr(),
         }),
       )
       const cloneIntoNew = link<V | Del>()
-        .with($match_(hardQuery) as RawStages<V | Del, V>)
+        .with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
         .with(projectInput)
-        .with<R & ID>(replaceRaw)
+        .with<unknown, R & ID>(replaceRaw)
 
       type Ctx = RORec<'after', Arr<T>>
       type R2 = Rec<'after', Arr<Result>> & ID
       const aggResult = await aggregate<Result2>(c =>
-        c({
+        c<V | Del, V | Del>({
           coll: collection,
-          stages: cloneIntoNew
-            .with<R2>(
+          input: link<V | Del>().stages,
+          exec: cloneIntoNew
+            .with<unknown, R2>(
               $simpleLookup_<R & ID, Result, null, 'after', Ctx>({
                 pipeline: link<null, Ctx>()
-                  .with<T>($documents_(ctx<Arr<T>>()('after').expr()))
-                  .with<Result>(input).stages,
+                  .with<unknown, T>($documents_(ctx<Arr<T>>()('after').expr()))
+                  .with<unknown, Result>(input).stages,
                 k: 'after',
                 vars: { after: root<R>().of('item').expr() },
               }),
@@ -153,28 +154,35 @@ const executes = <T extends doc, Result extends J, V extends T & Model>(
     }
     return stop
   }
-  const stages = link<V | Del, unknown, 1>()
-    .with($match_($and(hardMatch, notDeleted, match)) as RawStages<V | Del, V, unknown, 1>)
-    .with<Result>(input).stages
+  const matcher: RawStages<V | Del, V | Del, V | Del, unknown, 1> = $match_<J, V | Del>(notDeleted)
+  const stages = link<V, unknown, 1>()
+    .with($match_($and(hardMatch, match)))
+    .with(input).stages
   return {
     out: run,
-    stages: c => c({ coll: collection, stages }),
+    stages: c =>
+      c({
+        coll: collection,
+        input: matcher as RawStages<V | Del, V | Del, V, unknown, 1>,
+        exec: stages,
+      }),
   }
 }
-interface StreamRunnerHKT extends HKT<J> {
-  readonly out: SimpleStreamExecutionResult<I<J, this>>
+interface StreamRunnerHKT extends HKT<J2> {
+  readonly out: SimpleStreamExecutionResult<I<J2, this>[0], I<J2, this>[1]>
 }
-type J2 = readonly [J, J]
-interface StagesHKT extends HKT<J2> {
-  readonly out: RORec<'lin', RawStages<I<J2, this>[0], I<J2, this>[1], unknown, 1>>
+interface StagesHKT extends HKT<J3> {
+  readonly out: RORec<'lin', RawStages<I<J3, this>[0], I<J3, this>[1], I<J3, this>[2], unknown, 1>>
 }
 
+const emptyLin = <V>() => ({ lin: link<V, unknown, 1>().stages })
 export const from = <T extends doc, V extends T & Model = T & Model>(
   view: View<T & D, V>,
   streamName: string,
 ) =>
-  pipe<V, V, StreamRunnerHKT, StagesHKT>(
+  pipe<V, V, V, StreamRunnerHKT, StagesHKT>(
     input => executes(view, input.lin, streamName),
     { lin: link<V, unknown, 1>().stages },
     ({ lin: a }, { lin: b }) => ({ lin: concatStages(a, b) }),
+    emptyLin,
   )

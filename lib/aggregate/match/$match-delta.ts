@@ -9,9 +9,11 @@ import { $match_ } from '../mongo-stages'
 import { concatStages } from '../prefix'
 import { $replaceWithDelta } from '../set'
 
-export const $matchDelta = <T extends J>(query: Query<T>): RawStages<Delta<T>, Delta<T>> => {
+export const $matchDelta = <T extends J>(
+  query: Query<T>,
+): RawStages<Delta<T>, Delta<T>, Delta<T>> => {
   return concatStages(
-    $replaceWithDelta(ite(query.expr, root<T>().expr(), nil)),
+    $replaceWithDelta<T | null, T, T | null>(ite(query.expr, root<T>().expr(), nil)),
     $match_(
       $or(
         root<Delta<T>>().of('after').has($ne<T | null>(null)),

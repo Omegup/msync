@@ -1,5 +1,5 @@
-import type { App, HKT, I, ID, N, O, RORec, Rec, U, doc, jsonItem } from '../../types'
-import type { WriteonlyCollection } from '../../types'
+import type { App, HKT, I, WriteonlyCollection } from '../../types'
+import type { ID, N, O, RORec, Rec, U, doc, jsonItem } from '../../types/json'
 import { $mergeObjects } from '../expression/array'
 import { field } from '../expression/concat'
 import { $ifNull, eqTyped, ite } from '../expression/logic'
@@ -19,7 +19,7 @@ export type Merge<T extends doc> = (T & ND & TS) | Del
 
 export const $merge = <T extends doc>(
   out: WriteonlyCollection<Merge<T>>,
-): RawStages<OutInput<T>, 'out'> => {
+): RawStages<unknown, OutInput<T>, 'out'> => {
   const replacer = ite<Merge<T>, null, T, AfterHKT<T | null>>(
     eqTyped<null, T, AfterHKT<T | null>>(root<OutInput<T>>().of('after').expr(), nil),
     field<Del, OutInput<T>>({
@@ -33,9 +33,10 @@ export const $merge = <T extends doc>(
     ),
   )
   return link<OutInput<T>>()
-    .with<Merge<T>>($replaceWith_(replacer))
-    .with<'out'>($merge_({ into: out, on: root<O<ID>>().of('_id') })).stages
+    .with<unknown, Merge<T>>($replaceWith_(replacer))
+    .with<unknown, 'out'>($merge_({ into: out, on: root<O<ID>>().of('_id') })).stages
 }
+
 type Par<K extends string, V extends Rec<K, jsonItem>> = { readonly [k in K]?: V[k] | N }
 type ParMerge<K extends string, T extends Rec<K, jsonItem>> = TS & ID & O & Par<K, T>
 type ExactKeys<K extends string> = { readonly [P in K]: P } & RORec<string, K>
@@ -45,7 +46,7 @@ const extractKeys = <K extends string>(keyObject: ExactKeys<K>): Set<K> =>
 export const $partialMerge = <R extends doc, K extends string, T extends ID & Rec<K, jsonItem>>(
   out: WriteonlyCollection<Omit<R, K> & ParMerge<K, T>>,
   keyObject: ExactKeys<K>,
-): RawStages<OutInput<T>, 'out'> => {
+): RawStages<unknown, OutInput<T>, 'out'> => {
   const keys = [...extractKeys(keyObject)]
   const replacer = ite<ParMerge<K, T>, null, T, AfterHKT<T | null>>(
     eqTyped<null, T, AfterHKT<T | null>>(root<OutInput<T>>().of('after').expr(), nil),
@@ -62,8 +63,8 @@ export const $partialMerge = <R extends doc, K extends string, T extends ID & Re
     ),
   )
   return link<OutInput<T>>()
-    .with<ParMerge<K, T>>($replaceWith_(replacer))
-    .with<'out'>(
+    .with<unknown, ParMerge<K, T>>($replaceWith_(replacer))
+    .with<unknown, 'out'>(
       $merge_<ParMerge<K, T>, Omit<R, K> & ParMerge<K, T>>({
         into: out,
         on: root<O<ID>>().of('_id'),

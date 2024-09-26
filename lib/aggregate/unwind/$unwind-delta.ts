@@ -8,9 +8,9 @@ type s = string
 export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extends doc>(
   k1: K1,
   k2: K2,
-): RawStages<Delta<Rec<K1, T> & Rec<K2, Arr<U>>>, Delta<Rec<K1, T> & Rec<K2, U> & ID>> =>
-  link<Delta<Rec<K1, T> & Rec<K2, Arr<U>>>>()
-    .with<Rec<K1, Delta<T>> & Rec<K2, Arr<Delta<U>>>>(
+) => {
+  const stages = link<Delta<Rec<K1, T> & Rec<K2, Arr<U>>>>()
+    .with<unknown, Rec<K1, Delta<T>> & Rec<K2, Arr<Delta<U>>>>(
       asStages([
         {
           $replaceWith: {
@@ -75,8 +75,10 @@ export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extend
         },
       ]),
     )
-    .with<Rec<K1, Delta<T>> & Rec<K2, Delta<U>>>($unwind_<Rec<K1, Delta<T>>, K2, Delta<U>>(k2))
-    .with<Delta<Rec<K1, T> & Rec<K2, U> & ID>>(
+    .with<unknown, Rec<K1, Delta<T>> & Rec<K2, Delta<U>>>(
+      $unwind_<Rec<K1, Delta<T>>, K2, Delta<U>>(k2),
+    )
+    .with<unknown, Delta<Rec<K1, T> & Rec<K2, U> & ID>>(
       asStages([
         {
           $replaceWith: {
@@ -118,3 +120,9 @@ export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extend
         },
       ]),
     ).stages
+  return stages as RawStages<
+    Delta<Rec<K1, T>>,
+    Delta<Rec<K1, T> & Rec<K2, Arr<U>>>,
+    Delta<Rec<K1, T> & Rec<K2, U> & ID>
+  >
+}

@@ -1,15 +1,13 @@
 import { $sum } from '../lib/accumulators'
 import { $merge, type Merge } from '../lib/aggregate/$merge'
 import { $group } from '../lib/aggregate/group'
-import { $match } from '../lib/aggregate/match'
 import { $set } from '../lib/aggregate/set'
 import { from, staging } from '../lib/boot'
 import { concat } from '../lib/expression/concat'
 import { val } from '../lib/expression/val'
 import { root } from '../lib/field'
 import { Machine, wrap } from '../lib/machine'
-import { $ne } from '../lib/predicate'
-import { $lookup, type LeftWrite } from '../lib/stream/$lookup'
+import { $lookup } from '../lib/stream/$lookup'
 import type { Model } from '../lib/types'
 import { set, to } from '../lib/update'
 import type { ID, O, RORec, Rec } from '../types'
@@ -28,37 +26,40 @@ const c3 = db.collection<D3 & Model>('c3')
 // const r = db.collection<Merge<D1>>('r')
 const g = db.collection<Merge<ID & Rec<'v', number>>>('g')
 // const r2 = db.collection<Merge<LeftWrite<D1, D2>>>('r2')
-const r3 = db.collection<Merge<LeftWrite<LeftWrite<D1, D2>, D3>>>('r3')
-const r4 = db.collection<Merge<LeftWrite<LeftWrite<D1, D2>, D3>>>('r4')
+const r3 = db.collection<Merge<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>>('r3')
+const r4 = db.collection<Merge<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>>('r4')
 
 let machine1 = new Machine()
+
 machine1.add(
   staging<D1>({ collection: c1, projection: { _id: 1, deletedAt: 1, link: 1 } }, 'q1')
-    .then($match(root<D1>().of('link').has($ne('blabla'))))
-    .with(
-      $lookup({
-        right: staging<D2, D2 & Model>(
+    .with<D1, D1 & RORec<'d2', D2 & RORec<'d3', D3>>>(
+      $lookup<'d2', D1, D2, D2 & RORec<'d3', D3>, string>({
+        as: 'd2',
+        from: staging<D2>(
           {
             collection: c2,
             projection: { _id: 1, deletedAt: 1, link: 1, link2: 1 },
           },
           'q2',
-        ).get(),
-        lField: root<D1>().of('link'),
-        rField: root<D2>().of('link'),
-      }),
-    )
-    .with(
-      $lookup({
-        right: staging<D3, D3 & Model>(
-          {
-            collection: c3,
-            projection: { _id: 1, deletedAt: 1, link2: 1 },
-          },
-          'q3',
-        ).get(),
-        lField: root<LeftWrite<D1, D2>>().of('right').of('link2'),
-        rField: root<D3>().of('link2'),
+        )
+          .with<D2, D2 & RORec<'d3', D3>>(
+            $lookup<'d3', D2, D3, D3, string>({
+              from: staging<D3, D3 & Model>(
+                {
+                  collection: c3,
+                  projection: { _id: 1, deletedAt: 1, link2: 1 },
+                },
+                'q3',
+              ).get(),
+              localField: root<D2>().of('link2'),
+              foreignField: root<D3>().of('link2'),
+              as: 'd3',
+            }),
+          )
+          .get(),
+        localField: root<D1>().of('link'),
+        foreignField: root<D2>().of('link'),
       }),
     )
     .get()
@@ -68,8 +69,8 @@ machine1.add(
 machine1 = wrap(machine1)
 
 machine1.add(
-  from<LeftWrite<LeftWrite<D1, D2>, D3>>(
-    { collection: r3, projection: { _id: 1, deletedAt: 1, left: 1, right: 1 } },
+  from<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>(
+    { collection: r3, projection: { _id: 1, deletedAt: 1, d2: 1, link: 1 } },
     'xs1',
   )
     .get()

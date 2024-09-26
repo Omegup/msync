@@ -26,6 +26,7 @@ export interface J {
   readonly [_: string]: jsonItem | U
 }
 export type J2 = readonly [J, J]
+export type J3 = readonly [J, J, J]
 export type ID = { readonly _id: string }
 export type doc = J & ID
 export interface RawObj {

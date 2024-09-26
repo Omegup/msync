@@ -19,15 +19,15 @@ export const $merge_ = <T extends J, Out extends T = T, Ctx = unknown>({
     | { stages?: undefined; whenMatched?: 'replace' | 'keepExisting' | 'merge' | 'fail' }
     | {
         stages: true
-        whenMatched: RawStages<T, Out>
+        whenMatched: RawStages<unknown, T, Out>
       }
     | {
         stages: 'ctx'
         vars: { readonly [P in keyof Ctx]: Expr<Ctx[P], T> }
-        whenMatched: RawStages<T, Out, Ctx>
+        whenMatched: RawStages<unknown, T, Out, Ctx>
       }
   )) =>
-  asStages<T, 'out'>([
+  asStages<unknown, T, 'out'>([
     {
       $merge: {
         into: dbcoll(into),
