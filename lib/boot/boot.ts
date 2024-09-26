@@ -7,27 +7,12 @@ import { field } from '../expression/concat'
 import { $ifNull, ite } from '../expression/logic'
 import { nil, val } from '../expression/val'
 import { root } from '../field'
-import { $eq, $gteTs } from '../predicate'
+import { $eq, $gteTs, $ne } from '../predicate'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
-import type {
-  After,
-  Before,
-  D,
-  Del,
-  Delta,
-  DeltaStages,
-  Frame,
-  HasJob,
-  Iterator,
-  Model,
-  Query,
-  RawStages,
-  Runner,
-  SnapshotStreamExecutionResult,
-  UDelta,
-} from '../types'
-import type { AggregateCommand } from '../types/aggregate'
+import type { AggregateCommand, Before, SnapshotStreamExecutionResult } from '../types'
+import type { Frame, HasJob, Iterator, Runner } from '../types/machine'
+import type { After, D, Del, Delta, DeltaStages, Model, RawStages, UDelta } from '../types/stream'
 import { set, to } from '../update'
 import { asBefore } from '../utils/before'
 import { addTeardown } from '../utils/tear-down'
@@ -50,9 +35,6 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
   const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
   // TODO create indexes (if snapshot is in sources)
   const projectInput = $project_<T & D>({ ...projection, deletedAt: 1 })
-
-  const isNew = (isNew: boolean): Query<UDelta<T>> =>
-    root<UDelta<T>>().of('updated').has($eq<boolean>(isNew))
 
   const run = <Result2>(
     finalInput: RawStages<unknown, Delta<Result>, Result2>,
@@ -120,7 +102,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
           coll: snapshotCollection,
           input: link<UDelta<T>>().stages,
           exec: link<UDelta<T>>()
-            .with($match_(isNew(true)))
+            .with($match_(root<UDelta<T>>().of('updated').has($eq<boolean>(true))))
             .with(
               $set_<UDelta<T>, UDelta<T>, UDelta<T> & Delta<T>>(
                 set({
@@ -184,11 +166,12 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
     }
     return stop
   }
+  const hasBefore = root<UDelta<T>>().of('before').has($ne<T | N>(null))
   return {
     stages: c =>
       c<UDelta<T>, Before<T>>({
         coll: snapshotCollection,
-        input: $match_(isNew(false)) as RawStages<unknown, UDelta<T>, Before<T>>,
+        input: $match_(hasBefore) as RawStages<unknown, UDelta<T>, Before<T>>,
         exec: asBefore(input.raw),
       }),
     out: run,

@@ -38,7 +38,7 @@ export const fieldM = <
         ),
       ),
   })
-type Exprs<T, D, C> = {
+type Exprs<out T, in D, in C = unknown> = {
   readonly [K in StrKey<T>]: Expr<T[K], D, C>
 }
 export const field = <T extends object, D, C = unknown>(expr: Exprs<T, D, C>) =>
