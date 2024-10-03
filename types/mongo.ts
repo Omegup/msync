@@ -16,3 +16,4 @@ declare module 'mongodb' {
     toExtendedJSON(): BSON.TimestampExtended
   }
 }
+export * from 'mongodb'

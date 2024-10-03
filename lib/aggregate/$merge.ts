@@ -68,7 +68,7 @@ export const $partialMerge = <R extends doc, K extends string, T extends ID & Re
       $merge_<ParMerge<K, T>, Omit<R, K> & ParMerge<K, T>>({
         into: out,
         on: root<O<ID>>().of('_id'),
-        whenNotMatched: 'discard',
+        whenNotMatched: 'fail',
       }),
     ).stages
 }

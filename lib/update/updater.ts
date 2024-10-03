@@ -1,4 +1,4 @@
-import type { Arr, J, N, O, StrKey, Type, notArr, rawItem } from '../../types'
+import type { Arr, J, N, O, RORec, StrKey, Type, notArr, rawItem } from '../../types'
 import { Field, type Path } from '../field'
 import type { Expr } from '../types'
 
@@ -16,22 +16,16 @@ export const subUpdater = <P extends J, D, T, V, Ctx>(
 type FDom<R, C> = {
   readonly [P in string]: Updater<R, never, unknown, C>
 }
-type Par<K extends string> = { readonly [P in K]?: unknown }
-export const set = <
-  R,
-  Old extends Par<K>,
-  F extends FDom<R, C>,
-  K extends StrKey<F> = StrKey<F>,
-  C = unknown,
->(
+type Get<T, P extends string> = (T & RORec<P, notArr>)[P]
+export const set = <R, Old, F extends FDom<R, C>, K extends StrKey<F> = StrKey<F>, C = unknown>(
   fields: F,
 ): Updater<
   R,
   Old,
   Omit<Old, K> &
     O<{
-      readonly [P in K]: F[P] extends Updater<R, infer O extends Old[P], infer A, C>
-        ? A | Exclude<Old[P], O>
+      readonly [P in K]: F[P] extends Updater<R, infer O extends Get<Old, P>, infer A, C>
+        ? A | Exclude<Get<Old, P>, O>
         : never
     }>,
   C

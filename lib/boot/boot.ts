@@ -17,6 +17,7 @@ import { set, to } from '../update'
 import { asBefore } from '../utils/before'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
+import { log } from '../utils/log'
 
 const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T & Model>(
   view: View<T & D, V>,
@@ -122,7 +123,9 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
 
     // Step 5 : remove handled deleted updated
     const step5 = (l: L) => async (): Next => {
+      log('remove handled deleted updated')
       await snapshotCollection.deleteMany({ updated: true, after: null })
+      log('removed handled deleted updated')
       return next(step6(l), 'update snapshot aggregation')
     }
     type L = {
@@ -133,6 +136,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
 
     // Step 6 : update snapshot aggregation
     const step6 = (l: L) => async (): Next => {
+      log('update snapshot aggregation')
       await snapshotCollection.updateMany({ updated: true }, [
         {
           $set: {
@@ -142,6 +146,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
           },
         },
       ])
+      log('updated snapshot aggregation')
       return next(step7(l), 'update __last')
     }
 

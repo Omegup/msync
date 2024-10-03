@@ -42,11 +42,12 @@ const join = <
   stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE>, Result>,
 ): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
   const rightJoinField = { field1: lField, field2: rField }
+  const joinId = lField.str() === '_id' ? 'right' : rField.str() === '_id' ? 'left' : false
   const joinR_Snapshot: RawStages<
     Before<LQ | Q2>,
     Before<LE>,
     Before<LE & Rec<As, RE> & ID>
-  > = asBefore($lookupRaw(rightJoinField, rightSnapshot, as))
+  > = asBefore($lookupRaw(rightJoinField, rightSnapshot, as, joinId))
   const resultingSnapshot = concatTStages(leftSnapshot, joinR_Snapshot)
   const dict = { [as]: 'a' } as RORec<As, 'a'>
   const dictId: RORec<As, 'a'> & RORec<'_id', 'b'> = { ...dict, _id: 'b' }
@@ -64,12 +65,14 @@ const join = <
         leftSnapshot,
         'right',
         'left',
+        joinId,
       )
       const joinR_Delta: JoinStages<LE> = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, 'left', 'right'>(
         rightJoinField,
         rightSnapshot,
         'left',
         'right',
+        joinId,
       )
       const zefze = concatStages<
         unknown,

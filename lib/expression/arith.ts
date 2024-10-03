@@ -10,6 +10,10 @@ export const lt = <D, C>(...expr: [Expr<number, D, C>, Expr<number, D, C>]) =>
   asExpr<boolean, D, C>({
     raw: f => asExprRaw({ $lt: expr.map(e => e.raw(f).get()) }),
   })
+export const gt = <D, C>(...expr: [Expr<number, D, C>, Expr<number, D, C>]) =>
+  asExpr<boolean, D, C>({
+    raw: f => asExprRaw({ $gt: expr.map(e => e.raw(f).get()) }),
+  })
 
 export const $lte: {
   <D, C>(...expr: [Expr<Date, D, C>, Expr<Date, D, C>]): Expr<boolean, D, C>
@@ -17,6 +21,13 @@ export const $lte: {
 } = <D, C>(...expr: [Expr<number | Date, D, C>, Expr<number | Date, D, C>]) =>
   asExpr<boolean, D, C>({
     raw: f => asExprRaw({ $lte: expr.map(e => e.raw(f).get()) }),
+  })
+export const $gte: {
+  <D, C>(...expr: [Expr<Date, D, C>, Expr<Date, D, C>]): Expr<boolean, D, C>
+  <D, C>(...expr: [Expr<number, D, C>, Expr<number, D, C>]): Expr<boolean, D, C>
+} = <D, C>(...expr: [Expr<number | Date, D, C>, Expr<number | Date, D, C>]) =>
+  asExpr<boolean, D, C>({
+    raw: f => asExprRaw({ $gte: expr.map(e => e.raw(f).get()) }),
   })
 
 type Num = number | null | undefined

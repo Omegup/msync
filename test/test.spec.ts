@@ -26,15 +26,15 @@ const c3 = db.collection<D3 & Model>('c3')
 // const r = db.collection<Merge<D1>>('r')
 const g = db.collection<Merge<ID & Rec<'v', number>>>('g')
 // const r2 = db.collection<Merge<LeftWrite<D1, D2>>>('r2')
-const r3 = db.collection<Merge<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>>('r3')
+const r3 = db.collection<Merge<D1 & RORec<'d2', D2>>>('r3')
 const r4 = db.collection<Merge<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>>('r4')
 
 let machine1 = new Machine()
 
 machine1.add(
   staging<D1>({ collection: c1, projection: { _id: 1, deletedAt: 1, link: 1 } }, 'q1')
-    .with<D1, D1 & RORec<'d2', D2 & RORec<'d3', D3>>>(
-      $lookup<'d2', D1, D2, D2 & RORec<'d3', D3>, string>({
+    .with<D1, D1 & RORec<'d2', D2>>(
+      $lookup<'d2', D1, D2, D2, string>({
         as: 'd2',
         from: staging<D2>(
           {
@@ -43,20 +43,20 @@ machine1.add(
           },
           'q2',
         )
-          .with<D2, D2 & RORec<'d3', D3>>(
-            $lookup<'d3', D2, D3, D3, string>({
-              from: staging<D3, D3 & Model>(
-                {
-                  collection: c3,
-                  projection: { _id: 1, deletedAt: 1, link2: 1 },
-                },
-                'q3',
-              ).get(),
-              localField: root<D2>().of('link2'),
-              foreignField: root<D3>().of('link2'),
-              as: 'd3',
-            }),
-          )
+          // .with<D2, D2 & RORec<'d3', D3>>(
+          //   $lookup<'d3', D2, D3, D3, string>({
+          //     from: staging<D3, D3 & Model>(
+          //       {
+          //         collection: c3,
+          //         projection: { _id: 1, deletedAt: 1, link2: 1 },
+          //       },
+          //       'q3',
+          //     ).get(),
+          //     localField: root<D2>().of('link2'),
+          //     foreignField: root<D3>().of('link2'),
+          //     as: 'd3',
+          //   }),
+          // )
           .get(),
         localField: root<D1>().of('link'),
         foreignField: root<D2>().of('link'),

@@ -8,6 +8,7 @@ type s = string
 export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extends doc>(
   k1: K1,
   k2: K2,
+  k: K1 | K2 | false,
 ) => {
   const stages = link<Delta<Rec<K1, T> & Rec<K2, Arr<U>>>>()
     .with<unknown, Rec<K1, Delta<T>> & Rec<K2, Arr<Delta<U>>>>(
@@ -88,11 +89,13 @@ export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extend
                 then: null,
                 else: {
                   _id: {
-                    $concat: [
-                      `$${[k1, k2].sort()[0]}.before._id`,
-                      '.',
-                      `$${[k1, k2].sort()[1]}.before._id`,
-                    ],
+                    $concat: k
+                      ? `$${k}.before._id`
+                      : [
+                          `$${[k1, k2].sort()[0]}.before._id`,
+                          '.',
+                          `$${[k1, k2].sort()[1]}.before._id`,
+                        ],
                   },
                   [k1]: `$${k1}.before`,
                   [k2]: `$${k2}.before`,
@@ -105,11 +108,13 @@ export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extend
                 then: null,
                 else: {
                   _id: {
-                    $concat: [
-                      `$${[k1, k2].sort()[0]}.after._id`,
-                      '.',
-                      `$${[k1, k2].sort()[1]}.after._id`,
-                    ],
+                    $concat: k
+                      ? `$${k}.after._id`
+                      : [
+                          `$${[k1, k2].sort()[0]}.after._id`,
+                          '.',
+                          `$${[k1, k2].sort()[1]}.after._id`,
+                        ],
                   },
                   [k1]: `$${k1}.after`,
                   [k2]: `$${k2}.after`,

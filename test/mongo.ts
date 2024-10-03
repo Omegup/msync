@@ -19,7 +19,7 @@ export const enablePreAndPostImages = <T extends doc>(coll: Collection<T>) =>
     changeStreamPreAndPostImages: { enabled: true },
   })
 
-export const prepare = async (testName: string) => {
+export const prepare = async (testName?: string) => {
   const client = new MongoClient(uri, testName ? { monitorCommands: true } : {})
 
   if (testName) {

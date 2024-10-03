@@ -28,6 +28,7 @@ export const $lookupDelta = <
   { coll, exec, input }: TStages<RS, Before<RQ>, BRB, Before<RE>>,
   k1: Exclude<KK1, BA>,
   k2: Exclude<KK2, BA>,
+  k: Exclude<KK1, BA> | Exclude<KK2, BA> | false,
 ): RawStages<
   unknown,
   Delta<LE>,
@@ -60,8 +61,7 @@ export const $lookupDelta = <
               ),
             ),
           )
-          .with(exec)
-          .stages,
+          .with(exec).stages,
       }),
     )
     .with<unknown, Delta<Rec<K1, LE> & Rec<K2, Arr<RE>>>>(
@@ -87,5 +87,5 @@ export const $lookupDelta = <
         },
       ),
     )
-    .with<unknown, Delta<Rec<K1, LE> & Rec<K2, RE> & ID>>($unwindDelta(k1, k2)).stages
+    .with<unknown, Delta<Rec<K1, LE> & Rec<K2, RE> & ID>>($unwindDelta(k1, k2, k)).stages
 }

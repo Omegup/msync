@@ -16,7 +16,7 @@ export const $lookupRaw =
     LQ extends J,
     LE extends LQ & doc,
     RQ extends J,
-    RE extends RQ & J,
+    RE extends RQ & doc,
     BRB extends Before<RQ>,
     RS,
     S,
@@ -25,13 +25,18 @@ export const $lookupRaw =
     { field1, field2 }: { field1: Field<LQ, S>; field2: Field<RQ, S> },
     { coll, exec, input }: TStages<RS, Before<RQ>, BRB, Before<RE>>,
     k2: As,
+    k: 'left' | 'right' | false,
   ) =>
   <F extends HKT<J, J>>(
     f: <T extends J>() => Field<App<F, T>, T>,
   ): RawStages<App<F, LQ>, App<F, LE>, App<F, LE & Rec<As, RE> & ID>> => {
     type D = LE & Rec<As, RE>
+    const left = root<D>().of('_id').expr()
+    const right = root<D>().of(k2).of('_id').expr()
     const updateID: Updater<D, D, Omit<D, '_id'> & ID> = set({
-      _id: to<D, string>(concat(root<LE>().of('_id').expr(), val('.'), root<D>().of('_id').expr())),
+      _id: to<D, string>(
+        k === 'left' ? left : k === 'right' ? right : concat(left, val('.'), right),
+      ),
     })
 
     return link<App<F, LE>>()
