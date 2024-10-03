@@ -57,10 +57,16 @@ export const $partialMerge = <R extends doc, K extends string, T extends ID & Re
         keys.map(k => [k, nil as Expr<never, unknown>]),
       ),
     }),
-    $mergeObjects<T, TS, App<AfterHKT<T>, T>>(
-      root<App<AfterHKT<T>, T>>().of('after').expr(),
-      field({ touchedAt: now }),
-    ),
+    field<ParMerge<K, T>, After<Par<K, T>>, unknown>({
+      _id: root<App<AfterHKT<T>, T>>().of('after').of('_id').expr(),
+      touchedAt: now,
+      ...Object.fromEntries<RORec<K, Expr<never, unknown>>, 0>(
+        keys.map(k => [
+          k,
+          root<App<AfterHKT<T>, T>>().of('after').of(k).expr() as Expr<never, unknown>,
+        ]),
+      ),
+    }),
   )
   return link<OutInput<T>>()
     .with<unknown, ParMerge<K, T>>($replaceWith_(replacer))
