@@ -10,7 +10,7 @@ export const ite = (<T, D1, D2, C>(
   orelse: Expr<T, D2 | D2, C>,
 ) =>
   asExpr<T, D1 | D2, C>({
-    raw: <DeltaD extends J, I extends U, Ctx>(f: Field<DeltaD, D1 | D2| Undef<I>, Ctx>) =>
+    raw: <DeltaD extends J, I extends U, Ctx>(f: Field<DeltaD, D1 | D2 | Undef<I>, Ctx>) =>
       asExprRaw<T, DeltaD, C & Ctx>({
         $cond: {
           if: cond.raw(f).get(),
@@ -92,8 +92,8 @@ export const exprMapVal = <K extends string, T extends Partial<Record<K, rawItem
 export const mapVal = <K extends string, T extends Partial<Record<K, rawItem>>, D, C>(
   expr: Expr<K, D, C>,
   map: T,
-  or: T[K],
-): Expr<T[K], D, C> =>
+  or: T[K & keyof T],
+): Expr<T[K & keyof T], D, C> =>
   exprMapVal<K, T, D, C>(
     expr,
     Object.fromEntries<{ readonly [P in K]: Expr<T[P], D, C> }>(

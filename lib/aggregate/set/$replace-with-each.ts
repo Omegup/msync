@@ -23,24 +23,24 @@ const deltaExpr =
     )
   }
 
-export const $setEach1 = <Q, T extends Q & jsonItem, V extends Q & jsonItem, E = unknown, C = unknown>(
+export const $setEach1 = <T extends jsonItem, V extends jsonItem, E = unknown, C = unknown>(
   updater: <K extends BA>(k: K) => Updater<Delta<T> & E, T | null, V | null, C>,
 ) =>
-  $set1<Delta<Q>, Delta<T> & E, Delta<V> & Omit<E, BA>, C>(
+  $set1<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>, C>(
     set({
       after: updater('after'),
       before: updater('before'),
     }),
   )
 
-export const $setEach = <Q, T extends Q & J, V extends Q & jsonItem, E = unknown, C = unknown>(
+export const $setEach = <T extends J, V extends jsonItem, E = unknown, C = unknown>(
   updater: (k: BA) => Updater<Delta<T> & E, T | null, V | null, C>,
-): RawStages<Delta<Q>, Delta<T> & E, Delta<V> & Omit<E, BA>, C> =>
-  $setEach1<Q, T, V, E, C>(updater)<IdHKT<J>>(root)
+): RawStages<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>, C> =>
+  $setEach1<T, V, E, C>(updater)<IdHKT<J>>(root)
 
-export const $replaceWithEach = <Q, T extends Q & J, V extends Q & jsonItem, E>(
+export const $replaceWithEach = <T extends J, V extends jsonItem, E>(
   expr: <K extends BA>(field: K) => Expr<V, Rec<K, T> & Delta<T> & E>,
-): RawStages<Delta<Q>, Delta<T> & E, Delta<V> & Omit<E, BA>> => {
+): RawStages<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>> => {
   const t = deltaExpr<T, V, E>(expr)
-  return $setEach<Q, T, V, E>(k => to(t(k)))
+  return $setEach<T, V, E>(k => to(t(k)))
 }

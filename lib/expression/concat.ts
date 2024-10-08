@@ -22,9 +22,7 @@ export const fieldM = <
   Ref extends string = StrKey<T>,
   C = unknown,
 >(
-  expr: {
-    readonly [K in Ref]: Expr<T[K], D, C>
-  },
+  expr: { readonly [K in Ref]: Expr<T[K], D, C> },
   m: Pick<M, Dom>,
 ) =>
   asExpr<O<{ readonly [K in Dom]: T[M[K]] }>, D, C>({

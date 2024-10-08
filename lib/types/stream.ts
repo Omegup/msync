@@ -22,7 +22,7 @@ export type FRawStages<
 ) => RawStages<App<F, Q & J>, App<F, S>, App<F, R>, C, M>
 
 export type DeltaStages<out Q, in S extends Q & J, out R extends Q & J, in C = unknown> = {
-  delta: RawStages<Delta<Q>, Delta<S>, Delta<R>, C>
+  delta: RawStages<unknown, Delta<S>, Delta<R>, C>
   raw: FRawStages<Q, S, R, C>
 }
 export type LinStages<out Q, in S extends Q, out R extends Q, in C = unknown> = {

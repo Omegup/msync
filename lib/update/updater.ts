@@ -16,7 +16,7 @@ export const subUpdater = <P extends J, D, T, V, Ctx>(
 type FDom<R, C> = {
   readonly [P in string]: Updater<R, never, unknown, C>
 }
-type Get<T, P extends string> = (T & RORec<P, notArr>)[P]
+type Get<T, P extends string> = P extends keyof T ? T[P] : undefined
 export const set = <R, Old, F extends FDom<R, C>, K extends StrKey<F> = StrKey<F>, C = unknown>(
   fields: F,
 ): Updater<

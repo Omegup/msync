@@ -41,7 +41,7 @@ export const $lookupDelta = <
   const f2: Expr<S, BRB> = root<BRB>().of('before').with(field2).expr()
   return link<Delta<LE>>()
     .with<unknown, Delta<Rec<K1, LE>>>(
-      $replaceWithDelta<unknown, LE, Rec<K1, LE>>(field(map1(k1, root<LE>().expr()))),
+      $replaceWithDelta<LE, Rec<K1, LE>>(field(map1(k1, root<LE>().expr()))),
     )
     .with<unknown, Delta<Rec<K1, LE>> & Rec<K2, Arr<BU>>>(
       $simpleLookup_({
@@ -65,7 +65,7 @@ export const $lookupDelta = <
       }),
     )
     .with<unknown, Delta<Rec<K1, LE> & Rec<K2, Arr<RE>>>>(
-      $replaceWithEach<unknown, Rec<K1, LE>, Rec<K1, LE> & Rec<K2, Arr<RE>>, Rec<K2, Arr<BU>>>(
+      $replaceWithEach<Rec<K1, LE>, Rec<K1, LE> & Rec<K2, Arr<RE>>, Rec<K2, Arr<BU>>>(
         <K extends BA>(
           f: K,
         ): Expr<Rec<K1, LE> & Rec<K2, Arr<RE>>, Rec<K, Rec<K1, LE>> & Rec<K2, Arr<BU>>> => {
