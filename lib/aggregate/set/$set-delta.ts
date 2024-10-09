@@ -13,3 +13,29 @@ export const $replaceWithDelta = <T extends J, V extends jsonItem>(expr: Expr<V,
 export const $setDelta = <T extends J, V extends jsonItem, C = unknown>(
   updater: Updater<T, T, V, C>,
 ) => $setEach<T, V, unknown, C>(k => subUpdater(weaken(updater), root<Delta<T>>().of(k)))
+
+const ss = [
+  {
+    let: { a: '$after', b: '$before' },
+    pipeline: [
+      {
+        $documents: { $filter: { input: ['$$a', '$$b'], as: 'x', cond: '$$x' } },
+      },
+      {
+        $set: {},
+      },
+      {
+        $group: { _id: '', docs: { $push: '$$ROOT' } },
+      },
+      {
+        $replaceWith: {
+          after: { $cond: { if: '$$a', then: { $first: '$docs' }, else: null } },
+          before: { $cond: { if: '$$b', then: { $last: '$docs' }, else: null } },
+        },
+      },
+    ],
+    as: 'root',
+  },
+
+  { $mergeObjects: [{ _id: '$_id' }, { $first: '$root' }] },
+]
