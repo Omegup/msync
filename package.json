@@ -1,6 +1,9 @@
 {
     "name": "@omegup/msync",
     "module": "index.ts",
+    "scripts": {
+        "tsc": "tsc"
+    },
     "devDependencies": {
         "@types/bun": "latest"
     },
