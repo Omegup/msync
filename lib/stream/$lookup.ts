@@ -81,7 +81,7 @@ const join = <
         Delta<Result>,
         unknown
       >(
-        $replaceWithDelta<unknown, LeftRight, LE & RORec<As, RE>>(
+        $replaceWithDelta<LeftRight, LE & RORec<As, RE>>(
           $mergeObjects<LE, ID & RORec<As, RE>, LeftRight>(
             root<LeftRight>().of('left').expr(),
             fieldM<RORec<As, 'a'> & RORec<'_id', 'b'>, { a: RE; b: string }, LeftRight>(

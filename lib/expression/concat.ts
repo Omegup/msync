@@ -13,6 +13,10 @@ export const str = <D, C>(expr: Expr<unknown, D, C>) =>
   asExpr<string, D, C>({
     raw: f => asExprRaw({ $toString: expr.raw(f).get() }),
   })
+export const toInt = <D, C>(expr: Expr<unknown, D, C>) =>
+  asExpr<number, D, C>({
+    raw: f => asExprRaw({ $toInt: expr.raw(f).get() }),
+  })
 
 export const fieldM = <
   M extends RORec<Dom, Ref>,
@@ -22,9 +26,7 @@ export const fieldM = <
   Ref extends string = StrKey<T>,
   C = unknown,
 >(
-  expr: {
-    readonly [K in Ref]: Expr<T[K], D, C>
-  },
+  expr: { readonly [K in Ref]: Expr<T[K], D, C> },
   m: Pick<M, Dom>,
 ) =>
   asExpr<O<{ readonly [K in Dom]: T[M[K]] }>, D, C>({
