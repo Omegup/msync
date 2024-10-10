@@ -3,7 +3,7 @@ import { Collection, MongoClient } from 'mongodb'
 import type { AsynIter, Iterator, IteratorResult } from '../lib/types'
 import type { doc } from '../types'
 import { uri } from './uri'
-import type { CommandStartedEvent } from 'mongodb'
+import type { CommandStartedEvent, Db, OptionalUnlessRequiredId } from 'mongodb'
 
 export const run = <T, Info>(cont: Iterator<T, Info>) => runCont(cont())
 const runCont = async <T, Info>({ next }: IteratorResult<T, Info>): Promise<never> => {
@@ -38,4 +38,27 @@ export const prepare = async (testName?: string) => {
     },
   })
   return client
+}
+const clears: (() => Promise<void>)[] = []
+export const makeCol = async <T extends doc>(
+  docs: readonly OptionalUnlessRequiredId<T>[],
+  database: Db,
+  name?: string,
+) => {
+  if (!name) {
+    const n = (name = crypto.randomUUID())
+    clears.push(async () => {
+      await database.collection(n).drop({ ignoreUndefined: true })
+    })
+  }
+  // Enable history at collection level
+  try {
+    const col = await database.createCollection<T>(name, {
+      changeStreamPreAndPostImages: { enabled: true },
+    })
+    if (docs.length) await col.insertMany(docs)
+    return col
+  } catch {
+    return database.collection<T>(name)
+  }
 }

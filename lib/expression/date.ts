@@ -1,3 +1,4 @@
+import type { Arr } from '../../types'
 import type { Expr } from '../types'
 import { asExpr, asExprRaw } from './expr-base'
 
@@ -30,6 +31,19 @@ export const dateAdd = <D, C>(
       }),
   })
 
+export const maxDate = <D, C>(expr: Expr<Arr<Date>, D, C>): Expr<Date, D, C> =>
+  asExpr<Date, D, C>({
+    raw: f => asExprRaw({ $max: expr.raw(f).get() }),
+  })
+
+export const minDate = <D, C>(expr: Expr<Arr<Date>, D, C>): Expr<Date, D, C> =>
+  asExpr<Date, D, C>({
+    raw: f => asExprRaw({ $min: expr.raw(f).get() }),
+  })
+export const datePart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> =>
+  asExpr<string, D, C>({
+    raw: f => asExprRaw({ $dateToString: { date: date.raw(f).get(), format: '%Y-%m-%d' } }),
+  })
 export const startOf = <D, C>(
   startDate: Expr<Date, D, C>,
   freq: Expr<'week' | 'day' | 'month' | 'year', D, C>,
