@@ -21,7 +21,9 @@ export const $match1 =
     asStages(query ? [{ $match: query.raw(f<T>()) }] : [])
 
 export const $set1 =
-  <Q, T extends Q & J, V extends Q & J, C = unknown>(updater: Updater<T, T, V, C>): FRawStages<Q, T, V, C, 1> =>
+  <Q, T extends Q & J, V extends Q & J, C = unknown>(
+    updater: Updater<T, T, V, C>,
+  ): FRawStages<Q, T, V, C, 1> =>
   f =>
     asStages([
       {
@@ -57,31 +59,26 @@ export const $unwind1 =
     asStages([{ $unwind: `$${f<Rec<K, Arr<U>>>().of(k).str()}` }])
 
 export const $group1 =
-  <
-    Q extends J,
-    T extends Q,
-    ID extends jsonItem,
-    K extends string,
-    Acc extends Accumulators<T, K, RORec<K, jsonItem>, C>,
-    C,
-  >(
+  <T extends J, ID extends jsonItem, Acc extends Accumulators<T, RORec<string, jsonItem>, C>, C>(
     id: Expr<ID, T, C>,
     args: Acc,
   ) =>
   <F extends HKT<J, J>>(
     f: <T extends J>() => Field<App<F, T>, T>,
-  ): RawStages<J, App<F, T>, Rec<'_id', ID> & AccumulatorsParam<T, Acc, C, K>, C, 1> =>
+  ): RawStages<J, App<F, T>, Rec<'_id', ID> & AccumulatorsParam<T, Acc, C>, C, 1> =>
     asStages([
       {
         $group: {
           _id: id.raw(f()).get(),
-          ...map<Acc, K, RORec<K, RawObj>>(args, v => v.raw(f<T>())),
+          ...map<Acc, string & keyof Acc, RORec<string & keyof Acc, RawObj>>(args, v =>
+            v.raw(f<T>()),
+          ),
         },
       },
     ])
 
 export const $documents1 =
-  <Q extends J, T extends Q, C>(docs: Expr<Arr<T>, null, C>) =>
+  <Q extends J, T extends Q, C>(docs: Expr<Arr<T>, unknown, C>) =>
   <F extends HKT<J, J>>(
     f: <T extends J>() => Field<App<F, T>, T>,
   ): RawStages<unknown, null, App<F, T>, C, 1> =>

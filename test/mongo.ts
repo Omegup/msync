@@ -56,7 +56,7 @@ export const makeCol = async <T extends doc>(
     const col = await database.createCollection<T>(name, {
       changeStreamPreAndPostImages: { enabled: true },
     })
-    if (docs.length) await col.insertMany(docs)
+    if (docs.length) await col.insertMany([...docs])
     return col
   } catch {
     return database.collection<T>(name)

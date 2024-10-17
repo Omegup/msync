@@ -8,7 +8,7 @@ import type {
   Expr,
   RawStages,
   SimpleStream,
-  TStages
+  TStages,
 } from '../../types'
 import { $group_, $match_, $replaceWith_, $simpleLookup_, $unwind_ } from '../mongo-stages'
 import { link } from '../prefix'
@@ -18,7 +18,7 @@ export const $group =
     Q extends J,
     T extends Q,
     ID extends jsonItem,
-    Acc extends Accumulators<T, string & keyof Acc, RORec<string & keyof Acc, jsonItem>>,
+    Acc extends Accumulators<T, RORec<string & keyof Acc, jsonItem>>,
   >(
     id: Expr<ID, T>,
     args: Acc,
@@ -35,7 +35,7 @@ export const $group =
         .with(input)
         .with(exec)
         .with($match_($expr(eq<ID, T, Ctx>(id)(ctx<ID>()('id').expr()))))
-        .with($group_(id, args)).stages
+        .with($group_<T>()(id, args)).stages
       return $simpleLookup_<WID, VID, S, 'item', Ctx>({
         k: 'item',
         pipeline,
@@ -48,7 +48,7 @@ export const $group =
     const unwind: RawStages<J, I1, I2> = $unwind_('item')
     const unwind1 = unwind as RawStages<J, I1, I2, unknown, 1>
     const transition = link<T, unknown, 1>()
-      .with<J, VID>($group_(id, {}))
+      .with<J, WID>($group_<T>()(id, {}))
       .with(stages)
       .with(unwind1)
       .with($replaceWith_(root<I2>().of('item').expr()))

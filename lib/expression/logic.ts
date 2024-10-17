@@ -20,7 +20,7 @@ export const ite = (<T, D1, D2, C>(
       }),
   })) as {
   <T, D, C = unknown>(
-    cond: Expr<boolean, D, C>,
+    cond: Expr<unknown, D, C>,
     then: Expr<T, D, C>,
     orelse: Expr<T, D, C>,
   ): Expr<T, D, C>

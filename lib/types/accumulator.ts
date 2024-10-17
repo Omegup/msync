@@ -8,9 +8,12 @@ export interface AccumulatorRaw<in Doc, out T, in C = unknown> extends RawObj {
   [Type](_: typeof AccumulatorRaw, source: Doc, ctx: C): readonly [typeof AccumulatorRaw, T]
 }
 
-export type Accumulators<T, K extends string, V extends RORec<K, jsonItem>, C = unknown> = {
-  readonly [P in K]: Accumulator<T, V[P], C>
+export type Accumulators<in T, out V extends RORec<string, jsonItem>, in C = unknown> = {
+  readonly [P in keyof V]: Accumulator<T, V[P], C>
 }
+
+export type AccumulatorsRoot<Acc extends Accumulators<never, RORec<string, jsonItem>, never>> =
+  Acc extends Accumulators<infer T extends J, RORec<string, jsonItem>, never> ? T : never
 
 export type Accumulator<in Doc, out T, in Ctx = unknown> = {
   [Type]?(_: typeof Accumulator): typeof Accumulator
@@ -23,9 +26,10 @@ export type Accumulator<in Doc, out T, in Ctx = unknown> = {
 
 export type AccumulatorsParam<
   T extends J,
-  Acc extends Accumulators<T, K, RORec<K, jsonItem>, C>,
+  Acc extends Accumulators<T, RORec<string, jsonItem>, C>,
   C = unknown,
-  K extends string = string & keyof Acc,
 > = {
-  readonly [P in K]: Acc[P] extends Accumulator<T, infer V, C> ? V : jsonItem
+  readonly [P in keyof Acc]: Acc[P] extends Accumulator<T, infer V extends jsonItem, C>
+    ? V
+    : jsonItem
 }

@@ -1,10 +1,10 @@
-import type { J } from '../../../types'
+import type { J, doc } from '../../../types'
 import type { DeltaStages, Expr, LinStages } from '../../types'
 import type { Updater } from '../../update'
 import { $replaceWith1, $replaceWith_, $set1, $set_ } from '../mongo-stages'
 import { $replaceWithDelta, $setDelta } from './$set-delta'
 
-export const $set = <Q, T extends Q & J, V extends Q & J, C = unknown>(
+export const $set = <Q, T extends Q & doc, V extends Q & doc, C = unknown>(
   updater: Updater<T, T, V, C>,
 ): DeltaStages<Q, T, V, C> & LinStages<Q, T, V, C> => ({
   delta: $setDelta(updater),
