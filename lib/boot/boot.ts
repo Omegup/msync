@@ -28,7 +28,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
   const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
-  db.command({
+  const p = db.command({
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
   })
@@ -54,7 +54,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
     })
 
     // Step 0 : declare we are starting a job
-    const step0 = (): Next => Promise.resolve(next(step1, 'empty new collection'))
+    const step0 = (): Next => p.then(() => next(step1, 'empty new collection'))
     const stop: It = withStop(step0)
 
     // Step 1 : empty new collection
@@ -165,7 +165,10 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
         data: l.aggResult.cursor.firstBatch,
         info: { job: undefined, debug: 'wait for change' },
         cont: withStop(() =>
-          l.stream.tryNext().then(doc => (doc ? next(step1, 'restart') : step8(l))),
+          l.stream
+            .tryNext()
+            .catch(() => true)
+            .then(doc => (doc ? next(step1, 'restart') : step8(l))),
         ),
       }
     }

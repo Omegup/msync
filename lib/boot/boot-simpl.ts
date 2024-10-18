@@ -11,7 +11,7 @@ import { concatStages, link, pipe } from '../aggregate/prefix'
 import { $array, $first } from '../expression/array'
 import { field } from '../expression/concat'
 import { $ifNull, ite } from '../expression/logic'
-import { val } from '../expression/val'
+import { nil, val } from '../expression/val'
 import { ctx, root } from '../field'
 import { $eq, $gteTs } from '../predicate'
 import { $and } from '../query/logic'
@@ -41,7 +41,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
   const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
-  db.command({
+  const p = db.command({
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
   })
@@ -67,7 +67,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
     })
 
     // Step 0 : declare we are starting a job
-    const step0 = (): Next => Promise.resolve(next(step1, 'get last update'))
+    const step0 = (): Next => p.then(() => next(step1, 'get last update'))
     const stop: It = withStop(step0)
 
     // Step 1 : get last update
@@ -82,16 +82,11 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
         hardMatch,
       )
       type R = Rec<'item', Arr<T>>
-      const replaceRaw: RawStages<unknown, T & D, R & ID> = $replaceWith_(
-        field<R & ID, T & D>({
-          item: ite($and(notDeleted, match).expr, $array(root<T>().expr()), $array()),
-          _id: root<T & D>().of('_id').expr(),
-        }),
-      )
       const cloneIntoNew = link<V | Del>()
         .with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
         .with(projectInput)
-        .with<unknown, R & ID>(replaceRaw)
+        .with($match_($and(notDeleted, match)))
+        .with<unknown, Result>(input)
 
       type Ctx = RORec<'after', Arr<T>>
       type R2 = Rec<'after', Arr<Result>> & ID
@@ -100,20 +95,11 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
           coll: collection,
           input: link<V | Del>().stages,
           exec: cloneIntoNew
-            .with<unknown, R2>(
-              $simpleLookup_<R & ID, Result, null, 'after', Ctx>({
-                pipeline: link<null, Ctx>()
-                  .with<unknown, T>($documents_(ctx<Arr<T>>()('after').expr()))
-                  .with<unknown, Result>(input).stages,
-                k: 'after',
-                vars: { after: root<R>().of('item').expr() },
-              }),
-            )
             .with(
-              $replaceWith_<R2, OutInput<Result>>(
-                field({
-                  after: $ifNull($first(root<R2>().of('after').expr()), val(null)),
-                  before: field<O<ID>, R2>({ _id: root<R2>().of('_id').expr() }),
+              $replaceWith_<Result, OutInput<Result>>(
+                field<OutInput<Result>, Result>({
+                  after: root<Result>().expr(),
+                  before: nil,
                 }),
               ),
             )
