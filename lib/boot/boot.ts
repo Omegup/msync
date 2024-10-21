@@ -75,7 +75,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
       const replaceRaw: RawStages<J, T & D, After<T> & { updated: true; _id: string }> =
         $replaceWith_(
           field<After<T> & { updated: true; _id: string }, T & D>({
-            after: ite($and(notDeleted, match).expr, root<T>().expr(), val(null)),
+            after: ite($and(notDeleted, match).expr, root<T>().expr(), nil),
             updated: val(true),
             _id: root<T & D>().of('_id').expr(),
           }),

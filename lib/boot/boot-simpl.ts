@@ -11,22 +11,22 @@ import { concatStages, link, pipe } from '../aggregate/prefix'
 import { $array, $first } from '../expression/array'
 import { field } from '../expression/concat'
 import { $ifNull, ite } from '../expression/logic'
-import { val } from '../expression/val'
+import { nil } from '../expression/val'
 import { ctx, root } from '../field'
 import { $eq, $gteTs } from '../predicate'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
 import type {
   D,
+  Del,
+  Frame,
+  HasJob,
   Iterator,
   Model,
-  Frame,
   OutInput,
   RawStages,
   Runner,
   SimpleStreamExecutionResult,
-  HasJob,
-  Del,
 } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
 import { addTeardown } from '../utils/tear-down'
@@ -112,7 +112,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
             .with(
               $replaceWith_<R2, OutInput<Result>>(
                 field({
-                  after: $ifNull($first(root<R2>().of('after').expr()), val(null)),
+                  after: $ifNull($first(root<R2>().of('after').expr()), nil),
                   before: field<O<ID>, R2>({ _id: root<R2>().of('_id').expr() }),
                 }),
               ),

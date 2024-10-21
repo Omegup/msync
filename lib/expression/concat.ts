@@ -40,9 +40,13 @@ export const fieldM = <
         ),
       ),
   })
-type Exprs<out T, in D, in C = unknown> = {
+
+export type Exprs<out T, in D, in C = unknown> = {
   readonly [K in StrKey<T>]: Expr<T[K], D, C>
 }
+
+export const mergeExprs = <T, V, D, C = unknown>(exprs: Exprs<T, D, C>, exprs2: Exprs<V, D, C>) =>
+  ({ ...exprs, ...exprs2 }) as Exprs<T & V, D, C>
 export const field = <T extends object, D, C = unknown>(expr: Exprs<T, D, C>) =>
   asExpr<O<T>, D, C>({
     raw: f =>

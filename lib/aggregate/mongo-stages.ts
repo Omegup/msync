@@ -31,11 +31,11 @@ export const $unwind_ = <T extends J, K extends s, U>(k: K) => $unwind1<T, K, U>
 
 export const $group_ =
   <T extends J>() =>
-  <ID extends j, Acc extends Accumulators<T, RORec<string, j>, C>, C>(
+  <ID extends j, V extends RORec<string, j>, C = unknown>(
     id: Expr<ID, T, C>,
-    args: Acc,
+    args: Accumulators<T, V, C>,
   ) =>
-    $group1<T, ID, Acc, C>(id, args)<IdHKT<J>>(root)
+    $group1<T, ID, V, C>(id, args)<IdHKT<J>>(root)
 
 export const $documents_ = <T extends J, C>(docs: Expr<Arr<T>, unknown, C>) =>
   $documents1(docs)<IdHKT<J>>(root)

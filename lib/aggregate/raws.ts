@@ -2,12 +2,11 @@ import type { App, Arr, HKT, J, RORec, RawObj, Rec, StrKey, jsonItem } from '../
 import type { Field } from '../field'
 import type {
   Accumulators,
-  AccumulatorsParam,
   Expr,
   FRawStages,
   LookupArgs,
   Query,
-  RawStages,
+  RawStages
 } from '../types'
 import type { Updater } from '../update'
 import { id } from '../utils/json'
@@ -59,19 +58,20 @@ export const $unwind1 =
     asStages([{ $unwind: `$${f<Rec<K, Arr<U>>>().of(k).str()}` }])
 
 export const $group1 =
-  <T extends J, ID extends jsonItem, Acc extends Accumulators<T, RORec<string, jsonItem>, C>, C>(
+  <T extends J, ID extends jsonItem, V extends RORec<string, jsonItem>, C>(
     id: Expr<ID, T, C>,
-    args: Acc,
+    args: Accumulators<T, V, C>,
   ) =>
   <F extends HKT<J, J>>(
     f: <T extends J>() => Field<App<F, T>, T>,
-  ): RawStages<J, App<F, T>, Rec<'_id', ID> & AccumulatorsParam<T, Acc, C>, C, 1> =>
+  ): RawStages<J, App<F, T>, Rec<'_id', ID> & V, C, 1> =>
     asStages([
       {
         $group: {
           _id: id.raw(f()).get(),
-          ...map<Acc, string & keyof Acc, RORec<string & keyof Acc, RawObj>>(args, v =>
-            v.raw(f<T>()),
+          ...map<Accumulators<T, V, C>, string & keyof V, RORec<string & keyof V, RawObj>>(
+            args,
+            v => v.raw(f<T>()),
           ),
         },
       },

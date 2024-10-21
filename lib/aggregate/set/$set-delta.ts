@@ -6,13 +6,13 @@ import {
   type O,
   type Rec,
   type doc,
-  type jsonItem
+  type jsonItem,
 } from '../../../types'
 import { $push } from '../../accumulators'
-import { $array, $filter, $first, $last } from '../../expression/array'
+import { $array, $filterDefined, $first, $last } from '../../expression/array'
 import { field } from '../../expression/concat'
 import { ite, sub } from '../../expression/logic'
-import { val } from '../../expression/val'
+import { nil, val } from '../../expression/val'
 import { ctx, root } from '../../field'
 import type { BA, Delta, Expr, RawStages } from '../../types'
 import { type Updater } from '../../update'
@@ -40,14 +40,12 @@ export const $setDelta = <T extends doc, V extends doc, C = unknown>(
         pipeline: link<null, Ctx & C>()
           .with<unknown, T>(
             $documents_(
-              $filter<T | null, unknown, 'x', Ctx>({
-                as: 'x',
-                cond: ctx()('x').expr(),
-                expr: $array<T | null, unknown, Ctx>(
+              $filterDefined<T, unknown, Ctx>(
+                $array<T | null, unknown, Ctx>(
                   ctx<T | null>()('a').expr(),
                   ctx<T | null>()('b').expr(),
                 ),
-              }) as Expr<Arr<T>, unknown, Ctx>,
+              ),
             ),
           )
           .with<unknown, V>($set_(updater))
@@ -60,12 +58,12 @@ export const $setDelta = <T extends doc, V extends doc, C = unknown>(
                 after: ite(
                   ctx<T | null>()('a').expr(),
                   $first(root<Rec<'docs', Arr<V>>>().of('docs').expr()),
-                  val(null),
+                  nil,
                 ),
                 before: ite(
                   ctx<T | null>()('b').expr(),
                   $last(root<Rec<'docs', Arr<V>>>().of('docs').expr()),
-                  val(null),
+                  nil,
                 ),
                 _id: $first(root<Rec<'docs', Arr<V>>>().of('docs').of('_id').expr()) as Expr<
                   string,

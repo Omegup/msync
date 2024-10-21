@@ -1,4 +1,5 @@
-import type { App, Arr, HKT, RORec, notArr } from '../../types'
+import type { App, Arr, HKT, N, RORec, notArr } from '../../types'
+import { ctx } from '../field'
 import type { Expr } from '../types'
 import { asBoolExpr, asExpr, asExprRaw } from './expr-base'
 
@@ -6,6 +7,14 @@ export const $size = <T, D, C>(expr: Expr<Arr<T>, D, C>) =>
   asExpr<number, D, C>({
     raw: f => asExprRaw({ $size: expr.raw(f).get() }),
   })
+
+export const $filterDefined = <T, D, C = unknown>(expr: Expr<Arr<T | N>, D, C>) =>
+  $filter({
+    expr,
+    as: 'x',
+    cond: ctx()('x').expr(),
+  }) as Expr<Arr<T>, D, C>
+
 export const $filter = <T, D, K extends string, C = unknown>({
   as,
   cond,
@@ -49,23 +58,28 @@ export const $isArray = <T extends notArr, D, C, F extends HKT<T | Arr<T>>>(
     raw: f => asExprRaw<never, unknown, C>({ $isArray: expr.raw(f).get() }),
   })
 
-export const $array = <T, D, C>(...exprs: Expr<T, D, C>[]) =>
+export const $array = <T, D, C = unknown>(...exprs: Expr<T, D, C>[]) =>
   asExpr<Arr<T>, D, C>({
-    raw: (f) => asExprRaw(exprs.map(x => x.raw(f).get())),
+    raw: f => asExprRaw(exprs.map(x => x.raw(f).get())),
   })
 
-export const $concat = <T, D, C>(...exprs: Expr<Arr<T>, D, C>[])=> asExpr<Arr<T>, D, C>({
-  raw: f => asExprRaw({ $concatArrays: exprs.map(x => x.raw(f).get()) }),
-})
+export const $concat = <T, D, C>(...exprs: Expr<Arr<T>, D, C>[]) =>
+  asExpr<Arr<T>, D, C>({
+    raw: f => asExprRaw({ $concatArrays: exprs.map(x => x.raw(f).get()) }),
+  })
 
-export const $first = <T, D, C>(expr: Expr<Arr<T>, D, C>) => asExpr<T | null, D, C> ({
-  raw: f => asExprRaw({ $first: expr.raw(f).get() }),
-})
-export const $last = <T, D, C>(expr: Expr<Arr<T>, D, C>) => asExpr<T | null, D, C> ({
-  raw: f => asExprRaw({ $last: expr.raw(f).get() }),
-})
+export const $first = <T, D, C>(expr: Expr<Arr<T>, D, C>) =>
+  asExpr<T | null, D, C>({
+    raw: f => asExprRaw({ $first: expr.raw(f).get() }),
+  })
+export const $firstSure = $first as <T, D, C>(expr: Expr<Arr<T>, D, C>) => Expr<T, D, C>
+export const $last = <T, D, C>(expr: Expr<Arr<T>, D, C>) =>
+  asExpr<T | null, D, C>({
+    raw: f => asExprRaw({ $last: expr.raw(f).get() }),
+  })
 export const $mergeObjects = <T1, T2, D, C = unknown>(
   ...exprs: readonly [Expr<T1, D, C>, Expr<T2, D, C>]
-) => asExpr<T1 & T2, D, C>({
-  raw: f => asExprRaw({ $mergeObjects: exprs.map(x => x.raw(f).get()) }),
-})
+) =>
+  asExpr<T1 & T2, D, C>({
+    raw: f => asExprRaw({ $mergeObjects: exprs.map(x => x.raw(f).get()) }),
+  })
