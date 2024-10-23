@@ -3,10 +3,10 @@ import { operator } from './utils'
 
 const dualIn = operator<
   '$in' | '$nin',
-  ConstHKT<unknown, ArrHKT>,
+  ConstHKT<ArrHKT>,
   unknown,
   unknown,
-  ConstHKT<unknown, IdHKT>
+  ConstHKT<IdHKT>
 >()
 
 export const $in = dualIn('$in')

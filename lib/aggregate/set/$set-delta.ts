@@ -29,6 +29,7 @@ export const $setDelta = <T extends doc, V extends doc, C = unknown>(
   updater: Updater<T, T, V, C>,
 ): RawStages<unknown, Delta<T>, Delta<V>, C> => {
   type Ctx = { a: T | null; b: T | null }
+  const docs = root<Rec<'docs', Arr<V>>>().of('docs')
   return link<Delta<T>, C>()
     .with<unknown, Rec<'root', Arr<Delta<V> & ID>>>(
       $simpleLookup_<Delta<T>, Delta<V> & ID, never, 'root', Ctx, C>({
@@ -50,25 +51,14 @@ export const $setDelta = <T extends doc, V extends doc, C = unknown>(
           )
           .with<unknown, V>($set_(updater))
           .with<unknown, O & { readonly _id: string; readonly docs: Arr<V> }>(
-            $group_<V>()(val(''), { docs: $push(root<V>().expr()) }),
+            $group_<V>()(val(''), { docs: ['docs', $push(root<V>().expr())] }),
           )
           .with<unknown, Delta<V> & ID>(
             $replaceWith_<O & { readonly _id: string; readonly docs: Arr<V> }, Delta<V> & ID, Ctx>(
               field({
-                after: ite(
-                  ctx<T | null>()('a').expr(),
-                  $first(root<Rec<'docs', Arr<V>>>().of('docs').expr()),
-                  nil,
-                ),
-                before: ite(
-                  ctx<T | null>()('b').expr(),
-                  $last(root<Rec<'docs', Arr<V>>>().of('docs').expr()),
-                  nil,
-                ),
-                _id: $first(root<Rec<'docs', Arr<V>>>().of('docs').of('_id').expr()) as Expr<
-                  string,
-                  Rec<'docs', Arr<V>>
-                >,
+                after: ['after', ite(ctx<T | null>()('a').expr(), $first(docs.expr()), nil)],
+                before: ['before', ite(ctx<T | null>()('b').expr(), $last(docs.expr()), nil)],
+                _id: ['_id', $first(docs.of('_id').expr()) as Expr<string, Rec<'docs', Arr<V>>>],
               }),
             ),
           ).stages,

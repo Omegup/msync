@@ -1,5 +1,5 @@
 import { $sum } from '../lib/accumulators'
-import { $merge, type Merge } from '../lib/aggregate/$merge'
+import { $replace, type Merge } from '../lib/aggregate/$replace'
 import { $group } from '../lib/aggregate/group'
 import { $set } from '../lib/aggregate/set'
 import { from, staging } from '../lib/boot'
@@ -63,7 +63,7 @@ machine1.add(
       }),
     )
     .get()
-    .out($merge(r3)),
+    .out($replace(r3)),
 )
 
 machine1 = wrap(machine1)
@@ -74,7 +74,7 @@ machine1.add(
     'xs1',
   )
     .get()
-    .out($merge(r4)),
+    .out($replace(r4)),
 )
 
 machine1.start(console.log)
@@ -84,9 +84,9 @@ const machine2 = new Machine()
 machine2.add(
   from<V>({ collection: v, projection: { _id: 1, deletedAt: 1, link: 1, v: 1 } }, 's1')
     .then($set(set({ link: to(concat(root<V>().of('link').expr(), val('..'))) })))
-    .with($group(root<V>().of('link').expr(), { v: $sum(root<V>().of('v').expr()) }))
+    .with($group(root<V>().of('link').expr(), { v: ['v', $sum(root<V>().of('v').expr())] }))
     .get()
-    .out($merge(g)),
+    .out($replace(g)),
 )
 
 machine2.start(console.log)

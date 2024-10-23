@@ -20,6 +20,7 @@ export type Arr<T, N extends number = number> = A & { readonly [_ in N]: T }
 type Obj = { [Type]: typeof object }
 export type O<T = unknown> = Obj & T
 export type RORec<K extends keyof never, T = unknown> = { readonly [P in K]: T }
+export type Par<K extends string, V extends Rec<K, jsonItem>> = { readonly [k in K]?: V[k] | N }
 export type Rec<K extends string, T = unknown> = O<RORec<K, T>>
 export interface J {
   [Type]: typeof object
@@ -36,3 +37,10 @@ export type json = JsonArr | J
 export type raw = readonly rawItem[] | RawObj
 
 export type StrKey<T> = string & keyof T
+
+// a generic type that restricts another type to be a literal
+// for exemple AsLiteral<'a'> is 'a' and AsLiteral<string> is never, AsLiteral<1> is 1 and AsLiteral<number> is never
+export type AsLiteral<T extends string | boolean> = {} extends { [K in `${T}`]: 1 }
+  ? never
+  : NoUnion<T>
+type NoUnion<T, V = T> = T extends unknown ? ([V] extends [T] ? T : never) : never

@@ -1,4 +1,4 @@
-import type { Rec } from '../../types'
+import type { AsLiteral, Rec } from '../../types'
 
 export const id = <T>(x: T) => x
 export const defined = <T>(x: T | undefined | null): x is T => x != null
@@ -9,4 +9,7 @@ export const anoop = async () => {}
 
 export const asRec = <K extends string, T>(x: Record<K, T>) => x as Rec<K, T>
 
-export const map1 = <K extends string, Im>(k: K, to: Im) => ({ [k]: to }) as Record<K, Im>
+export const map1 = <K extends string, Im>(k: AsLiteral<K>, to: Im) => {
+  const k2: K = k
+  return { [k]: [k2, to] } as { readonly [P in K]: [P, Im] } & { readonly [_: string]: [K, Im] }
+}

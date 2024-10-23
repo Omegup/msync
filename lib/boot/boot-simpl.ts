@@ -84,8 +84,8 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
       type R = Rec<'item', Arr<T>>
       const replaceRaw: RawStages<unknown, T & D, R & ID> = $replaceWith_(
         field<R & ID, T & D>({
-          item: ite($and(notDeleted, match).expr, $array(root<T>().expr()), $array()),
-          _id: root<T & D>().of('_id').expr(),
+          item: ['item', ite($and(notDeleted, match).expr, $array(root<T>().expr()), $array())],
+          _id: ['_id', root<T & D>().of('_id').expr()],
         }),
       )
       const cloneIntoNew = link<V | Del>()
@@ -112,8 +112,11 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
             .with(
               $replaceWith_<R2, OutInput<Result>>(
                 field({
-                  after: $ifNull($first(root<R2>().of('after').expr()), nil),
-                  before: field<O<ID>, R2>({ _id: root<R2>().of('_id').expr() }),
+                  after: ['after', $ifNull($first(root<R2>().of('after').expr()), nil)],
+                  before: [
+                    'before',
+                    field<O<ID>, R2>({ _id: ['_id', root<R2>().of('_id').expr()] }),
+                  ],
                 }),
               ),
             )

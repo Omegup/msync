@@ -1,4 +1,4 @@
-import type { App, Arr, HKT, ID, J, Rec, doc } from '../../../types'
+import type { App, Arr, AsLiteral, HKT, ID, J, Rec, doc } from '../../../types'
 import { concat } from '../../expression/concat'
 import { eq } from '../../expression/logic'
 import { val } from '../../expression/val'
@@ -24,7 +24,7 @@ export const $lookupRaw =
   >(
     { field1, field2 }: { field1: Field<LQ, S>; field2: Field<RQ, S> },
     { coll, exec, input }: TStages<RS, Before<RQ>, BRB, Before<RE>>,
-    k2: As,
+    k2: AsLiteral<As>,
     k: 'left' | 'right' | false,
   ) =>
   <F extends HKT<J, J>>(

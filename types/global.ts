@@ -10,7 +10,7 @@ declare global {
   interface ObjectConstructor {
     entries<T, _ = 0>(object?: T): readonly Entry<T>[]
     fromEntries<T, _ = 0>(entries: readonly Entry<T>[]): T
-    keys<T, _ extends 1>(obj: T): (keyof T)[]
+    keys<T, _ extends 1>(obj: T): readonly (keyof T)[]
   }
   interface ReadonlyArray<T> {
     includes<T, V extends T>(this: ReadonlyArray<V>, item: T, fromIndex?: number): item is V

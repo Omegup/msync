@@ -1,16 +1,17 @@
-import type { App, Arr, HKT, J, RORec, RawObj, Rec, StrKey, jsonItem } from '../../types'
+import type { App, Arr, ConstHKT, HKT, J, RORec, RawObj, Rec, StrKey, jsonItem } from '../../types'
 import type { Field } from '../field'
 import type {
+  AccumulatorHKT,
   Accumulators,
   Expr,
   FRawStages,
   LookupArgs,
   Query,
-  RawStages
+  RawStages,
 } from '../types'
 import type { Updater } from '../update'
 import { id } from '../utils/json'
-import { map } from '../utils/map-object'
+import { mapExactToObject } from '../utils/map-object'
 import { asStages } from './prefix'
 
 type s = string
@@ -69,10 +70,7 @@ export const $group1 =
       {
         $group: {
           _id: id.raw(f()).get(),
-          ...map<Accumulators<T, V, C>, string & keyof V, RORec<string & keyof V, RawObj>>(
-            args,
-            v => v.raw(f<T>()),
-          ),
+          ...mapExactToObject<V, AccumulatorHKT<T, C>, ConstHKT<RawObj>>(args, v => v.raw(f<T>())),
         },
       },
     ])

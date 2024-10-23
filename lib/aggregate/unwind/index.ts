@@ -21,8 +21,8 @@ export const $unwind = <T extends doc, K extends s, U extends doc>(
     .with<unknown, Delta<LR<T & Rec<K, Arr<U>>, Arr<U>>>>(
       $replaceWithDelta(
         field({
-          left: root<T & Rec<K, Arr<U>>>().expr(),
-          right: root<Rec<K, Arr<U>>>().of(k).expr(),
+          left: ['left', root<T & Rec<K, Arr<U>>>().expr()],
+          right: ['right', root<Rec<K, Arr<U>>>().of(k).expr()],
         }),
       ),
     )

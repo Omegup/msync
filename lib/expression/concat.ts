@@ -1,7 +1,7 @@
-import type { J, O, RORec, StrKey, U, Undef, rawItem } from '../../types'
+import type { ConstHKT, HKT, I, J, O, RORec, StrKey, U, Undef, rawItem } from '../../types'
 import type { Field } from '../field'
 import type { Expr } from '../types'
-import { map } from '../utils/map-object'
+import { mapExactToObject, type Exact, type ExactPart } from '../utils/map-object'
 import { asExpr, asExprRaw } from './expr-base'
 
 export const concat = <D, C>(...expr: Expr<string, D, C>[]) =>
@@ -44,13 +44,38 @@ export const fieldM = <
 export type Exprs<out T, in D, in C = unknown> = {
   readonly [K in StrKey<T>]: Expr<T[K], D, C>
 }
+type MergeExactArgs<T1, T2, F extends HKT<T1[StrKey<T1>] | T2[StrKey<T2>]>> = readonly [
+  Exact<Omit<T1, keyof T2>, F>,
+  Exact<T2, F>,
+]
+export const mergeExact = <T1, T2, F extends HKT<T1[StrKey<T1>] | T2[StrKey<T2>]>, E = unknown>(
+  ...[exprsExact1, exprsExact2]: MergeExactArgs<T1, T2, F>
+) =>
+  ({
+    ...exprsExact1,
+    ...exprsExact2,
+  }) as Exact<T2 & Omit<T1, keyof T2> & Pick<E, symbol & keyof E>, F>
 
-export const mergeExprs = <T, V, D, C = unknown>(exprs: Exprs<T, D, C>, exprs2: Exprs<V, D, C>) =>
-  ({ ...exprs, ...exprs2 }) as Exprs<T & V, D, C>
-export const field = <T extends object, D, C = unknown>(expr: Exprs<T, D, C>) =>
+export const mergeExpr = <T1, T2, D, C = unknown, E = unknown>(
+  ...exprs: MergeExactArgs<T1, T2, ExprHKT<D, C>>
+) => mergeExact<T1, T2, ExprHKT<D, C>, E>(...exprs)
+
+export type ExprsPart<T, D, C> = ExactPart<T, ExprHKT<D, C>>
+export interface ExprHKT<D, C = unknown> extends HKT<unknown> {
+  readonly out: Expr<I<unknown, this>, D, C>
+}
+
+export type ExprsExact<T, D, C = unknown> = Exact<T, ExprHKT<D, C>>
+
+const asIntersect = <T, V, P extends keyof T & keyof V>(x: T[P] & V[P]) => x as (T & V)[P]
+export const pair = <T, D, C, P extends StrKey<T>>(
+  k: P,
+  v: Expr<T[P], D, C>,
+): ExprsExact<T, D, C>[P] =>
+  asIntersect<ExprsPart<T, D, C>, RORec<string, readonly [StrKey<T>, unknown]>, P>([k, v])
+
+export const field = <T extends object, D, C = unknown>(exprs: ExprsExact<T, D, C>) =>
   asExpr<O<T>, D, C>({
     raw: f =>
-      asExprRaw(
-        map<Exprs<T, D, C>, StrKey<T>, Record<StrKey<T>, rawItem>>(expr, e => e.raw(f).get()),
-      ),
+      asExprRaw(mapExactToObject<T, ExprHKT<D, C>, ConstHKT<rawItem>>(exprs, e => e.raw(f).get())),
   })

@@ -1,4 +1,4 @@
-import type { ID, J, RORec, Rec, doc, notArr } from '../../types'
+import type { AsLiteral, ID, J, RORec, Rec, doc, notArr } from '../../types'
 import { $lookupDelta, $lookupRaw } from '../aggregate/lookup'
 import { concatStages, concatTStages, emptyDelta } from '../aggregate/prefix'
 import { $replaceWithDelta } from '../aggregate/set'
@@ -107,7 +107,7 @@ type Params<As extends string, LQ extends J, RQ extends J, RE extends RQ, S exte
   localField: Field<LQ, S>
   foreignField: Field<RQ, S>
   from: SnapshotStreamExecutionResult<RQ, RE>
-  as: As
+  as: AsLiteral<As>
 }
 type LookupParams<
   As extends string,
@@ -120,7 +120,7 @@ type LookupParams<
   lField: Field<LQ, S>
   rField: Field<RQ, S>
   right: SnapshotStreamExecutionResult<RQ, RE>
-  as: As
+  as: AsLiteral<As>
   left: SnapshotStreamExecutionResult<LQ, LE>
 }
 

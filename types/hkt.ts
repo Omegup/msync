@@ -24,11 +24,11 @@ export interface IdHKT<Dom = unknown> extends HKT<Dom> {
   readonly out: I<Dom, this>
 }
 
-export interface RConstHKT<Dom, Im = Dom> extends HKT<Im, HKT<Dom, Im>> {
-  readonly out: ConstHKT<Dom, I<Im, this>>
+export interface RConstHKT<Im, Dom = Im> extends HKT<Im, HKT<Dom, Im>> {
+  readonly out: ConstHKT<I<Im, this>, Dom>
 }
 
-export interface ConstHKT<Dom, Im> extends HKT<Dom, Im> {
+export interface ConstHKT<Im, Dom = unknown> extends HKT<Dom, Im> {
   readonly out: Im
 }
 

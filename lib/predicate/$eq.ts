@@ -2,7 +2,7 @@ import { Timestamp } from 'mongodb'
 import type { ConstHKT, IdHKT, RConstHKT } from '../../types'
 import { operator } from './utils'
 
-const dualEq = operator<'$eq' | '$ne', ConstHKT<unknown, IdHKT<unknown>>, unknown>()
+const dualEq = operator<'$eq' | '$ne', ConstHKT<IdHKT<unknown>>, unknown>()
 
 export const $eq = dualEq('$eq')
 export const $ne = dualEq('$ne')

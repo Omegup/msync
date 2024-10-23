@@ -1,4 +1,4 @@
-import type { Arr, ID, Rec, doc } from '../../../types'
+import type { Arr, AsLiteral, ID, Rec, doc } from '../../../types'
 import type { Delta, RawStages } from '../../types'
 import { $unwind_ } from '../mongo-stages'
 import { asStages, link } from '../prefix'
@@ -6,8 +6,8 @@ import { asStages, link } from '../prefix'
 type s = string
 
 export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extends doc>(
-  k1: K1,
-  k2: K2,
+  k1: AsLiteral<K1>,
+  k2: AsLiteral<K2>,
   k: K1 | K2 | false,
 ) => {
   const stages = link<Delta<Rec<K1, T> & Rec<K2, Arr<U>>>>()
