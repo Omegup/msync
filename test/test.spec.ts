@@ -1,6 +1,7 @@
-import { $sum } from '../lib/accumulators'
+import { $sum, $sumDelta } from '../lib/accumulators'
 import { $replace, type Merge } from '../lib/aggregate/$replace'
 import { $group } from '../lib/aggregate/group'
+import { $groupMerge } from '../lib/aggregate/group/$group-merge'
 import { $set } from '../lib/aggregate/set'
 import { from, staging } from '../lib/boot'
 import { concat } from '../lib/expression/concat'
@@ -8,7 +9,7 @@ import { val } from '../lib/expression/val'
 import { root } from '../lib/field'
 import { Machine, wrap } from '../lib/machine'
 import { $lookup } from '../lib/stream/$lookup'
-import type { Model } from '../lib/types'
+import type { Model, TS } from '../lib/types'
 import { set, to } from '../lib/update'
 import type { ID, O, RORec, Rec } from '../types'
 import { prepare } from './mongo'
@@ -24,7 +25,7 @@ const c1 = db.collection<D1 & Model>('c1')
 const c2 = db.collection<D2 & Model>('c2')
 const c3 = db.collection<D3 & Model>('c3')
 // const r = db.collection<Merge<D1>>('r')
-const g = db.collection<Merge<ID & Rec<'v', number>>>('g')
+const g = db.collection<ID & TS & Rec<'_grp', string> & Rec<'v', number>>('g')
 // const r2 = db.collection<Merge<LeftWrite<D1, D2>>>('r2')
 const r3 = db.collection<Merge<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>>('r3')
 const r4 = db.collection<Merge<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>>('r4')
@@ -82,11 +83,20 @@ machine1.start(console.log)
 const machine2 = new Machine()
 
 machine2.add(
-  from<V>({ collection: v, projection: { _id: 1, deletedAt: 1, link: 1, v: 1 } }, 's1')
-    .then($set(set({ link: ['link', to(concat(root<V>().of('link').expr(), val('..')))] })))
-    .with($group(root<V>().of('link').expr(), { v: ['v', $sum(root<V>().of('v').expr())] }))
+  staging<V>({ collection: v, projection: { _id: 1, deletedAt: 1, link: 1, v: 1 } }, 's1')
+    .then(
+      $set(set({ link: ['link', to(concat(root<V>().of('link').expr(), val('..')))] as const })),
+    )
     .get()
-    .out($replace(g)),
+    .out(
+      $groupMerge<V, string, O<{ readonly v: number }>>(
+        root<V>().of('link').expr(),
+        {
+          v: ['v', $sumDelta(root<V>().of('v').expr())],
+        },
+        g,
+      ),
+    ),
 )
 
 machine2.start(console.log)
