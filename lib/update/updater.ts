@@ -1,7 +1,20 @@
-import type { Arr, HKT, I, IdHKT, J, N, O, StrKey, Type, notArr, rawItem } from '../../types'
+import type {
+  App,
+  Arr,
+  ConstHKT,
+  HKT,
+  I,
+  J,
+  N,
+  O,
+  StrKey,
+  Type,
+  notArr,
+  rawItem
+} from '../../types'
 import { Field, type Path } from '../field'
 import type { Expr } from '../types'
-import { mapExactToObject, type Exact } from '../utils/map-object'
+import { mapExactToObject } from '../utils/map-object'
 
 declare const Updater: unique symbol
 export type Updater<in R, in T, out V, in C = unknown> = {
@@ -14,33 +27,44 @@ export const subUpdater = <P extends J, D, T, V, Ctx>(
   f: Path<P, D | N>,
 ): Updater<P, T, V, Ctx> => ({ raw: <R extends J>(g: Field<R, P | N>) => a.raw(g.with(f)) })
 
-type FDom<R, C> = {
-  readonly [P in string]: Updater<R, never, unknown, C>
+interface UpdaterHKT<F extends FDom<F, R, C>, R, C> extends HKT<F[StrKey<F>]> {
+  readonly out: Updater<
+    R,
+    I<F[StrKey<F>], this>[1] extends Updater<R, infer T, unknown, C> ? T : never,
+    I<F[StrKey<F>], this>[1] extends Updater<R, never, infer V, C> ? V : never,
+    C
+  >
 }
+
+type ExactPart<T, F extends HKT<T[StrKey<T>]>> = {
+  readonly [K in StrKey<T>]: readonly [K, App<F, T[K]>]
+}
+// ExactPart
+type FDom<F extends FDom<F, R, C>, R, C> = ExactPart<F, UpdaterHKT<F, R, C>>
 type Get<T, P extends string> = P extends keyof T ? T[P] : undefined
 
-interface WithKey<T> extends HKT<readonly [T, StrKey<T>]> {
-  readonly out: I<readonly [T, StrKey<T>], this>[0][I<readonly [T, StrKey<T>], this>[1]]
-}
-
-export const set = <R, Old, F extends FDom<R, C>, K extends StrKey<F> = StrKey<F>, C = unknown>(
-  fields: Exact<F, IdHKT>,
+export const set = <R, Old, F extends FDom<F, R, C>, C = unknown>(
+  fx: F,
 ): Updater<
   R,
   Old,
-  Omit<Old, K> &
+  Omit<Old, StrKey<F>> &
     O<{
-      readonly [P in K]: F[P] extends Updater<R, infer O extends Get<Old, P>, infer A, C>
+      readonly [P in StrKey<F>]: F[P][1] extends Updater<R, infer O extends Get<Old, P>, infer A, C>
         ? A | Exclude<Get<Old, P>, O>
         : never
     }>,
   C
 > => ({
   raw: f =>
-    Object.entries(mapExactToObject<F, IdHKT, WithKey<F>>(fields, v => v)).flatMap(([k, v]) =>
-      v.raw(f).map(([l, v]) => [`.${k}${l}`, v]),
+    Object.entries(mapExactToObject<F, UpdaterHKT<F, R, C>, ConstHKT<1>>(fx, () => 1)).flatMap(
+      ([k]) => fx[k][1].raw(f).map(([l, v]) => [`.${k}${l}`, v]),
     ),
 })
+export const set1 =
+  <R>() =>
+  <F extends FDom<F, R, C>, Old, C = unknown>(fields: F) =>
+    set<R, Old, F, C>(fields)
 
 export const weaken = <R, T, V, C = unknown>(
   updater: Updater<R, T, V, C>,

@@ -22,7 +22,7 @@ export type WithItem<V, Grp> = Rec<'_id', Grp> & Rec<'item', O<V>>
 export const subGroup = <T extends J, Grp extends jsonItem, V extends RORec<string, jsonItem>>(
   id: Expr<Grp, T>,
   args: DeltaAccumulators<T, V>,
-  addGrp: <D extends Rec<'_id', Grp>>(src: ExprsExact<V, D>) => ExprsExact<Rec<GID, Grp> & V, D>,
+  addGrp: <D extends Rec<'_id', Grp>>(src: ExprsExact<V, D>) => ExprsExact<RORec<GID, Grp> & V, D>,
 ): RawStages<unknown, Delta<T>, Rec<GID, Grp> & V> => {
   type Part = Rec<'v', T> & RORec<'old', boolean>
   type ComposedId = Rec<'_id', Rec<'old', boolean> & Rec<'id', Grp>>
@@ -114,7 +114,7 @@ export const subGroup = <T extends J, Grp extends jsonItem, V extends RORec<stri
     )
     .with<unknown, Rec<GID, Grp> & V>(
       $replaceWith_<Rec<'_id', Grp> & HasItem, V & Rec<GID, Grp>>(
-        field<Rec<GID, Grp> & V, Rec<'_id', Grp> & HasItem>(
+        field<RORec<GID, Grp> & V, Rec<'_id', Grp> & HasItem>(
           addGrp<Rec<'_id', Grp> & HasItem>(
             mapExact<V, DeltaAccumulatorHKT<T>, ExprHKT<Rec<'item', Arr<WithCmpId>>>>(
               args,

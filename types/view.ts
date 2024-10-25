@@ -2,6 +2,7 @@ import type { Db } from 'mongodb'
 import type { Del, Query } from '../lib/types'
 import type { J, StrKey } from './json'
 import type { RawStage } from './mongo'
+import type { ExactKeys } from '../lib/utils/map-object'
 
 interface CommonCollection {
   readonly s: { readonly db: Db }
@@ -20,7 +21,7 @@ export interface WriteonlyCollection<in R> extends CommonCollection {
 
 export type View<T extends J, V extends T & J = T> = {
   collection: ReadonlyCollection<V | Del>
-  projection: Record<StrKey<T>, 1>
+  projection: ExactKeys<StrKey<T>>
   match?: Query<T>
   hardMatch?: Query<V>
 }

@@ -17,27 +17,26 @@ type GID = '_grp'
 type Denied = keyof (TS & ID) | GID
 const gid: GID = '_grp'
 
-export const subMerge = <T extends J, Grp extends jsonItem, VV extends Rec<string, jsonItem>>(
+export const subMerge = <T extends J, Grp extends jsonItem, VV extends RORec<string, jsonItem>>(
   args: DeltaAccumulators<T, Omit<VV, Denied>>,
   out: WriteonlyCollection<TS & ID & Rec<GID, Grp> & Omit<VV, Denied>>,
 ): RawStages<unknown, Rec<GID, Grp> & Omit<VV, Denied>, 'out'> => {
   type Out = TS & ID & Rec<GID, Grp> & V
   type V = Omit<VV, Denied>
-  const addId = { touchedAt: to(now), _id: to($rand) }
   const omit1 = omitRORec<GID, never, keyof (TS & ID), Grp>()
   const omit2 = omitPick<keyof VV, GID, keyof (TS & ID), VV>()
   type Ctx = RORec<'new', Out>
   interface UpdaterF<E> extends HKT {
-    readonly out: Updater<Rec<GID, Grp> & V, Rec<GID, Grp> & V, TS & ID & E & I<unknown, this>>
+    readonly out: Updater<Rec<GID, Grp> & V, Rec<GID, Grp> & V, O & TS & ID & E & I<unknown, this>>
   }
   return link<Rec<GID, Grp> & V>()
     .with<unknown, Out>(
       $set_<unknown, Rec<GID, Grp> & V, Out>(
         omit2.backward<UpdaterF<Rec<Exclude<GID, keyof (TS & ID)>, Grp>>>(
           omit1.forward<UpdaterF<Omit<Omit<VV, Denied>, keyof (TS & ID)>>>(
-            set<Rec<GID, Grp> & V, Rec<GID, Grp> & V, typeof addId>({
-              touchedAt: ['touchedAt', addId.touchedAt],
-              _id: ['_id', addId._id],
+            set({
+              touchedAt: ['touchedAt', to(now)],
+              _id: ['_id', to($rand)],
             }),
           ),
         ),
@@ -56,8 +55,8 @@ export const subMerge = <T extends J, Grp extends jsonItem, VV extends Rec<strin
               mergeExpr<VV, TS & ID & RORec<GID, Grp>, Out, Ctx, O>(
                 mapExact<V, DeltaAccumulatorHKT<T>, ExprHKT<Out, Ctx>>(args, (v, k) =>
                   v.sum<Out, Ctx>(
-                    $ifNull(root<V>().of(k).expr(), v.zero),
-                    $ifNull(ctx<V>()('new').of(k).expr(), v.zero),
+                    $ifNull(root<O<V>>().of(k).expr(), v.zero),
+                    $ifNull(ctx<O<V>>()('new').of(k).expr(), v.zero),
                   ),
                 ),
                 {

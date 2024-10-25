@@ -1,11 +1,11 @@
-import type { App, Arr, AsLiteral, HKT, ID, J, RORec, Rec, doc } from '../../../types'
+import type { App, Arr, AsLiteral, HKT, ID, J, Rec, doc } from '../../../types'
 import { concat } from '../../expression/concat'
 import { eq } from '../../expression/logic'
 import { val } from '../../expression/val'
 import { ctx, root, type Field } from '../../field'
 import { $expr } from '../../predicate/$expr'
 import type { Before, RawStages, TStages } from '../../types'
-import { set, to, type Updater } from '../../update'
+import { set1, to } from '../../update'
 import { map1 } from '../../utils/json'
 import { $match_, $replaceWith_, $set1, $simpleLookup1, $unwind1 } from '../mongo-stages'
 import { link } from '../prefix'
@@ -36,7 +36,6 @@ export const $lookupRaw =
     const right = root<D>().of<D, As>(k2).of<RE, '_id'>('_id').expr()
 
     const idVal = to(k === 'left' ? left : k === 'right' ? right : concat(left, val('.'), right))
-    const updateID = set<D, D, RORec<'_id', typeof idVal>, '_id'>({ _id: ['_id', idVal] })
 
     return link<App<F, LE>>()
       .with<App<F, LE>, App<F, LE & Rec<As, Arr<RE>>>>(
@@ -61,6 +60,6 @@ export const $lookupRaw =
       )
       .with<App<F, LE>, App<F, D>>($unwind1<LE, As, RE>(k2)(f))
       .with<App<F, LE>, App<F, LE & Rec<As, RE> & ID>>(
-        $set1<D, D, D & ID>(updateID as Updater<D, D, D & ID>)(f),
+        $set1(set1<D>()({ _id: ['_id', idVal] }))(f),
       ).stages
   }
