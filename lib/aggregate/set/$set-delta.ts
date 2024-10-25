@@ -35,8 +35,8 @@ export const $setDelta = <T extends doc, V extends doc, C = unknown>(
       $simpleLookup_<Delta<T>, Delta<V> & ID, never, 'root', Ctx, C>({
         k: 'root',
         vars: {
-          a: root<Delta<T>>().of('after').expr(),
-          b: root<Delta<T>>().of('before').expr(),
+          a: ['a', root<Delta<T>>().of('after').expr()],
+          b: ['b', root<Delta<T>>().of('before').expr()],
         },
         pipeline: link<null, Ctx & C>()
           .with<unknown, T>(

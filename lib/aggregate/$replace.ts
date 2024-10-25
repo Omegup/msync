@@ -1,5 +1,5 @@
 import type { App, HKT, I, WriteonlyCollection } from '../../types'
-import type { ID, O, RORec, Rec, U, doc } from '../../types/json'
+import type { ID, O, RORec, U, doc } from '../../types/json'
 import { $mergeObjects } from '../expression/array'
 import { field } from '../expression/concat'
 import { $ifNull, eqTyped, ite } from '../expression/logic'
@@ -38,10 +38,9 @@ export const $replace = <T extends doc>(
   return link<OutInput<T>>()
     .with<unknown, Merge<T>>($replaceWith_(replacer))
     .with<unknown, 'out'>(
-      $merge_({
+      $merge_<Merge<T>, Merge<T>>({
         into: out,
         on: root<O<ID>>().of('_id'),
-        vars: { new: root<Rec<'kk', number>>().of('kk').expr() },
       }),
     ).stages
 }

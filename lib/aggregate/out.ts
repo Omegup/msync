@@ -1,6 +1,7 @@
 import type { J, WriteonlyCollection, jsonItem } from '../../types'
+import type { ExprsExact } from '../expression/concat'
 import { root, type Field } from '../field'
-import type { Expr, RawStages } from '../types'
+import type { RawStages } from '../types'
 import { dbcoll } from '../utils/coll'
 import { asStages } from './prefix'
 import { rawVars } from './raws'
@@ -23,7 +24,7 @@ export const $merge_ = <T extends J, Out extends T = T, Ctx = unknown>({
       }
     | {
         stages: 'ctx'
-        vars: { readonly [P in keyof Ctx]: Expr<Ctx[P], T> }
+        vars: ExprsExact<Ctx, T>
         whenMatched: RawStages<unknown, T, Out, Ctx>
       }
   )) =>

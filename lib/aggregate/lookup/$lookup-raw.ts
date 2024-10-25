@@ -1,4 +1,4 @@
-import type { App, Arr, AsLiteral, HKT, ID, J, Rec, doc } from '../../../types'
+import type { App, Arr, AsLiteral, HKT, ID, J, RORec, Rec, doc } from '../../../types'
 import { concat } from '../../expression/concat'
 import { eq } from '../../expression/logic'
 import { val } from '../../expression/val'
@@ -6,6 +6,7 @@ import { ctx, root, type Field } from '../../field'
 import { $expr } from '../../predicate/$expr'
 import type { Before, RawStages, TStages } from '../../types'
 import { set, to, type Updater } from '../../update'
+import { map1 } from '../../utils/json'
 import { $match_, $replaceWith_, $set1, $simpleLookup1, $unwind1 } from '../mongo-stages'
 import { link } from '../prefix'
 
@@ -33,18 +34,16 @@ export const $lookupRaw =
     type D = LE & Rec<As, RE>
     const left = root<D>().of('_id').expr()
     const right = root<D>().of<D, As>(k2).of<RE, '_id'>('_id').expr()
-    const updateID: Updater<D, D, Omit<D, '_id'> & ID> = set({
-      _id: to<D, string>(
-        k === 'left' ? left : k === 'right' ? right : concat(left, val('.'), right),
-      ),
-    })
+
+    const idVal = to(k === 'left' ? left : k === 'right' ? right : concat(left, val('.'), right))
+    const updateID = set<D, D, RORec<'_id', typeof idVal>, '_id'>({ _id: ['_id', idVal] })
 
     return link<App<F, LE>>()
       .with<App<F, LE>, App<F, LE & Rec<As, Arr<RE>>>>(
         $simpleLookup1<LE, RE, RS, As, { readonly local: S }, unknown>({
           coll,
           k: k2,
-          vars: { local: root<LE>().with(field1).expr() },
+          vars: map1('local', root<LE>().with(field1).expr()),
           pipeline: link<RS, { readonly local: S }>()
             .with<unknown, BRB>(input)
             .with<unknown, BRB>(

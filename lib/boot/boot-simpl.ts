@@ -31,6 +31,7 @@ import type {
 import type { AggregateCommand } from '../types/aggregate'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
+import { map1 } from '../utils/json'
 
 const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T & Model>(
   view: View<T & D, V>,
@@ -106,7 +107,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
                   .with<unknown, T>($documents_(ctx<Arr<T>>()('after').expr()))
                   .with<unknown, Result>(input).stages,
                 k: 'after',
-                vars: { after: root<R>().of('item').expr() },
+                vars: map1('after', root<R>().of('item').expr()),
               }),
             )
             .with(

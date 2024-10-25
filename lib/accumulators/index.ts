@@ -1,20 +1,21 @@
 import type { Arr, J, RawObj, U, Undef } from '../../types'
-import { subtract } from '../expression/arith'
-import { $ifNull } from '../expression/logic'
+import { add, subtract } from '../expression/arith'
 import { val } from '../expression/val'
-import { root, type Field } from '../field'
-import type { Delta, Accumulator, AccumulatorRaw, DeltaAccumulator, Expr } from '../types'
+import { type Field } from '../field'
+import type { Accumulator, AccumulatorRaw, DeltaAccumulator, Expr } from '../types'
 
 const asAccumulator = <T, V, C = unknown>(x: RawObj) => x as AccumulatorRaw<T, V, C>
 
-export const $sumDelta = <D extends J, C>(expr: Expr<number, D, C>): DeltaAccumulator<D, number, C> => ({
+export const $sumDelta = <D extends J, C>(
+  expr: Expr<number, D, C>,
+): DeltaAccumulator<D, number, C> => ({
   raw: f => asAccumulator({ $sum: expr.raw(f).get() }),
-  diff: subtract(
-    $ifNull(root<Delta<number>>().of('after').expr(), val(0)),
-    $ifNull(root<Delta<number>>().of('before').expr(), val(0)),
-  ),
+  diff: subtract,
+  sum: add,
+  zero: val(0),
 })
-export const $sum = <D extends J, C>(expr: Expr<number, D, C>): Accumulator<D, number, C> => $sumDelta(expr)
+export const $sum = <D extends J, C>(expr: Expr<number, D, C>): Accumulator<D, number, C> =>
+  $sumDelta(expr)
 
 export const $push = <D extends J, T, C>(expr: Expr<T, D, C>): Accumulator<D, Arr<T>, C> => ({
   raw: f => asAccumulator({ $push: expr.raw(f).get() }),

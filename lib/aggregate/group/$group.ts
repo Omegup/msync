@@ -26,7 +26,7 @@ export const $group =
       return $simpleLookup_<WID, VID, S, 'item', Ctx>({
         k: 'item',
         pipeline,
-        vars: { id: root<WID>().of('_id').expr() },
+        vars: { id: ['id', root<WID>().of('_id').expr()] },
         coll,
       })
     })

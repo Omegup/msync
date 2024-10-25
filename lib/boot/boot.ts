@@ -107,7 +107,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
             .with(
               $set_<UDelta<T>, UDelta<T>, UDelta<T> & Delta<T>>(
                 set({
-                  before: to($ifNull(root<UDelta<T>>().of('before').expr(), nil)),
+                  before: ['before', to($ifNull(root<UDelta<T>>().of('before').expr(), nil))],
                 }),
               ),
             )

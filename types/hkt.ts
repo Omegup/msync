@@ -65,3 +65,7 @@ export interface RecordHKT<K extends string, Dom = unknown> extends HKT<Dom, Rec
 export interface RecHKT<K extends string, Dom = unknown> extends HKT<Dom, Rec<K, Dom>> {
   readonly out: Rec<K, I<Dom, this>>
 }
+
+export interface And<E> extends HKT {
+  readonly out: E & I<unknown, this>
+}

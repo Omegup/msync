@@ -28,8 +28,8 @@ export const $setEach1 = <T extends jsonItem, V extends jsonItem, E = unknown, C
 ) =>
   $set1<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>, C>(
     set({
-      after: updater('after'),
-      before: updater('before'),
+      after: ['after', updater('after')],
+      before: ['before', updater('before')],
     }),
   )
 

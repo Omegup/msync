@@ -1,4 +1,17 @@
-import type { App, Arr, ConstHKT, HKT, J, RORec, RawObj, Rec, StrKey, jsonItem } from '../../types'
+import type {
+  App,
+  Arr,
+  ConstHKT,
+  HKT,
+  J,
+  RORec,
+  RawObj,
+  Rec,
+  StrKey,
+  jsonItem,
+  rawItem,
+} from '../../types'
+import type { ExprHKT, ExprsExact } from '../expression/concat'
 import type { Field } from '../field'
 import type {
   AccumulatorHKT,
@@ -83,9 +96,9 @@ export const $documents1 =
     asStages([{ $documents: docs.raw(f<never>()).get() }])
 
 export const rawVars = <T, Ctx, C, V extends J>(
-  vars: { readonly [P in keyof Ctx]: Expr<Ctx[P], T, C> },
+  vars: ExprsExact<Ctx, T, C>,
   f: Field<V, T, unknown>,
-) => Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, v.raw(f).get()]))
+) => mapExactToObject<Ctx, ExprHKT<T, C>, ConstHKT<rawItem>>(vars, v => v.raw(f).get())
 
 export const $simpleLookup1 =
   <T extends J, U extends J, R, K extends s, Ctx, C = unknown>(

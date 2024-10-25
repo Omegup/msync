@@ -1,6 +1,7 @@
-import type { Arr, J, N, O, StrKey, Type, notArr, rawItem } from '../../types'
+import type { Arr, HKT, I, IdHKT, J, N, O, StrKey, Type, notArr, rawItem } from '../../types'
 import { Field, type Path } from '../field'
 import type { Expr } from '../types'
+import { mapExactToObject, type Exact } from '../utils/map-object'
 
 declare const Updater: unique symbol
 export type Updater<in R, in T, out V, in C = unknown> = {
@@ -17,8 +18,13 @@ type FDom<R, C> = {
   readonly [P in string]: Updater<R, never, unknown, C>
 }
 type Get<T, P extends string> = P extends keyof T ? T[P] : undefined
+
+interface WithKey<T> extends HKT<readonly [T, StrKey<T>]> {
+  readonly out: I<readonly [T, StrKey<T>], this>[0][I<readonly [T, StrKey<T>], this>[1]]
+}
+
 export const set = <R, Old, F extends FDom<R, C>, K extends StrKey<F> = StrKey<F>, C = unknown>(
-  fields: F,
+  fields: Exact<F, IdHKT>,
 ): Updater<
   R,
   Old,
@@ -30,7 +36,10 @@ export const set = <R, Old, F extends FDom<R, C>, K extends StrKey<F> = StrKey<F
     }>,
   C
 > => ({
-  raw: f => Object.entries(fields).flatMap(([k, v]) => v.raw(f).map(([l, v]) => [`.${k}${l}`, v])),
+  raw: f =>
+    Object.entries(mapExactToObject<F, IdHKT, WithKey<F>>(fields, v => v)).flatMap(([k, v]) =>
+      v.raw(f).map(([l, v]) => [`.${k}${l}`, v]),
+    ),
 })
 
 export const weaken = <R, T, V, C = unknown>(

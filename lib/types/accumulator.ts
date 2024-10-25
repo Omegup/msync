@@ -1,4 +1,3 @@
-import type { Delta } from '.'
 import type { HKT, I, J, RORec, RawObj, Type, U, Undef, jsonItem } from '../../types'
 import type { Field } from '../field'
 import type { Exact } from '../utils/map-object'
@@ -46,6 +45,7 @@ export type DeltaAccumulator<in out Doc, in out T, in out Ctx = unknown> = {
       f: Field<DeltaD, Doc | Undef<I>, C>,
     ): AccumulatorRaw<T | I, DeltaD, Ctx & C>
   }
-  diff: Expr<T, Delta<T>, Ctx>
-  // merge: Expr<T, Delta<T>, Ctx>
+  zero: Expr<T, unknown, Ctx>,
+  sum: <D, C = Ctx>(a: Expr<T, D, C>, b: Expr<T, D, C>) => Expr<T, D, C>
+  diff: <D, C = Ctx>(a: Expr<T, D, C>, b: Expr<T, D, C>) => Expr<T, D, C>
 }

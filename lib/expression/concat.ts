@@ -1,4 +1,17 @@
-import type { ConstHKT, HKT, I, J, O, RORec, StrKey, U, Undef, rawItem } from '../../types'
+import type {
+  App,
+  ConstHKT,
+  HKT,
+  I,
+  IdHKT,
+  J,
+  O,
+  RORec,
+  StrKey,
+  U,
+  Undef,
+  rawItem,
+} from '../../types'
 import type { Field } from '../field'
 import type { Expr } from '../types'
 import { mapExactToObject, type Exact, type ExactPart } from '../utils/map-object'
@@ -58,14 +71,18 @@ export const mergeExact = <T1, T2, F extends HKT<T1[StrKey<T1>] | T2[StrKey<T2>]
 
 export const mergeExpr = <T1, T2, D, C = unknown, E = unknown>(
   ...exprs: MergeExactArgs<T1, T2, ExprHKT<D, C>>
-) => mergeExact<T1, T2, ExprHKT<D, C>, E>(...exprs)
+): ExprsExact<T2 & Omit<T1, keyof T2> & Pick<E, symbol & keyof E>, D, C> =>
+  mergeExact<T1, T2, ExprHKT<D, C>, E>(...exprs)
 
 export type ExprsPart<T, D, C> = ExactPart<T, ExprHKT<D, C>>
-export interface ExprHKT<D, C = unknown> extends HKT<unknown> {
-  readonly out: Expr<I<unknown, this>, D, C>
+export interface ExprHKT<D, C = unknown, F extends HKT = IdHKT> extends HKT<unknown> {
+  readonly out: Expr<App<F, I<unknown, this>>, D, C>
 }
 
-export type ExprsExact<T, D, C = unknown> = Exact<T, ExprHKT<D, C>>
+export type ExprsExact<T, D, C = unknown, F extends HKT = IdHKT> = Exact<T, ExprHKT<D, C, F>>
+export interface ExprsExactHKT<E, D, C = unknown, F extends HKT = IdHKT> extends HKT {
+  readonly out: ExprsExact<E & I<unknown, this>, D, C, F>
+}
 
 const asIntersect = <T, V, P extends keyof T & keyof V>(x: T[P] & V[P]) => x as (T & V)[P]
 export const pair = <T, D, C, P extends StrKey<T>>(
@@ -74,8 +91,15 @@ export const pair = <T, D, C, P extends StrKey<T>>(
 ): ExprsExact<T, D, C>[P] =>
   asIntersect<ExprsPart<T, D, C>, RORec<string, readonly [StrKey<T>, unknown]>, P>([k, v])
 
-export const field = <T extends object, D, C = unknown>(exprs: ExprsExact<T, D, C>) =>
-  asExpr<O<T>, D, C>({
-    raw: f =>
-      asExprRaw(mapExactToObject<T, ExprHKT<D, C>, ConstHKT<rawItem>>(exprs, e => e.raw(f).get())),
-  })
+export const fieldF =
+  <F extends HKT>() =>
+  <T extends object, D, C = unknown>(exprs: ExprsExact<T, D, C, F>) =>
+    asExpr<O<{ [K in keyof T]: App<F, T[K]> }>, D, C>({
+      raw: f =>
+        asExprRaw(
+          mapExactToObject<T, ExprHKT<D, C>, ConstHKT<rawItem>>(exprs, e => e.raw(f).get()),
+        ),
+    })
+export const field: <T extends object, D, C = unknown>(
+  exprs: ExprsExact<T, D, C, IdHKT<unknown>>,
+) => Expr<O<T>, D, C> = fieldF<IdHKT>()

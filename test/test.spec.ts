@@ -83,7 +83,7 @@ const machine2 = new Machine()
 
 machine2.add(
   from<V>({ collection: v, projection: { _id: 1, deletedAt: 1, link: 1, v: 1 } }, 's1')
-    .then($set(set({ link: to(concat(root<V>().of('link').expr(), val('..'))) })))
+    .then($set(set({ link: ['link', to(concat(root<V>().of('link').expr(), val('..')))] })))
     .with($group(root<V>().of('link').expr(), { v: ['v', $sum(root<V>().of('v').expr())] }))
     .get()
     .out($replace(g)),

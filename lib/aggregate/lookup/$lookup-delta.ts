@@ -1,6 +1,6 @@
-import type { Arr, AsLiteral, HKT, I, ID, J, N, RORec, Rec, doc } from '../../../types'
+import type { Arr, AsLiteral, ID, J, N, RORec, Rec, doc } from '../../../types'
 import { $filter } from '../../expression/array'
-import { field, mergeExpr, type ExprsExact } from '../../expression/concat'
+import { field, mergeExpr, type ExprsExactHKT } from '../../expression/concat'
 import { eq } from '../../expression/logic'
 import { Field, ctx, root } from '../../field'
 import { $expr } from '../../predicate/$expr'
@@ -49,8 +49,8 @@ export const $lookupDelta = <
         coll,
         k: k2,
         vars: {
-          after: root<Delta<Rec<K1, LE>>>().of('after').of(k1).with(field1).expr(),
-          before: root<Delta<Rec<K1, LE>>>().of('before').of(k1).with(field1).expr(),
+          after: ['after', root<Delta<Rec<K1, LE>>>().of('after').of(k1).with(field1).expr()],
+          before: ['before', root<Delta<Rec<K1, LE>>>().of('before').of(k1).with(field1).expr()],
         },
         pipeline: link<RS, DeltaS>()
           .with(input)
@@ -68,10 +68,7 @@ export const $lookupDelta = <
     .with(
       $replaceWithEach<Rec<K1, LE>, Rec<K1, LE> & Rec<K2, Arr<RE>>, Rec<K2, Arr<BU>>>(
         <K extends BA>(f: K): Expr<Rec<K1, LE> & Rec<K2, Arr<RE>>, Both<K>> => {
-          interface BothExpr<E> extends HKT<unknown> {
-            readonly out: ExprsExact<E & I<unknown, this>, Both<K>>
-          }
-          const omit = <E = {}>() => omitRORec<KK2, BA, K1, Arr<RE>, BothExpr<E>>()
+          const omit = omitRORec<KK2, BA, K1, Arr<RE>>()
           const a = $filter<RE, Both<K>, 'before'>({
             as: 'before',
             cond: eq<S | N, Both<K>, { readonly before: RE }>(
@@ -80,9 +77,9 @@ export const $lookupDelta = <
             expr: root<Rec<K2, Arr<BU>>>().of(k2).of('before').expr(),
           })
           return field<RORec<K1, LE> & RORec<K2, Arr<RE>>, Both<K>>(
-            omit<RORec<K1, LE>>().backward(
+            omit.backward<ExprsExactHKT<RORec<K1, LE>, Both<K>>>(
               mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, LE>, Both<K>>(
-                omit().forward(map1(k2, a)),
+                omit.forward<ExprsExactHKT<{}, Both<K>>>(map1(k2, a)),
                 map1(k1, root<Rec<K, Rec<K1, LE>>>().of(f).of(k1).expr()),
               ),
             ),
