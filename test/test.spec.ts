@@ -1,6 +1,5 @@
-import { $sum, $sumDelta } from '../lib/accumulators'
+import { $sumDelta } from '../lib/accumulators'
 import { $replace, type Merge } from '../lib/aggregate/$replace'
-import { $group } from '../lib/aggregate/group'
 import { $groupMerge } from '../lib/aggregate/group/$group-merge'
 import { $set } from '../lib/aggregate/set'
 import { from, staging } from '../lib/boot'
@@ -33,14 +32,17 @@ const r4 = db.collection<Merge<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>>('r4')
 let machine1 = new Machine()
 
 machine1.add(
-  staging<D1>({ collection: c1, projection: { _id: 1, deletedAt: 1, link: 1 } }, 'q1')
+  staging<D1>(
+    { collection: c1, projection: { _id: '_id', deletedAt: 'deletedAt', link: 'link' } },
+    'q1',
+  )
     .with<D1, D1 & RORec<'d2', D2 & RORec<'d3', D3>>>(
       $lookup<'d2', D1, D2, D2 & RORec<'d3', D3>, string>({
         as: 'd2',
         from: staging<D2>(
           {
             collection: c2,
-            projection: { _id: 1, deletedAt: 1, link: 1, link2: 1 },
+            projection: { _id: '_id', deletedAt: 'deletedAt', link: 'link', link2: 'link2' },
           },
           'q2',
         )
@@ -49,7 +51,7 @@ machine1.add(
               from: staging<D3, D3 & Model>(
                 {
                   collection: c3,
-                  projection: { _id: 1, deletedAt: 1, link2: 1 },
+                  projection: { _id: '_id', deletedAt: 'deletedAt', link2: 'link2' },
                 },
                 'q3',
               ).get(),
@@ -71,7 +73,7 @@ machine1 = wrap(machine1)
 
 machine1.add(
   from<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>(
-    { collection: r3, projection: { _id: 1, deletedAt: 1, d2: 1, link: 1 } },
+    { collection: r3, projection: { _id: '_id', deletedAt: 'deletedAt', d2: 'd2', link: 'link' } },
     'xs1',
   )
     .get()
@@ -83,7 +85,10 @@ machine1.start(console.log)
 const machine2 = new Machine()
 
 machine2.add(
-  staging<V>({ collection: v, projection: { _id: 1, deletedAt: 1, link: 1, v: 1 } }, 's1')
+  staging<V>(
+    { collection: v, projection: { _id: '_id', deletedAt: 'deletedAt', link: 'link', v: 'v' } },
+    's1',
+  )
     .then(
       $set(set({ link: ['link', to(concat(root<V>().of('link').expr(), val('..')))] as const })),
     )

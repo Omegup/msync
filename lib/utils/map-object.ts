@@ -11,9 +11,8 @@ export type ExactPart<T, F extends HKT<T[StrKey<T>]>> = {
 export type ExactPart1<T, F extends HKT<readonly [T, StrKey<T>]>> = {
   readonly [K in StrKey<T>]: App<F, readonly [T, K]>
 }
-export type Exact<T, F extends HKT<T[StrKey<T>]>> = {
-  readonly [K in string]: readonly [StrKey<T>, unknown]
-} & ExactPart<T, F>
+export type Exact<T, F extends HKT<T[StrKey<T>]>> = RORec<string, readonly [StrKey<T>, unknown]> &
+  ExactPart<T, F>
 
 export type ExactKeys<K extends string> = { readonly [P in K]: P } & RORec<string, K>
 

@@ -1,4 +1,4 @@
-import type { HKT, I, ID, J, O, RORec, Rec, WriteonlyCollection, jsonItem } from '../../../types'
+import type { ID, J, O, RORec, Rec, WriteonlyCollection, jsonItem } from '../../../types'
 import { mergeExpr, type ExprsExact, type ExprsExactHKT } from '../../expression/concat'
 import { root } from '../../field'
 import type { Delta, Expr, RawStages, TS } from '../../types'
@@ -14,15 +14,15 @@ const gid: GID = '_grp'
 type Denied = keyof (TS & ID) | GID
 
 const addGrp = <
-  VV extends RORec<string, jsonItem>,
+  V extends RORec<string, jsonItem>,
   D extends Rec<'_id', Grp>,
   Grp extends jsonItem,
 >(
-  expr: ExprsExact<Omit<VV, Denied>, D>,
-): ExprsExact<RORec<GID, Grp> & Omit<VV, Denied>, D> => {
-  const omit = omitPick<keyof VV, Denied, GID, VV>()
+  expr: ExprsExact<Omit<V, Denied>, D>,
+): ExprsExact<RORec<GID, Grp> & Omit<V, Denied>, D> => {
+  const omit = omitPick<keyof V, Denied, GID, V>()
   return omit.backward<ExprsExactHKT<RORec<GID, Grp>, D>>(
-    mergeExpr<Omit<VV, Denied>, RORec<GID, Grp>, D, unknown, O>(
+    mergeExpr<Omit<V, Denied>, RORec<GID, Grp>, D, unknown, O>(
       omit.forward<ExprsExactHKT<unknown, D>>(expr),
       map1(gid, root<D>().of('_id').expr()),
     ),
@@ -30,10 +30,9 @@ const addGrp = <
 }
 
 export const $groupMerge = <
-  Q extends J,
-  T extends Q,
+  T extends J,
   Grp extends jsonItem,
-  V extends Rec<string, jsonItem>,
+  V extends RORec<string, jsonItem>,
 >(
   id: Expr<Grp, T>,
   args: DeltaAccumulators<T, Omit<V, Denied>>,

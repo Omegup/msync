@@ -1,12 +1,6 @@
 import type { ConstHKT, HKT, I, WriteonlyCollection } from '../../types'
 import type { ID, O, Par, RORec, Rec, U, doc, jsonItem } from '../../types/json'
-import {
-  field,
-  mergeExpr,
-  type ExprHKT,
-  type ExprsExact,
-  type ExprsExactHKT,
-} from '../expression/concat'
+import { field, mergeExpr, type ExprHKT, type ExprsExactHKT } from '../expression/concat'
 import { $ifNull, eqTyped, ite } from '../expression/logic'
 import { nil, now, val } from '../expression/val'
 import { root } from '../field'
