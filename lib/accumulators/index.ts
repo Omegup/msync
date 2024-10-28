@@ -1,5 +1,6 @@
 import type { Arr, J, RawObj, U, Undef } from '../../types'
 import { add, subtract } from '../expression/arith'
+import { $array, $concat, $except } from '../expression/array'
 import { val } from '../expression/val'
 import { type Field } from '../field'
 import type { Accumulator, AccumulatorRaw, DeltaAccumulator, Expr } from '../types'
@@ -19,6 +20,13 @@ export const $sum = <D extends J, C>(expr: Expr<number, D, C>): Accumulator<D, n
 
 export const $push = <D extends J, T, C>(expr: Expr<T, D, C>): Accumulator<D, Arr<T>, C> => ({
   raw: f => asAccumulator({ $push: expr.raw(f).get() }),
+})
+export const $pushDelta = <D extends J, T, C>(expr: Expr<T, D, C>): DeltaAccumulator<D, Arr<T>, C> => ({
+  raw: f => asAccumulator({ $push: expr.raw(f).get() }),
+  diff:$except,
+  sum:$concat,
+  zero: $array(),
+
 })
 export const subAcc = <T, D, P extends J, Ctx = unknown>(
   a: Accumulator<D, T, Ctx>,
