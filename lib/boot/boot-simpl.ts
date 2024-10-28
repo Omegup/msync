@@ -1,5 +1,6 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
-import type { Arr, HKT, I, ID, J, J2, J3, N, O, RORec, Rec, View, doc } from '../../types'
+import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
+import type { Arr, ID, J, J2, J3, N, O, RORec, Rec, StrKey, View, doc } from '../../types'
 import {
   $documents_,
   $match_,
@@ -32,6 +33,7 @@ import type { AggregateCommand } from '../types/aggregate'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 import { map1 } from '../utils/json'
+import { asExact, mapExactToObject } from '../utils/map-object'
 
 const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T & Model>(
   view: View<T & D, V>,
@@ -42,13 +44,15 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
   const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
+  const keys = asExact<StrKey<T & D>>(projection)
+  const ones = mapExactToObject<RORec<StrKey<T & D>, 1>, IdHKT, ConstHKT<1>>(keys, () => 1)
   db.command({
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
   })
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   // TODO create indexes (if snapshot is in sources)
-  const projectInput = $project_<T & D>({ ...projection, deletedAt: 1 })
+  const projectInput = $project_<T & D>({ ...ones, deletedAt: 1 })
   const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
 
   const run = <Result2>(

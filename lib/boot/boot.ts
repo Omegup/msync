@@ -1,5 +1,6 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
-import type { HKT, I, J, J2, J3, N, View, doc } from '../../types'
+import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
+import type { J, J2, J3, N, RORec, StrKey, View, doc } from '../../types'
 import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe } from '../aggregate/prefix'
@@ -15,9 +16,10 @@ import type { Frame, HasJob, Iterator, Runner } from '../types/machine'
 import type { After, D, Del, Delta, DeltaStages, Model, RawStages, UDelta } from '../types/stream'
 import { set, to } from '../update'
 import { asBefore } from '../utils/before'
+import { log } from '../utils/log'
+import { asExact, mapExactToObject } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
-import { log } from '../utils/log'
 
 const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T & Model>(
   view: View<T & D, V>,
@@ -28,6 +30,8 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
   const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
+  const keys = asExact<StrKey<T & D>>(projection)
+  const ones = mapExactToObject<RORec<StrKey<T & D>, 1>, IdHKT, ConstHKT<1>>(keys, () => 1)
   db.command({
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
@@ -35,7 +39,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
   // TODO create indexes (if snapshot is in sources)
-  const projectInput = $project_<T & D>({ ...projection, deletedAt: 1 })
+  const projectInput = $project_<T & D>({ ...ones, deletedAt: 1 })
 
   const run = <Result2>(
     finalInput: RawStages<unknown, Delta<Result>, Result2>,
