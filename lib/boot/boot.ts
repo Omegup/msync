@@ -92,6 +92,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
           exec: cloneIntoNew,
         }),
       )
+      await snapshotCollection.deleteMany({ updated: true, after: null, before: null })
       return next(step4(r), 'run the aggregation')
     }
 
