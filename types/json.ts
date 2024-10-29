@@ -40,7 +40,10 @@ export type StrKey<T> = string & keyof T
 
 // a generic type that restricts another type to be a literal
 // for exemple AsLiteral<'a'> is 'a' and AsLiteral<string> is never, AsLiteral<1> is 1 and AsLiteral<number> is never
-export type AsLiteral<T extends string | boolean> = {} extends { [K in `${T}`]: 1 }
-  ? never
-  : NoUnion<T>
+export type AsLiteral<T extends keyof any | boolean, V = NoUnion<T>> = T extends keyof any
+  ? {} extends { [K in T]: 1 }
+    ? never
+    : V
+  : V
 type NoUnion<T, V = T> = T extends unknown ? ([V] extends [T] ? T : never) : never
+export type RemoveSignature<T> = { [K in keyof T as AsLiteral<K, K>]: T[K] }

@@ -188,9 +188,9 @@ export const from = <T extends doc, V extends T & Model = T & Model>(
   view: View<T & D, V>,
   streamName: string,
 ) =>
-  pipe<V, V, V, StreamRunnerHKT, StagesHKT>(
+  pipe<T, T, T, StreamRunnerHKT, StagesHKT>(
     input => executes(view, input.lin, streamName),
-    { lin: link<V, unknown, 1>().stages },
+    { lin: link<T, unknown, 1>().stages },
     ({ lin: a }, { lin: b }) => ({ lin: concatStages(a, b) }),
     emptyLin,
   )

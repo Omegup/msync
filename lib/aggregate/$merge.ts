@@ -1,5 +1,16 @@
 import type { ConstHKT, HKT, I, WriteonlyCollection } from '../../types'
-import type { ID, O, Par, RORec, Rec, U, doc, jsonItem } from '../../types/json'
+import type {
+  AsLiteral,
+  ID,
+  O,
+  Par,
+  RORec,
+  Rec,
+  RemoveSignature,
+  U,
+  doc,
+  jsonItem,
+} from '../../types/json'
 import { field, mergeExpr, type ExprHKT, type ExprsExactHKT } from '../expression/concat'
 import { $ifNull, eqTyped, ite } from '../expression/logic'
 import { nil, now, val } from '../expression/val'
@@ -17,7 +28,7 @@ type Allowed<K extends string> = Exclude<K, keyof (TS & ID)>
 type ParMerge<K extends string, T extends Rec<K, jsonItem>> = TS & ID & O & Par<K, T>
 
 export const $merge = <R extends doc, KK extends string, T extends ID & Rec<Allowed<KK>, jsonItem>>(
-  out: WriteonlyCollection<Omit<R, Allowed<KK>> & ParMerge<Allowed<KK>, T>>,
+  out: WriteonlyCollection<Omit<RemoveSignature<R>, Allowed<KK>> & ParMerge<Allowed<KK>, T>>,
   keyObject: ExactKeys<Allowed<KK>>,
 ): RawStages<unknown, OutInput<T>, 'out'> => {
   type K = Allowed<KK>

@@ -195,11 +195,11 @@ export interface DeltaHKT extends HKT<J3> {
   readonly out: DeltaStages<I<J3, this>[0], I<J3, this>[1], I<J3, this>[2]>
 }
 
-export const staging = <T extends doc, V extends T & Model = T & Model>(
-  view: View<T & D, V>,
+export const staging = <V extends Model>(
+  view: View<V>,
   streamName: string,
 ) =>
-  pipe<V, V, V, SnapshotStreamHKT, DeltaHKT>(
+  pipe<T, T, T, SnapshotStreamHKT, DeltaHKT>(
     input => executes(view, input, streamName),
     emptyDelta(),
     concatDelta,
