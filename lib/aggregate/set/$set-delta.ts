@@ -1,13 +1,4 @@
-import {
-  type App,
-  type Arr,
-  type ID,
-  type J,
-  type O,
-  type Rec,
-  type doc,
-  type jsonItem,
-} from '../../../types'
+import type { App, Arr, ID, O, Rec, doc, jsonItem } from '../../../types'
 import { $push } from '../../accumulators'
 import { $array, $filterDefined, $first, $last } from '../../expression/array'
 import { field } from '../../expression/concat'
@@ -20,12 +11,12 @@ import { $documents_, $group_, $replaceWith_, $set_, $simpleLookup_ } from '../m
 import { link } from '../prefix'
 import { $replaceWithEach, type ParDeltaHKT } from './$replace-with-each'
 
-export const $replaceWithDelta = <T extends J, V extends jsonItem>(expr: Expr<V, T>) =>
+export const $replaceWithDelta = <T extends O, V extends jsonItem>(expr: Expr<V, T>) =>
   $replaceWithEach<T, V, unknown>(<K extends BA>(field: K) =>
     sub(expr, root<App<ParDeltaHKT<K, T, unknown>, T>>().of(field)),
   )
 
-export const $setDelta = <T extends doc, V extends doc, C = unknown>(
+export const $setDelta = <T extends O, V extends doc, C = unknown>(
   updater: Updater<T, T, V, C>,
 ): RawStages<unknown, Delta<T>, Delta<V>, C> => {
   type Ctx = { a: T | null; b: T | null }
@@ -51,14 +42,19 @@ export const $setDelta = <T extends doc, V extends doc, C = unknown>(
           )
           .with<unknown, V>($set_(updater))
           .with<unknown, O & { readonly _id: string; readonly docs: Arr<V> }>(
-            $group_<V>()(val(''), { docs: ['docs', $push(root<V>().expr())] }),
+            $group_<Rec<'docs', Arr<V>>>()(val(''), {
+              docs: ['docs', $push(root<V>().expr())],
+            }),
           )
           .with<unknown, Delta<V> & ID>(
             $replaceWith_<O & { readonly _id: string; readonly docs: Arr<V> }, Delta<V> & ID, Ctx>(
               field({
                 after: ['after', ite(ctx<T | null>()('a').expr(), $first(docs.expr()), nil)],
                 before: ['before', ite(ctx<T | null>()('b').expr(), $last(docs.expr()), nil)],
-                _id: ['_id', $first(docs.of('_id').expr()) as Expr<string, Rec<'docs', Arr<V>>>],
+                _id: [
+                  '_id',
+                  $first(docs.of<V, '_id', 0>('_id').expr()) as Expr<string, Rec<'docs', Arr<V>>>,
+                ],
               }),
             ),
           ).stages,

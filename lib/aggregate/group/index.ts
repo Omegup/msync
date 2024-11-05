@@ -1,1 +1,1 @@
-export { $group } from './$group'
+export { $groupMerge } from './$group-merge'

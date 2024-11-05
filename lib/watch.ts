@@ -1,25 +1,25 @@
 import type { BSON, Db, Timestamp } from 'mongodb'
-import type { J, O, View, doc } from '../types'
+import type { O, StrKey, View } from '../types'
 import { sub } from './expression/logic'
 import { root, type Field } from './field'
 import { $or } from './query/logic'
-import type { Query } from './types'
+import type { Model, Query } from './types'
 
 export const changeKeys = ['fullDocument', 'fullDocumentBeforeChange'] as const
 export type ChangeKey = (typeof changeKeys)[number]
 
-export type Change<T extends J> = O<{
+export type Change<T extends Model> = O<{
   readonly fullDocument: T
   readonly fullDocumentBeforeChange: T
 }>
-export const subQ = <D extends J, C, DeltaD extends J>(
+export const subQ = <D extends O, C, DeltaD extends O>(
   a: Query<D, C>,
   f: Field<DeltaD, D>,
 ): Query<DeltaD, C> => ({ raw: g => a.raw(g.with(f)), expr: sub(a.expr, f) })
 
-export const makeWatchStream = <T extends doc, V extends T & J = T>(
+export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
   db: Db,
-  { collection, match, projection, hardMatch }: View<T, V>,
+  { collection, match, projection, hardMatch }: View<V, K>,
   startAt: Timestamp,
 ) => {
   const pipeline: BSON.Document[] = [

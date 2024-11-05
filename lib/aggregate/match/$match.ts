@@ -1,11 +1,9 @@
 import { $matchDelta } from '.'
-import type { J } from '../../../types'
-import type { DeltaStages, LinStages, Query } from '../../types'
-import { $match_ } from '../mongo-stages'
+import type { O } from '../../../types'
+import type { DeltaStages, Query } from '../../types'
 import { $match1 } from '../raws'
 
-export const $match = <T extends J>(query: Query<T>): DeltaStages<T, T, T> & LinStages<T, T, T> => ({
+export const $match = <T extends O>(query: Query<T>): DeltaStages<T, T, T> => ({
   raw: $match1(query),
   delta: $matchDelta(query),
-  lin: $match_(query)
 })

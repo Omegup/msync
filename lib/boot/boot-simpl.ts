@@ -1,62 +1,49 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
-import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
-import type { Arr, ID, J, J2, J3, N, O, RORec, Rec, StrKey, View, doc } from '../../types'
-import {
-  $documents_,
-  $match_,
-  $project_,
-  $replaceWith_,
-  $simpleLookup_,
-} from '../aggregate/mongo-stages'
+import type { O2, O3, N, O, OPickD, RORec, StrKey, View } from '../../types'
+import type { HKT, I, IdHKT } from '../../types/hkt'
+import { $match_, $project_ } from '../aggregate/mongo-stages'
 import { concatStages, link, pipe } from '../aggregate/prefix'
-import { $array, $first } from '../expression/array'
-import { field } from '../expression/concat'
-import { $ifNull, ite } from '../expression/logic'
-import { nil } from '../expression/val'
-import { ctx, root } from '../field'
+import { root } from '../field'
 import { $eq, $gteTs } from '../predicate'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
-import type {
-  D,
-  Del,
-  Frame,
-  HasJob,
-  Iterator,
-  Model,
-  OutInput,
-  RawStages,
-  Runner,
-  SimpleStreamExecutionResult,
-} from '../types'
+import type { Frame, HasJob, Iterator, Query, RawStages, Runner } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
+import type { D, Del, Model, SimpleStreamExecutionResult } from '../types/stream'
+import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
-import { map1 } from '../utils/json'
-import { asExact, mapExactToObject } from '../utils/map-object'
 
-const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T & Model>(
-  view: View<T & D, V>,
-  input: RawStages<Q, T, Result, unknown, 1>,
+const executes = <
+  q extends O,
+  V extends Model,
+  K extends StrKey<V>,
+  Result extends q | OPickD<V, K>,
+>(
+  view: View<V, K>,
+  input: RawStages<q | OPickD<V, K>, OPickD<V, K>, Result, unknown, 1>,
   streamName: string,
-): SimpleStreamExecutionResult<Q, Result> => {
+): SimpleStreamExecutionResult<q | OPickD<V, K>, Result> => {
   const { collection, projection, hardMatch, match } = view
   const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
-  const keys = asExact<StrKey<T & D>>(projection)
-  const ones = mapExactToObject<RORec<StrKey<T & D>, 1>, IdHKT, ConstHKT<1>>(keys, () => 1)
   db.command({
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
   })
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   // TODO create indexes (if snapshot is in sources)
-  const projectInput = $project_<T & D>({ ...ones, deletedAt: 1 })
+  type WithDel = 'deletedAt' | Exclude<K, 'deletedAt'>
+  const projectInput = $project_<V, WithDel>(
+    spread<RORec<K, 1>, RORec<'deletedAt', 1>, IdHKT>(projection, {
+      deletedAt: ['deletedAt', 1],
+    }),
+  )
   const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
 
   const run = <Result2>(
-    finalInput: RawStages<unknown, OutInput<Result>, Result2>,
+    finalInput: RawStages<unknown, Result, Result2>,
   ): Runner<readonly Result2[], HasJob> => {
     type W = HasJob & { debug: string }
     type It = Iterator<readonly Result2[], W>
@@ -82,49 +69,20 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
     // Step 4 : run the aggregation // idempotent
     const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
-      const hardQuery = $and(
+      const hardQuery: Query<V> | undefined = $and(
         lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
         hardMatch,
+        notDeleted,
+        match,
       )
-      type R = Rec<'item', Arr<T>>
-      const replaceRaw: RawStages<unknown, T & D, R & ID> = $replaceWith_(
-        field<R & ID, T & D>({
-          item: ['item', ite($and(notDeleted, match).expr, $array(root<T>().expr()), $array())],
-          _id: ['_id', root<T & D>().of('_id').expr()],
-        }),
-      )
-      const cloneIntoNew = link<V | Del>()
-        .with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
-        .with(projectInput)
-        .with<unknown, R & ID>(replaceRaw)
-
-      type Ctx = RORec<'after', Arr<T>>
-      type R2 = Rec<'after', Arr<Result>> & ID
       const aggResult = await aggregate<Result2>(c =>
         c<V | Del, V | Del>({
           coll: collection,
           input: link<V | Del>().stages,
-          exec: cloneIntoNew
-            .with<unknown, R2>(
-              $simpleLookup_<R & ID, Result, null, 'after', Ctx>({
-                pipeline: link<null, Ctx>()
-                  .with<unknown, T>($documents_(ctx<Arr<T>>()('after').expr()))
-                  .with<unknown, Result>(input).stages,
-                k: 'after',
-                vars: map1('after', root<R>().of('item').expr()),
-              }),
-            )
-            .with(
-              $replaceWith_<R2, OutInput<Result>>(
-                field({
-                  after: ['after', $ifNull($first(root<R2>().of('after').expr()), nil)],
-                  before: [
-                    'before',
-                    field<O<ID>, R2>({ _id: ['_id', root<R2>().of('_id').expr()] }),
-                  ],
-                }),
-              ),
-            )
+          exec: link<V | Del>()
+            .with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
+            .with(projectInput)
+            .with<unknown, Result>(input)
             .with(finalInput).stages,
         }),
       )
@@ -162,35 +120,22 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
     }
     return stop
   }
-  const matcher: RawStages<V | Del, V | Del, V | Del, unknown, 1> = $match_<J, V | Del>(notDeleted)
-  const stages = link<V, unknown, 1>()
-    .with($match_($and(hardMatch, match)))
-    .with(input).stages
   return {
     out: run,
-    stages: c =>
-      c({
-        coll: collection,
-        input: matcher as RawStages<V | Del, V | Del, V, unknown, 1>,
-        exec: stages,
-      }),
   }
 }
-interface StreamRunnerHKT extends HKT<J2> {
-  readonly out: SimpleStreamExecutionResult<I<J2, this>[0], I<J2, this>[1]>
+interface StreamRunnerHKT extends HKT<O2> {
+  readonly out: SimpleStreamExecutionResult<I<O2, this>[0], I<O2, this>[1]>
 }
-interface StagesHKT extends HKT<J3> {
-  readonly out: RORec<'lin', RawStages<I<J3, this>[0], I<J3, this>[1], I<J3, this>[2], unknown, 1>>
+interface StagesHKT extends HKT<O3> {
+  readonly out: RORec<'lin', RawStages<I<O3, this>[0], I<O3, this>[1], I<O3, this>[2], unknown, 1>>
 }
 
 const emptyLin = <V>() => ({ lin: link<V, unknown, 1>().stages })
-export const from = <T extends doc, V extends T & Model = T & Model>(
-  view: View<T & D, V>,
-  streamName: string,
-) =>
-  pipe<V, V, V, StreamRunnerHKT, StagesHKT>(
+export const from = <V extends Model, K extends StrKey<V>>(view: View<V, K>, streamName: string) =>
+  pipe<OPickD<V, K>, OPickD<V, K>, OPickD<V, K>, StreamRunnerHKT, StagesHKT>(
     input => executes(view, input.lin, streamName),
-    { lin: link<V, unknown, 1>().stages },
+    { lin: link<OPickD<V, K>, unknown, 1>().stages },
     ({ lin: a }, { lin: b }) => ({ lin: concatStages(a, b) }),
     emptyLin,
   )

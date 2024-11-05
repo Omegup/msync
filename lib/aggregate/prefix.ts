@@ -1,4 +1,4 @@
-import type { App, HKT, J, J2, J3, RawObj } from '../../types'
+import type { App, HKT, O2, O3, O, RawObj } from '../../types'
 import type { Delta, DeltaStages, RawStages, Stream, TStages } from '../types'
 import type { Equal } from '../utils/guard'
 
@@ -24,7 +24,7 @@ export const concatStages = <Q, T extends Q, V extends Q, W extends Q, C, M exte
   part2: RawStages<Q, V, W, C, M>,
 ): RawStages<Q, T, W, C, M> => asStages([...part1, ...part2])
 
-export const concatDelta = <Q extends J, T extends Q, V extends Q, W extends Q>(
+export const concatDelta = <Q extends O, T extends Q, V extends Q, W extends Q>(
   part1: DeltaStages<Q, T, V>,
   part2: DeltaStages<Q, V, W>,
 ): DeltaStages<Q, T, W> => ({
@@ -36,25 +36,25 @@ type Concat<out Q, in T extends Q, out V extends Q, in out C, in out M extends n
   with: <Q2, W extends Q2>(extra: RawStages<Q | Q2, V, W, C, M>) => Concat<Q | Q2, T, W, C, M>
   stages: RawStages<Q, T, V, C, M>
 }
-export type DeltaPipe<Q extends J, T extends Q, F extends HKT<J2>, G extends HKT<J3>> = {
-  with: <Q2 extends J, V extends Q2>(
+export type DeltaPipe<Q extends O, T extends Q, F extends HKT<O2>, G extends HKT<O3>> = {
+  with: <Q2 extends O, V extends Q2>(
     map: (a: Stream<Q, T, F, G>) => Stream<Q | Q2, V, F, G>,
   ) => DeltaPipe<Q | Q2, V, F, G>
-  then: <Q2 extends J, V extends Q2>(next: App<G, [Q2 | T, T, V]>) => DeltaPipe<Q | Q2, V, F, G>
+  then: <Q2 extends O, V extends Q2>(next: App<G, [Q2 | T, T, V]>) => DeltaPipe<Q | Q2, V, F, G>
   get: () => App<F, [Q, T]>
 }
 
-export const pipe = <Q extends J, S extends Q, T extends Q, F extends HKT<J2>, G extends HKT<J3>>(
+export const pipe = <Q extends O, S extends Q, T extends Q, F extends HKT<O2>, G extends HKT<O3>>(
   stream: Stream<Q, S, F, G>,
   s: App<G, [Q, S, T]>,
-  concat: <Q extends J, T extends Q, V extends Q, W extends Q>(
+  concat: <Q extends O, T extends Q, V extends Q, W extends Q>(
     part1: App<G, [Q, T, V]>,
     part2: App<G, [Q, V, W]>,
   ) => App<G, [Q, T, W]>,
   empty: <T extends Q>() => App<G, [Q, T, T]>,
 ) => {
   const acc: DeltaPipe<Q, T, F, G> = {
-    with: <Q2 extends J, V extends Q2>(
+    with: <Q2 extends O, V extends Q2>(
       map: (a: Stream<Q, T, F, G>) => Stream<Q | Q2, V, F, G>,
     ): DeltaPipe<Q | Q2, V, F, G> =>
       pipe<Q | Q2, V, V, F, G>(
@@ -63,7 +63,7 @@ export const pipe = <Q extends J, S extends Q, T extends Q, F extends HKT<J2>, G
         concat,
         empty,
       ),
-    then: <Q2 extends J, V extends Q2>(next: App<G, [T | Q2, T, V]>): DeltaPipe<Q | Q2, V, F, G> =>
+    then: <Q2 extends O, V extends Q2>(next: App<G, [T | Q2, T, V]>): DeltaPipe<Q | Q2, V, F, G> =>
       pipe<Q | Q2, S, V, F, G>(stream, concat(s, next), concat, empty),
     get: () => stream(s),
   }
@@ -83,9 +83,9 @@ export const link: Link = () => ({
   stages: asStages([]),
 })
 
-export const emptyDelta = <T extends J>() => ({
+export const emptyDelta = <T extends O>() => ({
   delta: link<Delta<T>>().stages,
-  raw: <F extends HKT<J>>() => link<App<F, T>>().stages,
+  raw: <F extends HKT<O>>() => link<App<F, T>>().stages,
 })
 
 export const concatTStages = <S, Q, B extends Q, T extends Q, V extends Q>(

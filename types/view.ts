@@ -1,8 +1,9 @@
 import type { Db } from 'mongodb'
-import type { Del, Query } from '../lib/types'
-import type { J, StrKey } from './json'
+import type { Del, Model, Query } from '../lib/types'
+import type { ExactKeys, MapKDom } from '../lib/utils/map-object'
+import type { ConstHKT, HKT } from './hkt'
+import type { O, StrKey } from './json'
 import type { RawStage } from './mongo'
-import type { ExactKeys } from '../lib/utils/map-object'
 
 interface CommonCollection {
   readonly s: { readonly db: Db }
@@ -16,12 +17,26 @@ export interface ReadonlyCollection<out T> extends CommonCollection {
 }
 
 export interface WriteonlyCollection<in R> extends CommonCollection {
-  insertOne(x: R): unknown
+  [RawStage]: { (_: 1, x: R): unknown }
+  insertOne(x: Omit<R, keyof O>): unknown
 }
 
-export type View<T extends J, V extends T & J = T> = {
+export type KDom<
+  RK extends KDom<RK, K, F>,
+  K extends string,
+  F extends HKT<K> = ConstHKT<1>,
+> = MapKDom<RK, F, K>
+
+export type OPick<V, K extends StrKey<V>, E extends StrKey<V> = never> = O & Pick<V, K | E>
+export type OPickD<V extends Model, K extends StrKey<V>> = OPick<V, K, 'deletedAt'>
+
+export type View<V extends Model, K extends StrKey<V>> = {
   collection: ReadonlyCollection<V | Del>
-  projection: ExactKeys<StrKey<T>>
-  match?: Query<T>
+  projection: ExactKeys<K>
+  match?: Query<OPickD<V, K>>
   hardMatch?: Query<V>
 }
+
+const erger = <V, K extends KDom<K, StrKey<V>>>(v: V, k: K) => {}
+
+erger({ a: 3, v: 4 }, { a: ['a', 1], v: ['v', 1], zef: ['a', 5] })

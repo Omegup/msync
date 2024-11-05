@@ -3,12 +3,12 @@ import type {
   Arr,
   ConstHKT,
   HKT,
-  J,
+  IdHKT,
+  O,
   RORec,
   RawObj,
   Rec,
   StrKey,
-  jsonItem,
   rawItem,
 } from '../../types'
 import type { ExprHKT, ExprsExact } from '../expression/concat'
@@ -24,41 +24,46 @@ import type {
 } from '../types'
 import type { Updater } from '../update'
 import { id } from '../utils/json'
-import { mapExactToObject } from '../utils/map-object'
+import { mapExactToObject, type ExactKeys } from '../utils/map-object'
 import { asStages } from './prefix'
 
 type s = string
 export const $match1 =
-  <T extends J, C = unknown>(query?: Query<T, C>): FRawStages<T, T, T, C, 1> =>
+  <T extends O, C = unknown>(query?: Query<T, C>): FRawStages<T, T, T, C> =>
   f =>
     asStages(query ? [{ $match: query.raw(f<T>()) }] : [])
 
 export const $set1 =
-  <Q, T extends Q & J, V extends Q & J, C = unknown>(
+  <Q, T extends Q & O, V extends Q & O, C = unknown>(
     updater: Updater<T, T, V, C>,
   ): FRawStages<Q, T, V, C, 1> =>
   f =>
     asStages([
       {
         $set: Object.fromEntries(
-          updater.raw(f<T>()).map(([k, v]) => [f().of(k.slice(1)).str(), v]),
+          updater.raw(f<T>()).map(([k, v]) => [
+            f<T>()
+              .of(k.slice(1) as keyof T)
+              .str(),
+            v,
+          ]),
         ),
       },
     ])
 
 export const $project1 =
-  <T extends J>(projection: Record<StrKey<T>, 1>): FRawStages<T, T, T, unknown, 1> =>
+  <T extends O, K extends StrKey<T>>(projection: ExactKeys<K>): FRawStages<T, T, T, unknown, 1> =>
   f =>
     asStages([
       {
-        $project: Object.fromEntries(
-          Object.entries(projection).map(([k, v]) => [f<T>().of(k).str(), v]),
+        $project: mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<string>>(projection, (_, k) =>
+          f<T>().of(k).str(),
         ),
       },
     ])
 
 export const $replaceWith1 =
-  <T extends J, V extends J, C = unknown>(expr: Expr<V, T, C>): FRawStages<J, T, V, C, 1> =>
+  <T extends O, V extends O, C = unknown>(expr: Expr<V, T, C>): FRawStages<O, T, V, C, 1> =>
   f => {
     const parts = f<T>().str().split('.').filter(id)
     return asStages([
@@ -67,18 +72,15 @@ export const $replaceWith1 =
   }
 
 export const $unwind1 =
-  <T extends J, K extends s, U>(k: K): FRawStages<T, T & Rec<K, Arr<U>>, T & Rec<K, U>> =>
+  <T extends O, K extends s, R>(k: K): FRawStages<T, T & Rec<K, Arr<R>>, T & Rec<K, R>> =>
   f =>
-    asStages([{ $unwind: `$${f<Rec<K, Arr<U>>>().of(k).str()}` }])
+    asStages([{ $unwind: `$${f<Rec<K, Arr<R>>>().of(k).str()}` }])
 
 export const $group1 =
-  <T extends J, ID extends jsonItem, V extends RORec<string, jsonItem>, C>(
-    id: Expr<ID, T, C>,
-    args: Accumulators<T, V, C>,
-  ) =>
-  <F extends HKT<J, J>>(
-    f: <T extends J>() => Field<App<F, T>, T>,
-  ): RawStages<J, App<F, T>, Rec<'_id', ID> & V, C, 1> =>
+  <T extends O, ID, V extends O, C>(id: Expr<ID, T, C>, args: Accumulators<T, V, C>) =>
+  <F extends HKT<O, O>>(
+    f: <T extends O>() => Field<App<F, T>, T>,
+  ): RawStages<O, App<F, T>, Rec<'_id', ID> & V, C, 1> =>
     asStages([
       {
         $group: {
@@ -89,19 +91,19 @@ export const $group1 =
     ])
 
 export const $documents1 =
-  <Q extends J, T extends Q, C>(docs: Expr<Arr<T>, unknown, C>) =>
-  <F extends HKT<J, J>>(
-    f: <T extends J>() => Field<App<F, T>, T>,
+  <Q extends O, T extends Q & O, C>(docs: Expr<Arr<T>, unknown, C>) =>
+  <F extends HKT<O, O>>(
+    f: <T extends O>() => Field<App<F, T>, T>,
   ): RawStages<unknown, null, App<F, T>, C, 1> =>
     asStages([{ $documents: docs.raw(f<never>()).get() }])
 
-export const rawVars = <T, Ctx, C, V extends J>(
+export const rawVars = <T, Ctx, C, V extends O>(
   vars: ExprsExact<Ctx, T, C>,
   f: Field<V, T, unknown>,
 ) => mapExactToObject<Ctx, ExprHKT<T, C>, ConstHKT<rawItem>>(vars, v => v.raw(f).get())
 
 export const $simpleLookup1 =
-  <T extends J, U extends J, R, K extends s, Ctx, C = unknown>(
+  <T extends O, U extends O, R, K extends s, Ctx, C = unknown>(
     args: LookupArgs<T, U, R, K, Ctx, C>,
   ): FRawStages<T, T, T & Rec<K, Arr<U>>, C, 1> =>
   f => {

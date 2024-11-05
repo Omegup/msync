@@ -1,11 +1,11 @@
-import type { App, Arr, AsLiteral, HKT, ID, J, Rec, doc } from '../../../types'
+import type { App, Arr, AsLiteral, HKT, ID, O, Rec, RORec } from '../../../types'
 import { concat } from '../../expression/concat'
 import { eq } from '../../expression/logic'
 import { val } from '../../expression/val'
 import { ctx, root, type Field } from '../../field'
 import { $expr } from '../../predicate/$expr'
 import type { Before, RawStages, TStages } from '../../types'
-import { set1, to } from '../../update'
+import { set, to } from '../../update'
 import { map1 } from '../../utils/json'
 import { $match_, $replaceWith_, $set1, $simpleLookup1, $unwind1 } from '../mongo-stages'
 import { link } from '../prefix'
@@ -14,10 +14,10 @@ type s = string
 
 export const $lookupRaw =
   <
-    LQ extends J,
-    LE extends LQ & doc,
-    RQ extends J,
-    RE extends RQ & doc,
+    LQ extends O,
+    LE extends LQ & ID,
+    RQ extends O,
+    RE extends RQ & ID,
     BRB extends Before<RQ>,
     RS,
     S,
@@ -28,8 +28,8 @@ export const $lookupRaw =
     k2: AsLiteral<As>,
     k: 'left' | 'right' | false,
   ) =>
-  <F extends HKT<J, J>>(
-    f: <T extends J>() => Field<App<F, T>, T>,
+  <F extends HKT<O, O>>(
+    f: <T extends O>() => Field<App<F, T>, T>,
   ): RawStages<App<F, LQ>, App<F, LE>, App<F, LE & Rec<As, RE> & ID>> => {
     type D = LE & Rec<As, RE>
     const left = root<D>().of('_id').expr()
@@ -60,6 +60,6 @@ export const $lookupRaw =
       )
       .with<App<F, LE>, App<F, D>>($unwind1<LE, As, RE>(k2)(f))
       .with<App<F, LE>, App<F, LE & Rec<As, RE> & ID>>(
-        $set1(set1<D>()({ _id: ['_id', idVal] }))(f),
+        $set1(set<RORec<'_id', string>>()<D, D>({ _id: ['_id', idVal] }))(f),
       ).stages
   }

@@ -1,4 +1,4 @@
-import type { ID, J, O, RORec, Rec, WriteonlyCollection, jsonItem } from '../../../types'
+import type { ID, O, RORec, Rec, WriteonlyCollection } from '../../../types'
 import { mergeExpr, type ExprsExact, type ExprsExactHKT } from '../../expression/concat'
 import { root } from '../../field'
 import type { Delta, Expr, RawStages, TS } from '../../types'
@@ -13,11 +13,7 @@ type GID = '_grp'
 const gid: GID = '_grp'
 type Denied = keyof (TS & ID) | GID
 
-const addGrp = <
-  V extends RORec<string, jsonItem>,
-  D extends Rec<'_id', Grp>,
-  Grp extends jsonItem,
->(
+const addGrp = <V extends O, D extends Rec<'_id', Grp>, Grp>(
   expr: ExprsExact<Omit<V, Denied>, D>,
 ): ExprsExact<RORec<GID, Grp> & Omit<V, Denied>, D> => {
   const omit = omitPick<keyof V, Denied, GID, V>()
@@ -29,11 +25,7 @@ const addGrp = <
   )
 }
 
-export const $groupMerge = <
-  T extends J,
-  Grp extends jsonItem,
-  V extends RORec<string, jsonItem>,
->(
+export const $groupMerge = <T extends O, Grp, V extends O>(
   id: Expr<Grp, T>,
   args: DeltaAccumulators<T, Omit<V, Denied>>,
   out: WriteonlyCollection<TS & ID & Rec<GID, Grp> & Omit<V, Denied>>,

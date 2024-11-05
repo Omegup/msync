@@ -1,9 +1,9 @@
 import type { ChangeStream, Timestamp } from 'mongodb'
-import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
-import type { J, J2, J3, N, RORec, StrKey, View, doc } from '../../types'
+import type { O2, O3, N, O, OPickD, RORec, StrKey, View } from '../../types'
+import type { HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
-import { concatDelta, emptyDelta, link, pipe } from '../aggregate/prefix'
+import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
 import { field } from '../expression/concat'
 import { $ifNull, ite } from '../expression/logic'
 import { nil, val } from '../expression/val'
@@ -17,21 +17,25 @@ import type { After, D, Del, Delta, DeltaStages, Model, RawStages, UDelta } from
 import { set, to } from '../update'
 import { asBefore } from '../utils/before'
 import { log } from '../utils/log'
-import { asExact, mapExactToObject } from '../utils/map-object'
+import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 
-const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T & Model>(
-  view: View<T & D, V>,
-  input: DeltaStages<Q, T, Result>,
+const executes = <
+  q extends O,
+  V extends Model,
+  K extends StrKey<V>,
+  Result extends q | OPickD<V, K>,
+>(
+  view: View<V, K>,
+  input: DeltaStages<q | OPickD<V, K>, OPickD<V, K>, Result>,
   streamName: string,
-): SnapshotStreamExecutionResult<Q, Result> => {
+): SnapshotStreamExecutionResult<q | OPickD<V, K>, Result> => {
+  type T = OPickD<V, K>
   const { collection, projection, hardMatch, match } = view
   const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
-  const keys = asExact<StrKey<T & D>>(projection)
-  const ones = mapExactToObject<RORec<StrKey<T & D>, 1>, IdHKT, ConstHKT<1>>(keys, () => 1)
   db.command({
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
@@ -39,7 +43,13 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
   // TODO create indexes (if snapshot is in sources)
-  const projectInput = $project_<T & D>({ ...ones, deletedAt: 1 })
+  type WithDel = 'deletedAt' | '_id' | Exclude<K, 'deletedAt' | '_id'>
+  const projectInput = $project_<V, WithDel>(
+    spread<RORec<K, 1>, RORec<'deletedAt' | '_id', 1>, IdHKT>(projection, {
+      deletedAt: ['deletedAt', 1],
+      _id: ['_id', 1],
+    }),
+  )
 
   const run = <Result2>(
     finalInput: RawStages<unknown, Delta<Result>, Result2>,
@@ -76,10 +86,10 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
         hardMatch,
       )
       const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
-      const replaceRaw: RawStages<J, T & D, After<T> & { updated: true; _id: string }> =
+      const replaceRaw: RawStages<O, T & D, After<T> & { updated: true; _id: string }> =
         $replaceWith_(
           field<After<T> & { updated: true; _id: string }, T & D>({
-            after: ['after', ite($and(notDeleted, match).expr, root<T>().expr(), nil)],
+            after: ['after', ite($and<T & D>(notDeleted, match).expr, root<T>().expr(), nil)],
             updated: ['updated', val(true)],
             _id: ['_id', root<T & D>().of('_id').expr()],
           }),
@@ -92,7 +102,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
       const r = await aggregate<'out'>(c =>
         c({
           coll: collection,
-          input: $match_(hardQuery) as RawStages<J, V | Del, V>,
+          input: $match_(hardQuery) as RawStages<O, V | Del, V>,
           exec: cloneIntoNew,
         }),
       )
@@ -111,7 +121,7 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
             .with($match_(root<UDelta<T>>().of('updated').has($eq<boolean>(true))))
             .with(
               $set_<UDelta<T>, UDelta<T>, UDelta<T> & Delta<T>>(
-                set({
+                set<Before<T | null>>()({
                   before: ['before', to($ifNull(root<UDelta<T>>().of('before').expr(), nil))],
                 }),
               ),
@@ -188,18 +198,18 @@ const executes = <Q extends J, T extends doc & Q, Result extends Q, V extends T 
   }
 }
 
-export interface SnapshotStreamHKT extends HKT<J2> {
-  readonly out: SnapshotStreamExecutionResult<I<J2, this>[0], I<J2, this>[1]>
+export interface SnapshotStreamHKT extends HKT<O2> {
+  readonly out: SnapshotStreamExecutionResult<I<O2, this>[0], I<O2, this>[1]>
 }
-export interface DeltaHKT extends HKT<J3> {
-  readonly out: DeltaStages<I<J3, this>[0], I<J3, this>[1], I<J3, this>[2]>
+export interface DeltaHKT extends HKT<O3> {
+  readonly out: DeltaStages<I<O3, this>[0], I<O3, this>[1], I<O3, this>[2]>
 }
 
-export const staging = <T extends doc, V extends T & Model = T & Model>(
-  view: View<T & D, V>,
+export const staging = <V extends Model, K extends StrKey<V>>(
+  view: View<V, K>,
   streamName: string,
-) =>
-  pipe<V, V, V, SnapshotStreamHKT, DeltaHKT>(
+): DeltaPipe<OPickD<V, K>, OPickD<V, K>, SnapshotStreamHKT, DeltaHKT> =>
+  pipe<OPickD<V, K>, OPickD<V, K>, OPickD<V, K>, SnapshotStreamHKT, DeltaHKT>(
     input => executes(view, input, streamName),
     emptyDelta(),
     concatDelta,

@@ -1,5 +1,5 @@
 import type { Timestamp } from 'mongodb'
-import type { App, HKT, ID, J, O, RawObj, ReadonlyCollection, Rec, Type } from '../../types'
+import type { App, HKT, ID, O, RawObj, ReadonlyCollection, Rec, Type } from '../../types'
 import type { Field } from '../field'
 import type { Runner, HasJob } from './machine'
 
@@ -13,15 +13,15 @@ export interface RawStages<out Q, in S extends Q, out R extends Q, in C = unknow
 
 export type FRawStages<
   out Q,
-  in S extends Q & J,
-  out R extends Q & J,
+  in S extends Q & O,
+  out R extends Q & O,
   in C = unknown,
   out M extends number = number,
-> = <F extends HKT<J, J>>(
-  f: <T extends J>() => Field<App<F, T>, T>,
-) => RawStages<App<F, Q & J>, App<F, S>, App<F, R>, C, M>
+> = <F extends HKT<O, O>>(
+  f: <T extends O>() => Field<App<F, T>, T>,
+) => RawStages<App<F, Q & O>, App<F, S>, App<F, R>, C, M>
 
-export type DeltaStages<out Q, in S extends Q & J, out R extends Q & J, in C = unknown> = {
+export type DeltaStages<out Q, in S extends Q & O, out R extends Q & O, in C = unknown> = {
   delta: RawStages<unknown, Delta<S>, Delta<R>, C>
   raw: FRawStages<Q, S, R, C>
 }
@@ -49,8 +49,7 @@ export type StreamRunner<out V> = <Result>(
 ) => Runner<readonly Result[], HasJob>
 
 export type SimpleStreamExecutionResult<out Q, out V extends Q> = {
-  readonly out: StreamRunner<OutInput<V>>
-  readonly stages: Stages<Q, V, 1>
+  readonly out: StreamRunner<V>
 }
 
 export type SnapshotStreamExecutionResult<out Q, out V extends Q> = {
@@ -59,11 +58,11 @@ export type SnapshotStreamExecutionResult<out Q, out V extends Q> = {
 }
 
 export type Stream<
-  out Q extends J,
+  out Q extends O,
   in out T extends Q,
-  in out F extends HKT<[J, J]>,
-  in out G extends HKT<[J, J, J]>,
-> = <Q2 extends J, Result extends Q2>(
+  in out F extends HKT<[O, O]>,
+  in out G extends HKT<[O, O, O]>,
+> = <Q2 extends O, Result extends Q2>(
   input: App<G, [Q2 | T, T, Result]>,
 ) => App<F, [Q | Q2, Result]>
 
@@ -74,7 +73,7 @@ export type Model = D & TS
 
 export type OutInput<T, A = T | null> = Rec<'before', O<ID> | null> & Rec<'after', A>
 
-export type SimpleStream<in out Q extends J, out T extends Q> = <Q2 extends J, Result extends Q2>(
+export type SimpleStream<in out Q extends O, out T extends Q> = <Q2 extends O, Result extends Q2>(
   input: LinStages<Q2 | T, T, Result>,
 ) => SimpleStreamExecutionResult<Q | Q2, Result>
 // T1 {a: 1, b: 2} T2 {a: 1, b: 2, c: 3}
@@ -93,7 +92,7 @@ export type UDelta<T, E = { readonly updated: boolean }> = Delta<T | null, 'afte
 // this type of streams is based on the separation between
 // • last snapshot which is the last data successfully synced
 // • and the new incoming data to be synced
-export type SnapshotStream<out Q extends J, in out T extends Q> = <Q2 extends J, Result extends Q2>(
+export type SnapshotStream<out Q extends O, in out T extends Q> = <Q2 extends O, Result extends Q2>(
   // this input doesn't end necessarily with merge stage, cuz it can be used for another lookup
   // so input can be used to construct the stages of the left/rigth join of another lookup
   input: DeltaStages<Q2 | T, T, Result>,

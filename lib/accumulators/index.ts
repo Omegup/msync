@@ -1,4 +1,4 @@
-import type { Arr, J, RawObj, U, Undef } from '../../types'
+import type { Arr, O, RawObj, U, Undef } from '../../types'
 import { add, subtract } from '../expression/arith'
 import { $array, $concat, $except } from '../expression/array'
 import { val } from '../expression/val'
@@ -7,7 +7,7 @@ import type { Accumulator, AccumulatorRaw, DeltaAccumulator, Expr } from '../typ
 
 const asAccumulator = <T, V, C = unknown>(x: RawObj) => x as AccumulatorRaw<T, V, C>
 
-export const $sumDelta = <D extends J, C>(
+export const $sumDelta = <D extends O, C>(
   expr: Expr<number, D, C>,
 ): DeltaAccumulator<D, number, C> => ({
   raw: f => asAccumulator({ $sum: expr.raw(f).get() }),
@@ -15,23 +15,24 @@ export const $sumDelta = <D extends J, C>(
   sum: add,
   zero: val(0),
 })
-export const $sum = <D extends J, C>(expr: Expr<number, D, C>): Accumulator<D, number, C> =>
+export const $sum = <D extends O, C>(expr: Expr<number, D, C>): Accumulator<D, number, C> =>
   $sumDelta(expr)
 
-export const $push = <D extends J, T, C>(expr: Expr<T, D, C>): Accumulator<D, Arr<T>, C> => ({
+export const $push = <D extends O, T, C>(expr: Expr<T, D, C>): Accumulator<D, Arr<T>, C> => ({
   raw: f => asAccumulator({ $push: expr.raw(f).get() }),
 })
-export const $pushDelta = <D extends J, T, C>(expr: Expr<T, D, C>): DeltaAccumulator<D, Arr<T>, C> => ({
+export const $pushDelta = <D extends O, T, C>(
+  expr: Expr<T, D, C>,
+): DeltaAccumulator<D, Arr<T>, C> => ({
   raw: f => asAccumulator({ $push: expr.raw(f).get() }),
-  diff:$except,
-  sum:$concat,
+  diff: $except,
+  sum: $concat,
   zero: $array(),
-
 })
-export const subAcc = <T, D, P extends J, Ctx = unknown>(
+export const subAcc = <T, D, P extends O, Ctx = unknown>(
   a: Accumulator<D, T, Ctx>,
   f: Field<P, D, Ctx>,
 ): Accumulator<P, T, Ctx> => ({
-  raw: <DeltaD extends J, I extends U, C = unknown>(g: Field<DeltaD, P | Undef<I>, C>) =>
+  raw: <DeltaD extends O, I extends U, C = unknown>(g: Field<DeltaD, P | Undef<I>, C>) =>
     a.raw(g.with<P, D, I, Ctx, 2>(f)),
 })

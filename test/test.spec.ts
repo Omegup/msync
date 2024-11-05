@@ -1,107 +1,120 @@
-import { $sumDelta } from '../lib/accumulators'
-import { $replace, type Merge } from '../lib/aggregate/$replace'
-import { $groupMerge } from '../lib/aggregate/group/$group-merge'
-import { $set } from '../lib/aggregate/set'
-import { from, staging } from '../lib/boot'
-import { concat } from '../lib/expression/concat'
+import type { Collection } from 'mongodb'
+import { $merge } from '../lib/aggregate/$merge'
+import { $replaceWith, $set } from '../lib/aggregate/set'
+import { staging } from '../lib/boot'
+import { $mergeObjects } from '../lib/expression/array'
+import { concat, field } from '../lib/expression/concat'
+import { exprMapVal } from '../lib/expression/logic'
 import { val } from '../lib/expression/val'
 import { root } from '../lib/field'
-import { Machine, wrap } from '../lib/machine'
 import { $lookup } from '../lib/stream/$lookup'
-import type { Model, TS } from '../lib/types'
-import { set, to } from '../lib/update'
-import type { ID, O, RORec, Rec } from '../types'
-import { prepare } from './mongo'
+import type { Model } from '../lib/types'
+import { to } from '../lib/update'
+import type { O, OPick, Rec, StrKey, notArr } from '../types'
 
-const client = await prepare('test')
-const db = client.db('msync')
-type D1 = O<ID & { readonly link: string }>
-type D2 = O<ID & { readonly link: string; readonly link2: string }>
-type D3 = O<ID & { readonly link2: string }>
-type V = D1 & RORec<'v', number>
-const v = db.collection<V & Model>('v')
-const c1 = db.collection<D1 & Model>('c1')
-const c2 = db.collection<D2 & Model>('c2')
-const c3 = db.collection<D3 & Model>('c3')
-// const r = db.collection<Merge<D1>>('r')
-const g = db.collection<ID & TS & Rec<'_grp', string> & Rec<'v', number>>('g')
-// const r2 = db.collection<Merge<LeftWrite<D1, D2>>>('r2')
-const r3 = db.collection<Merge<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>>('r3')
-const r4 = db.collection<Merge<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>>('r4')
+type NotificationType = 'invoice' | 'payment'
+type Notification = {
+  readonly _id: string
+  readonly userId: string
+  readonly _data: notArr
+  readonly data: notArr
+  readonly type: NotificationType
+  readonly deletedAt: Date | null
+  readonly ready?: boolean | null
+  readonly seen: boolean | null
+}
 
-let machine1 = new Machine()
+export type UserBase = O<{ _id: string; lastName: string; firstName: string; email: string }>
 
-machine1.add(
-  staging<D1>(
-    { collection: c1, projection: { _id: '_id', deletedAt: 'deletedAt', link: 'link' } },
-    'q1',
+export const fillDataNotification = (
+  notifications: Collection<Notification & Model>,
+  users: Collection<UserBase & Model>,
+) => {
+  type NOtif = OPick<Notification & Model, 'userId' | '_data' | '_id' | 'type'>
+  type USer = OPick<UserBase & Model, 'firstName' | 'lastName' | '_id' | 'email'>
+  type Joined = NOtif & Rec<'user', USer>
+  type Data = Notification['_data']
+
+  return staging<Notification & Model, StrKey<NOtif>>(
+    {
+      collection: notifications,
+      projection: {
+        userId: ['userId', 1],
+        _data: ['_data', 1],
+        _id: ['_id', 1],
+        type: ['type', 1],
+      },
+    },
+    'notif-users',
   )
-    .with<D1, D1 & RORec<'d2', D2 & RORec<'d3', D3>>>(
-      $lookup<'d2', D1, D2, D2 & RORec<'d3', D3>, string>({
-        as: 'd2',
-        from: staging<D2>(
+    .with<NOtif, Joined>(
+      $lookup({
+        from: staging<UserBase & Model, StrKey<USer>>(
           {
-            collection: c2,
-            projection: { _id: '_id', deletedAt: 'deletedAt', link: 'link', link2: 'link2' },
+            collection: users,
+            projection: {
+              _id: ['_id', 1],
+              firstName: ['firstName', 1],
+              email: ['email', 1],
+              lastName: ['lastName', 1],
+            },
           },
-          'q2',
-        )
-          .with<D2, D2 & RORec<'d3', D3>>(
-            $lookup<'d3', D2, D3, D3, string>({
-              from: staging<D3, D3 & Model>(
-                {
-                  collection: c3,
-                  projection: { _id: '_id', deletedAt: 'deletedAt', link2: 'link2' },
-                },
-                'q3',
-              ).get(),
-              localField: root<D2>().of('link2'),
-              foreignField: root<D3>().of('link2'),
-              as: 'd3',
-            }),
-          )
-          .get(),
-        localField: root<D1>().of('link'),
-        foreignField: root<D2>().of('link'),
+          'invoice-payment-notif',
+        ).get(),
+        as: 'user',
+        foreignField: root<USer>().of('_id'),
+        localField: root<NOtif>().of('userId'),
       }),
     )
-    .get()
-    .out($replace(r3)),
-)
-
-machine1 = wrap(machine1)
-
-machine1.add(
-  from<D1 & RORec<'d2', D2 & RORec<'d3', D3>>>(
-    { collection: r3, projection: { _id: '_id', deletedAt: 'deletedAt', d2: 'd2', link: 'link' } },
-    'xs1',
-  )
-    .get()
-    .out($replace(r4)),
-)
-
-machine1.start(console.log)
-
-const machine2 = new Machine()
-
-machine2.add(
-  staging<V>(
-    { collection: v, projection: { _id: '_id', deletedAt: 'deletedAt', link: 'link', v: 'v' } },
-    's1',
-  )
     .then(
-      $set(set({ link: ['link', to(concat(root<V>().of('link').expr(), val('..')))] as const })),
+      $replaceWith<
+        Joined,
+        O<{ readonly data: Data; readonly ready: boolean; readonly _id: string }>
+      >(
+        field({
+          _id: ['_id', root<Joined>().of('_id').expr()],
+          data: [
+            'data',
+            $mergeObjects(
+              root<Joined>().of('_data').expr(),
+              field({
+                name: [
+                  'name',
+                  concat(
+                    root<Joined>().of('user').of('firstName').expr(),
+                    val(' '),
+                    root<Joined>().of('user').of('lastName').expr(),
+                  ),
+                ],
+                email: ['email', root<Joined>().of('user').of('email').expr()],
+                url: [
+                  'url',
+                  concat(
+                    val('baseurl'),
+                    exprMapVal<
+                      NotificationType,
+                      { readonly [k in NotificationType]: string },
+                      Joined,
+                      unknown
+                    >(
+                      root<Joined>().of('type').expr(),
+                      { invoice: val('invoice_url'), payment: val('payment_url') },
+                      val(''),
+                    ),
+                  ),
+                ],
+              }),
+            ),
+          ],
+          ready: ['ready', val(true)],
+        }),
+      ),
     )
     .get()
     .out(
-      $groupMerge<V, string, O<{ readonly v: number }>>(
-        root<V>().of('link').expr(),
-        {
-          v: ['v', $sumDelta(root<V>().of('v').expr())],
-        },
-        g,
-      ),
-    ),
-)
-
-machine2.start(console.log)
+      $merge<Notification & Model>()(notifications, {
+        data: ['data', 1],
+        ready: ['ready', 1],
+      }),
+    )
+}

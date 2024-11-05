@@ -1,4 +1,4 @@
-import type { Arr, AsLiteral, ID, J, N, RORec, Rec, doc } from '../../../types'
+import type { Arr, AsLiteral, ID, N, O, RORec, Rec } from '../../../types'
 import { $filter } from '../../expression/array'
 import { field, mergeExpr, type ExprsExactHKT } from '../../expression/concat'
 import { eq } from '../../expression/logic'
@@ -20,9 +20,9 @@ type Both<K1 extends s, LE, KK2 extends s, RE> = Delta<
 
 export const $lookupDelta = <
   LQ,
-  LE extends LQ & J,
-  RQ extends J,
-  RE extends RQ & doc,
+  LE extends LQ & O,
+  RQ extends O,
+  RE extends RQ,
   BRB extends Before<RQ>,
   RS,
   S,

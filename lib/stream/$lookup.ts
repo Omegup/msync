@@ -1,4 +1,4 @@
-import type { AsLiteral, ID, J, RORec, Rec, doc, notArr } from '../../types'
+import type { AsLiteral, ID, O, RORec, Rec, doc, notArr } from '../../types'
 import { $lookupDelta, $lookupRaw } from '../aggregate/lookup'
 import { concatStages, concatTStages, emptyDelta } from '../aggregate/prefix'
 import { $replaceWithDelta } from '../aggregate/set'
@@ -24,12 +24,12 @@ const merge = <Result, LD extends HasJob, RD extends HasJob>({
 
 const join = <
   As extends string,
-  LQ extends J,
-  Q2 extends J,
-  LE extends LQ & doc,
+  LQ extends O,
+  Q2 extends O,
+  LE extends LQ,
   LS,
   BLB extends Before<LQ>,
-  RQ extends J,
+  RQ extends O,
   RE extends RQ & doc,
   S extends notArr,
   RS,
@@ -103,7 +103,7 @@ const join = <
   }
 }
 
-type Params<As extends string, LQ extends J, RQ extends J, RE extends RQ, S extends notArr> = {
+type Params<As extends string, LQ extends O, RQ extends O, RE extends RQ, S extends notArr> = {
   localField: Field<LQ, S>
   foreignField: Field<RQ, S>
   from: SnapshotStreamExecutionResult<RQ, RE>
@@ -111,9 +111,9 @@ type Params<As extends string, LQ extends J, RQ extends J, RE extends RQ, S exte
 }
 type LookupParams<
   As extends string,
-  LQ extends J,
+  LQ extends O,
   LE extends LQ,
-  RQ extends J,
+  RQ extends O,
   RE extends RQ,
   S extends notArr,
 > = {
@@ -127,15 +127,15 @@ type LookupParams<
 export const $lookup1 =
   <
     As extends string,
-    LQ extends J,
-    LE extends LQ & doc,
-    RQ extends J,
+    LQ extends O,
+    LE extends LQ,
+    RQ extends O,
     RE extends RQ & doc,
     S extends notArr,
   >(
     p: LookupParams<As, LQ, LE, RQ, RE, S>,
   ): SnapshotStream<LQ, LE & RORec<As, RE>> =>
-  <Q2 extends J, Result extends Q2>(
+  <Q2 extends O, Result extends Q2>(
     input: DeltaStages<Q2 | (LE & RORec<As, RE>), LE & RORec<As, RE>, Result>,
   ) =>
     p.left.stages(<LS, BLB extends Before<LQ>>(lStages: TStages<LS, Before<LQ>, BLB, Before<LE>>) =>
@@ -145,10 +145,10 @@ export const $lookup1 =
       ),
     )
 export const $lookup =
-  <As extends string, LQ extends J, RQ extends J, RE extends RQ & doc, S extends notArr>(
+  <As extends string, LQ extends O, RQ extends O, RE extends RQ & doc, S extends notArr>(
     p: Params<As, LQ, RQ, RE, S>,
   ) =>
-  <LE extends LQ & doc>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE>> =>
+  <LE extends LQ>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE>> =>
     $lookup1<As, LQ, LE, RQ, RE, S>({
       right: p.from,
       as: p.as,

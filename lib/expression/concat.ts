@@ -4,13 +4,12 @@ import type {
   HKT,
   I,
   IdHKT,
-  J,
   O,
   RORec,
   StrKey,
   U,
   Undef,
-  rawItem,
+  rawItem
 } from '../../types'
 import type { Field } from '../field'
 import type { Expr } from '../types'
@@ -43,7 +42,7 @@ export const fieldM = <
   m: Pick<M, Dom>,
 ) =>
   asExpr<O<{ readonly [K in Dom]: T[M[K]] }>, D, C>({
-    raw: <DeltaD extends J, I extends U, Ctx>(f: Field<DeltaD, D | Undef<I>, Ctx>) =>
+    raw: <DeltaD extends O, I extends U, Ctx>(f: Field<DeltaD, D | Undef<I>, Ctx>) =>
       asExprRaw<O<{ readonly [K in Dom]: T[M[K]] }>, DeltaD, Ctx & C>(
         Object.fromEntries(
           Object.entries(m).map(<K extends Dom>([dom, ref]: readonly [K, M[K]]) => [

@@ -1,4 +1,4 @@
-import type { Arr, J, O, RORec, Rec, RecHKT, jsonItem } from '../../../../types'
+import type { Arr, O, RORec, Rec, RecHKT } from '../../../../types'
 import { $push, subAcc } from '../../../accumulators'
 import { $array, $filter, $filterDefined, $first } from '../../../expression/array'
 import { field, type ExprHKT, type ExprsExact } from '../../../expression/concat'
@@ -19,7 +19,7 @@ type GID = '_grp'
 export type WithGRP<V, Grp> = Rec<GID, Grp> & V
 export type WithItem<V, Grp> = Rec<'_id', Grp> & Rec<'item', O<V>>
 
-export const subGroup = <T extends J, Grp extends jsonItem, V extends RORec<string, jsonItem>>(
+export const subGroup = <T extends O, Grp, V extends O>(
   id: Expr<Grp, T>,
   args: DeltaAccumulators<T, V>,
   addGrp: <D extends Rec<'_id', Grp>>(src: ExprsExact<V, D>) => ExprsExact<RORec<GID, Grp> & V, D>,
@@ -86,6 +86,10 @@ export const subGroup = <T extends J, Grp extends jsonItem, V extends RORec<stri
       ),
     )
 
+  const grpId: Expr<Grp, WithCmpId> = root<WithCmpId>().of('_id').of('id').expr()
+
+  const replaceWith = <X extends O, A extends O>(expr: Expr<X, A>) => $replaceWith_(expr)
+
   return link<Delta<T>, unknown>()
     .with<unknown, Rec<'part', Arr<Part>>>(
       $replaceWith_(
@@ -97,7 +101,7 @@ export const subGroup = <T extends J, Grp extends jsonItem, V extends RORec<stri
     .with<unknown, Rec<'part', Part>>($unwind_('part'))
     .with<unknown, Part>($replaceWith_(root<Rec<'part', Part>>().of('part').expr()))
     .with<unknown, WithCmpId>(
-      $group_<Part>()<RORec<'old', boolean> & Rec<'id', Grp>, V>(
+      $group_<V>()(
         field({
           old: ['old', root<Part>().of('old').expr()],
           id: ['id', sub(id, root<Part>().of('v'))],
@@ -108,13 +112,13 @@ export const subGroup = <T extends J, Grp extends jsonItem, V extends RORec<stri
       ),
     )
     .with<unknown, Rec<'_id', Grp> & HasItem>(
-      $group_<WithCmpId>()(root<WithCmpId>().of('_id').of('id').expr(), {
+      $group_<Rec<'item', Arr<WithCmpId>>>()(grpId, {
         item: ['item', $push(root<WithCmpId>().expr())],
       }),
     )
     .with<unknown, Rec<GID, Grp> & V>(
-      $replaceWith_<Rec<'_id', Grp> & HasItem, V & Rec<GID, Grp>>(
-        field<RORec<GID, Grp> & V, Rec<'_id', Grp> & HasItem>(
+      replaceWith(
+        field(
           addGrp<Rec<'_id', Grp> & HasItem>(
             mapExact<V, DeltaAccumulatorHKT<T>, ExprHKT<Rec<'item', Arr<WithCmpId>>>>(
               args,

@@ -1,4 +1,4 @@
-import type { J, WriteonlyCollection, jsonItem } from '../../types'
+import type { O, WriteonlyCollection, jsonItem } from '../../types'
 import type { ExprsExact } from '../expression/concat'
 import { root, type Field } from '../field'
 import type { RawStages } from '../types'
@@ -6,7 +6,7 @@ import { dbcoll } from '../utils/coll'
 import { asStages } from './prefix'
 import { rawVars } from './raws'
 
-export const $merge_ = <T extends J, Out extends T = T, Ctx = unknown>({
+export const $merge_ = <T extends O, Out extends T = T, Ctx = unknown>({
   into,
   on,
   whenNotMatched,
