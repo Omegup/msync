@@ -27,12 +27,6 @@ export const omitRORec = <
   R extends string,
   T extends unknown,
 >() => assertEqual<unknown, RORec<Exclude<K, E | R>, T>, Omit<RORec<Exclude<K, E | R>, T>, R>>()
-export const omitPar = <
-  K extends string,
-  E extends string,
-  R extends string,
-  T extends Rec<Exclude<K, E | R>, unknown>,
->() => assertEqual<unknown, Par<Exclude<K, E | R>, T>, Omit<Par<Exclude<K, E | R>, T>, R>>()
 
 type s = keyof any
 

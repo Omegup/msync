@@ -8,8 +8,8 @@ export const map = <T, K extends string & keyof T, V extends RORec<K, unknown>>(
 
 export type ExactPart<T, F extends HKT<T[StrKey<T>]>> = MapKPart<StrKey<T>, MappedHKT<T, F>>
 
-export type ExactPart1<T, F extends HKT<readonly [T, StrKey<T>]>> = {
-  readonly [K in StrKey<T>]: App<F, readonly [T, K]>
+export type ExactPart1<T, F extends HKT<StrKey<T>>> = {
+  readonly [K in StrKey<T>]: App<F, K>
 }
 
 type s = string
@@ -35,7 +35,7 @@ export type MapKPart1<K extends string, F extends HKT<K>> = {
 
 export type Exact<T, F extends HKT<T[StrKey<T>]>> = MapK<StrKey<T>, MappedHKT<T, F>>
 
-interface MappedHKT<T, F extends HKT<T[StrKey<T>]>> extends HKT<StrKey<T>> {
+export interface MappedHKT<T, F extends HKT<T[StrKey<T>]>> extends HKT<StrKey<T>> {
   readonly out: App<F, T[I<StrKey<T>, this>]>
 }
 
@@ -51,7 +51,7 @@ export const mapExactToObject1 = <K extends string, F extends HKT<K>, G extends 
   )
 }
 
-interface WithKey1<K extends string, G extends HKT<K>> extends HKT<K> {
+export interface WithKey1<K extends string, G extends HKT<K>> extends HKT<K> {
   readonly out: readonly [I<K, this>, App<G, I<K, this>>]
 }
 
@@ -60,20 +60,13 @@ export const mapExact1 = <K extends s, F extends HKT<K>, G extends HKT<K>>(
   f: <P extends K>(v: App<F, P>, k: P) => App<G, P>,
 ): MapK<K, G> => mapExactToObject1<K, F, WithKey1<K, G>>(x, (v, k) => [k, f(v, k)])
 
-export const mapExactToObject = <
-  T,
-  F extends HKT<T[StrKey<T>]>,
-  G extends HKT<readonly [T, StrKey<T>]>,
->(
+export const mapExactToObject = <T, F extends HKT<T[StrKey<T>]>, G extends HKT<StrKey<T>>>(
   x: Exact<T, F>,
-  f: <P extends StrKey<T>>(v: App<F, T[P]>, k: P) => App<G, readonly [T, P]>,
+  f: <P extends StrKey<T>>(v: App<F, T[P]>, k: P) => App<G, P>,
 ): ExactPart1<T, G> => mapExactToObject1(x, f)
 
-interface WithKey<T, G extends HKT<T[StrKey<T>]>> extends HKT<readonly [T, StrKey<T>]> {
-  readonly out: readonly [
-    I<readonly [T, StrKey<T>], this>[1],
-    App<G, I<readonly [T, StrKey<T>], this>[0][I<readonly [T, StrKey<T>], this>[1]]>,
-  ]
+interface WithKey<T, G extends HKT<T[StrKey<T>]>> extends HKT<StrKey<T>> {
+  readonly out: readonly [I<StrKey<T>, this>, App<G, T[I<StrKey<T>, this>]>]
 }
 
 export const mapExact = <T, F extends HKT<T[StrKey<T>]>, G extends HKT<T[StrKey<T>]>>(
@@ -81,7 +74,8 @@ export const mapExact = <T, F extends HKT<T[StrKey<T>]>, G extends HKT<T[StrKey<
   f: <P extends StrKey<T>>(v: App<F, T[P]>, k: P) => App<G, T[P]>,
 ): Exact<T, G> => mapExactToObject<T, F, WithKey<T, G>>(x, (v, k) => [k, f(v, k)])
 
-export const spread = <T, V, F extends HKT<T[StrKey<T>] | V[StrKey<V>]>>(
-  a: Exact<T, F>,
+type Dom<T, V> = HKT<T[StrKey<T>] | V[StrKey<V>]>
+export const spread = <T, V, F extends Dom<T, V>, E = unknown, No extends keyof V = never>(
+  a: Exact<Omit<T, No>, F>,
   b: Exact<V, F>,
-) => ({ ...a, ...mapExact(b, id) }) as Exact<V & Omit<T, keyof V>, F>
+) => ({ ...a, ...mapExact(b, id) }) as Exact<V & Omit<T, keyof V> & Pick<E, symbol & keyof E>, F>

@@ -1,12 +1,23 @@
-import type { ConstHKT, HKT, I, WriteonlyCollection } from '../../types'
-import type { ID, N, O, Par, RORec, Rec, StrKey, U } from '../../types/json'
-import { field, mergeExpr, type ExprHKT, type ExprsExactHKT } from '../expression/concat'
+import type { App, ConstHKT, HKT, I, IdHKT, OPick, WriteonlyCollection } from '../../types'
+import type { ID, N, O, RORec, Rec, StrKey, U } from '../../types/json'
+import {
+  field,
+  type ExprHKT,
+  type ExprsExact,
+  type ExprsExactHKT
+} from '../expression/concat'
 import { $ifNull, eqTyped, ite } from '../expression/logic'
 import { nil, now, val } from '../expression/val'
 import { root } from '../field'
 import type { Expr, Model, OutInput, RawStages, TS } from '../types'
-import { omitPar } from '../utils/guard'
-import { mapExact, type ExactKeys } from '../utils/map-object'
+import { omitPick, omitRORec, type Equal } from '../utils/guard'
+import {
+  mapExact,
+  mapExactToObject,
+  spread,
+  type ExactKeys,
+  type WithKey1
+} from '../utils/map-object'
 import { $replaceWith_ } from './mongo-stages'
 import { $merge_ } from './out'
 import { link } from './prefix'
@@ -14,33 +25,47 @@ interface AfterHKT<T> extends HKT {
   readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
 }
 type Allowed<K extends string> = Exclude<K, keyof (TS & ID)>
-type ParMerge<K extends string, T extends Rec<K>> = TS & ID & O & Par<K, T>
+type Outt<V, MKeys extends StrKey<V>> = ID & TS & Omit<V, MKeys> & (OPick<V, MKeys> | Rec<MKeys, N>)
 
 export const $merge =
   <V extends Model & ID>() =>
-  <MKeys extends StrKey<V>>(
-    out: WriteonlyCollection<Omit<V, MKeys> & (Pick<V, MKeys> | Rec<MKeys, N>)>,
-    keys: ExactKeys<MKeys>,
-  ): RawStages<unknown, OutInput<Pick<V, MKeys>>, 'out'> => {
-    type KK = any
-    type T = any
-    type R = any
+  <KK extends StrKey<V>>(
+    out: WriteonlyCollection<Outt<V, Allowed<KK>>>,
+    keys: ExactKeys<Allowed<KK>>,
+  ): RawStages<unknown, OutInput<OPick<V, Allowed<KK>> & ID>, 'out'> => {
     type K = Allowed<KK>
+    type T = OPick<V, K> & ID
+    type Patch = (T | (Rec<K, N> & ID)) & TS
+    type Out = Outt<V, K>
     type FromOut<N, E = TS & ID & O> = ExprsExactHKT<E, OutInput<T, N>>
-    const omit = omitPar<KK, never, keyof (TS & ID), T>()
-    const replacer = ite<ParMerge<K, T>, null, T, AfterHKT<T>>(
+
+    const omRORec: Equal<unknown, RORec<K, N>, Omit<RORec<K, N>, keyof (TS & ID)>> = omitRORec<
+      KK,
+      never,
+      keyof (TS & ID),
+      N
+    >()
+
+    interface ExprHKT2<T, D, C = unknown, F extends HKT = IdHKT> extends HKT<StrKey<T>> {
+      readonly out: Expr<App<F, T[I<StrKey<T>, this>]>, D, C>
+    }
+    type F = WithKey1<K, ExprHKT2<T, OutInput<T, T>>>
+
+    const patch: ExprsExact<OPick<V, K>, OutInput<T, T>> = mapExactToObject<RORec<K, 1>, IdHKT, F>(
+      keys,
+      (_, k) => [k, root<OutInput<T, T>>().of('after').of<T, typeof k, 1>(k).expr()],
+    )
+    const replacer = ite<Patch, null, T, AfterHKT<T>>(
       eqTyped<null, T, AfterHKT<T>>(root<OutInput<T>>().of('after').expr(), nil),
-      field<ParMerge<K, T>, OutInput<T, null>>(
-        omit.backward<FromOut<null>>(
-          mergeExpr<Par<K, T>, TS & ID, OutInput<T, null>, unknown, O>(
-            omit.forward<FromOut<null, unknown>>(
-              mapExact<Par<K, T>, ConstHKT<1>, ExprHKT<OutInput<T, null>>>(keys, () => nil),
-            ),
+      field<RORec<K, N> & ID & TS, OutInput<T, null>>(
+        omRORec.backward<FromOut<null, ID & TS>>(
+          spread<RORec<K, N>, ID & TS, ExprHKT<OutInput<T, null>>>(
+            mapExact<RORec<K, 1>, IdHKT, ConstHKT<Expr<null, unknown>>>(keys, () => nil),
             {
               _id: [
                 '_id',
                 $ifNull(
-                  root<OutInput<T>>().of('before').of<ID, '_id', U, 3>('_id').expr() as any,
+                  root<OutInput<T>>().of('before').of<ID, '_id', U, 3>('_id').expr(),
                   val(''),
                 ),
               ],
@@ -49,34 +74,20 @@ export const $merge =
           ),
         ),
       ),
-      field<ParMerge<K, T>, OutInput<T, T>>(
-        omit.backward<FromOut<T>>(
-          mergeExpr<Par<K, T>, TS & ID, OutInput<T, T>, unknown, O>(
-            omit.forward<FromOut<T, unknown>>(
-              mapExact<Par<K, T>, ConstHKT<1>, ExprHKT<OutInput<T, T>>>(
-                keys,
-                <P extends keyof T & StrKey<Par<Exclude<KK, '_id' | 'touchedAt'>, T>>>(
-                  _: 1,
-                  k: P,
-                ): Expr<T[P], OutInput<T, T>> => {
-                  const p = k
-                  return root<OutInput<T, T>>().of('after').of(p).expr()
-                },
-              ),
-            ),
-            {
-              _id: ['_id', root<OutInput<T, T>>().of('after').of('_id').expr()],
-              touchedAt: ['touchedAt', now],
-            },
-          ),
+      field<OPick<V, K> & ID & TS, OutInput<T, T>>(
+        omitPick<KK, never, keyof (TS & ID), V>().backward<FromOut<T>>(
+          spread<Pick<V, K>, ID & TS, ExprHKT<OutInput<T, T>>, O>(patch, {
+            _id: ['_id', root<OutInput<T, T>>().of('after').of('_id').expr()],
+            touchedAt: ['touchedAt', now],
+          }),
         ),
       ),
     )
     return link<OutInput<T>>()
-      .with<unknown, ParMerge<K, T>>($replaceWith_(replacer))
+      .with<unknown, Patch>($replaceWith_(replacer))
       .with<unknown, 'out'>(
-        $merge_<ParMerge<K, T>, Omit<R, K> & ParMerge<K, T>>({
-          into: out as any,
+        $merge_<Patch, Out>({
+          into: out,
           on: root<O<ID>>().of('_id'),
           whenNotMatched: 'fail',
         }),
