@@ -51,6 +51,12 @@ export const doubleExclude = <
   R extends s,
 >() => assertEqual<K, K, Exclude<K, E & Exclude<Literal<R>, K>>>()
 
+export const excludeIdem = <
+  K extends s,
+  E extends s,
+  S extends E = E,
+>() => assertEqual<Exclude<K, E>, Exclude<K, E>, Exclude<Exclude<K, E>, S>>()
+
 export const eqPar = <K extends string, T extends Rec<K, jsonItem>, K2 extends K>() =>
   assertEqual<unknown, Par<K2, T>, Par<K, T>>()
 

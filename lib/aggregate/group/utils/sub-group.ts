@@ -15,11 +15,9 @@ import { mapExact } from '../../../utils/map-object'
 import { $group_, $replaceWith_, $unwind_ } from '../../mongo-stages'
 import { link } from '../../prefix'
 
-type GID = '_grp'
-export type WithGRP<V, Grp> = Rec<GID, Grp> & V
 export type WithItem<V, Grp> = Rec<'_id', Grp> & Rec<'item', O<V>>
 
-export const subGroup = <T extends O, Grp, V extends O>(
+export const subGroup = <T extends O, Grp, V extends O, GID extends string>(
   id: Expr<Grp, T>,
   args: DeltaAccumulators<T, V>,
   addGrp: <D extends Rec<'_id', Grp>>(src: ExprsExact<V, D>) => ExprsExact<RORec<GID, Grp> & V, D>,
