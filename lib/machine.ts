@@ -17,7 +17,7 @@ export class Machine<Result> {
     if (items.length === 1) {
       return items[0]
     }
-    return firstWorksMerge<Result, HasJob>(this.sources)
+    return firstWorksMerge<Result, HasJob>(items)
   }
 
   start(cb?: (info: HasJob) => void): Promise<never> {

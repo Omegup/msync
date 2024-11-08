@@ -25,10 +25,10 @@ export const mergeIterators = <K extends KEYS, Result, Info extends Record<K, Ha
         mergeIterators<K, Result, Info>({
           sources: patch<Sources, K>(sources, key, result),
           interrupt,
-          select: sources => nextWinner(winner, result.next, sources),
+          select: sources => nextWinner(winner, result.next, sources, interrupt),
         }),
       data: frame.data,
-      info: { key, value: frame.info, job: interrupt?.(key) ? undefined : frame.info.job },
+      info: { key, value: frame.info,  job: frame.info.job },
     }
   }
   // The main `IteratorResult` returned by `mergeItResults`.
