@@ -21,17 +21,21 @@ import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 
+type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
+type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
+
 const executes = <
   q extends O,
   V extends Model,
-  K extends StrKey<V>,
-  Result extends q | OPickD<V, K>,
+  KK extends StrKey<V>,
+  Result extends q | AllowedPick<V, KK>,
 >(
-  view: View<V, K>,
-  input: DeltaStages<q | OPickD<V, K>, OPickD<V, K>, Result>,
+  view: View<V, Allowed<KK>>,
+  input: DeltaStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result>,
   streamName: string,
-): SnapshotStreamExecutionResult<q | OPickD<V, K>, Result> => {
-  type T = OPickD<V, K>
+): SnapshotStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
+  type T = AllowedPick<V, KK>
+  type K = Allowed<KK>
   const { collection, projection, hardMatch, match } = view
   const job = {}
   const db = collection.s.db,
@@ -205,11 +209,11 @@ export interface DeltaHKT extends HKT<O3> {
   readonly out: DeltaStages<I<O3, this>[0], I<O3, this>[1], I<O3, this>[2]>
 }
 
-export const staging = <V extends Model, K extends StrKey<V>>(
-  view: View<V, K>,
+export const staging = <V extends Model, KK extends StrKey<V>>(
+  view: View<V, Allowed<KK>>,
   streamName: string,
-): DeltaPipe<OPickD<V, K>, OPickD<V, K>, SnapshotStreamHKT, DeltaHKT> =>
-  pipe<OPickD<V, K>, OPickD<V, K>, OPickD<V, K>, SnapshotStreamHKT, DeltaHKT>(
+): DeltaPipe<AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT, DeltaHKT> =>
+  pipe<AllowedPick<V, KK>, AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT, DeltaHKT>(
     input => executes(view, input, streamName),
     emptyDelta(),
     concatDelta,

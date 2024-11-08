@@ -28,7 +28,7 @@ export type KDom<
 > = MapKDom<RK, F, K>
 
 export type OPick<V, K extends StrKey<V>, E extends StrKey<V> = never> = O & Pick<V, K | E>
-export type OPickD<V extends Model, K extends StrKey<V>> = OPick<V, K, 'deletedAt'>
+export type OPickD<V extends Model, K extends StrKey<V>> = OPick<V, K, 'deletedAt' | '_id'>
 
 export type View<V extends Model, K extends StrKey<V>> = {
   collection: ReadonlyCollection<V | Del>

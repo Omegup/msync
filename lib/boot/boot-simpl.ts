@@ -14,16 +14,19 @@ import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 
+type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
+type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
 const executes = <
   q extends O,
   V extends Model,
-  K extends StrKey<V>,
-  Result extends q | OPickD<V, K>,
+  KK extends StrKey<V>,
+  Result extends q | AllowedPick<V, KK>,
 >(
-  view: View<V, K>,
-  input: RawStages<q | OPickD<V, K>, OPickD<V, K>, Result, unknown, 1>,
+  view: View<V, Allowed<KK>>,
+  input: RawStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result, unknown, 1>,
   streamName: string,
-): SimpleStreamExecutionResult<q | OPickD<V, K>, Result> => {
+): SimpleStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
+  type K = Allowed<KK>
   const { collection, projection, hardMatch, match } = view
   const job = {}
   const db = collection.s.db,
@@ -33,11 +36,13 @@ const executes = <
     changeStreamPreAndPostImages: { enabled: true },
   })
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
+  type D_ID = 'deletedAt' | '_id'
   // TODO create indexes (if snapshot is in sources)
-  type WithDel = 'deletedAt' | Exclude<K, 'deletedAt'>
+  type WithDel = D_ID | Exclude<K, D_ID>
   const projectInput = $project_<V, WithDel>(
-    spread<RORec<K, 1>, RORec<'deletedAt', 1>, IdHKT>(projection, {
+    spread<RORec<K, 1>, RORec<D_ID, 1>, IdHKT>(projection, {
       deletedAt: ['deletedAt', 1],
+      _id: ['_id', 1],
     }),
   )
   const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
@@ -132,10 +137,13 @@ interface StagesHKT extends HKT<O3> {
 }
 
 const emptyLin = <V>() => ({ lin: link<V, unknown, 1>().stages })
-export const from = <V extends Model, K extends StrKey<V>>(view: View<V, K>, streamName: string) =>
-  pipe<OPickD<V, K>, OPickD<V, K>, OPickD<V, K>, StreamRunnerHKT, StagesHKT>(
+export const from = <V extends Model, KK extends StrKey<V>>(
+  view: View<V, Allowed<KK>>,
+  streamName: string,
+) =>
+  pipe<AllowedPick<V, KK>, AllowedPick<V, KK>, AllowedPick<V, KK>, StreamRunnerHKT, StagesHKT>(
     input => executes(view, input.lin, streamName),
-    { lin: link<OPickD<V, K>, unknown, 1>().stages },
+    { lin: link<AllowedPick<V, KK>, unknown, 1>().stages },
     ({ lin: a }, { lin: b }) => ({ lin: concatStages(a, b) }),
     emptyLin,
   )

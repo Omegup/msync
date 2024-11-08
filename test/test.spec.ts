@@ -41,7 +41,6 @@ export const fillDataNotification = (
       projection: {
         userId: ['userId', 1],
         _data: ['_data', 1],
-        _id: ['_id', 1],
         type: ['type', 1],
       },
     },
@@ -53,7 +52,6 @@ export const fillDataNotification = (
           {
             collection: users,
             projection: {
-              _id: ['_id', 1],
               firstName: ['firstName', 1],
               email: ['email', 1],
               lastName: ['lastName', 1],
@@ -134,7 +132,6 @@ export const fillDataNotification2 = (
       projection: {
         userId: ['userId', 1],
         _data: ['_data', 1],
-        _id: ['_id', 1],
         type: ['type', 1],
       },
     },
@@ -146,7 +143,6 @@ export const fillDataNotification2 = (
           {
             collection: users,
             projection: {
-              _id: ['_id', 1],
               firstName: ['firstName', 1],
               email: ['email', 1],
               lastName: ['lastName', 1],
