@@ -1,4 +1,4 @@
-import type { Arr, HKT, I, N, O, StrKey, Type, notArr, rawItem } from '../../types'
+import type { Arr, HKT, I, N, O, StrKey, Type, rawItem } from '../../types'
 import { Field, type Path } from '../field'
 import type { Expr } from '../types'
 import { mapExactToObject1, type MapK } from '../utils/map-object'
@@ -41,7 +41,7 @@ export const weaken = <R, T, V, C = unknown>(
   updater: Updater<R, T, V, C>,
 ): Updater<R, T | null, V | null, C> => ({ raw: f => updater.raw(f) })
 
-export const to = <R, V, C = unknown>(expr: Expr<V, R, C>): Updater<R, notArr, V, C> => ({
+export const to = <R, V, C = unknown>(expr: Expr<V, R, C>): Updater<R, unknown, V, C> => ({
   raw: f => [['', expr.raw(f).get()]],
 })
 export const items = <R, T, V, C = unknown>(x: Updater<R, T, V, C>) =>
