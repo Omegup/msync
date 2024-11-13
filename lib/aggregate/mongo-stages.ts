@@ -1,8 +1,7 @@
-import type { Arr, IdHKT, O, StrKey } from '../../types'
+import type { Arr, IdHKT, O } from '../../types'
 import { root } from '../field'
 import type { Accumulators, Expr, LookupArgs, Query } from '../types'
 import type { Updater } from '../update'
-import type { ExactKeys } from '../utils/map-object'
 import {
   $documents1,
   $group1,
@@ -37,8 +36,7 @@ export const $group_ =
 export const $documents_ = <T extends O, C>(docs: Expr<Arr<T>, unknown, C>) =>
   $documents1(docs)<IdHKT<O>>(root)
 
-export const $project_ = <T extends O, K extends StrKey<T>>(projection: ExactKeys<K>) =>
-  $project1<T, K>(projection)<IdHKT<O>>(root)
+export const $project_ = $project1
 
 export const $simpleLookup_ = <T extends O, U extends O, R, K extends s, Ctx, C = unknown>(
   args: LookupArgs<T, U, R, K, Ctx, C>,

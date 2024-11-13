@@ -51,16 +51,14 @@ export const $set1 =
       },
     ])
 
-export const $project1 =
-  <T extends O, K extends StrKey<T>>(projection: ExactKeys<K>): FRawStages<T, T, T, unknown, 1> =>
-  f =>
-    asStages([
-      {
-        $project: mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<string>>(projection, (_, k) =>
-          f<T>().of(k).str(),
-        ),
-      },
-    ])
+export const $project1 = <T extends O, K extends StrKey<T>>(
+  projection: ExactKeys<K>,
+): RawStages<T, T, T, unknown, 1> =>
+  asStages([
+    {
+      $project: mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<1>>(projection, () => 1),
+    },
+  ])
 
 export const $replaceWith1 =
   <T extends O, V extends O, C = unknown>(expr: Expr<V, T, C>): FRawStages<O, T, V, C, 1> =>
