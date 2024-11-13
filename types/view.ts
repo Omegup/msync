@@ -36,7 +36,3 @@ export type View<V extends Model, K extends StrKey<V>> = {
   match?: Query<OPickD<V, K>>
   hardMatch?: Query<V>
 }
-
-const erger = <V, K extends KDom<K, StrKey<V>>>(v: V, k: K) => {}
-
-erger({ a: 3, v: 4 }, { a: ['a', 1], v: ['v', 1], zef: ['a', 5] })
