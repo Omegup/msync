@@ -1,4 +1,4 @@
-import type { Arr, HKT, I, N, O, StrKey, Type, rawItem } from '../../types'
+import type { Arr, HKT, I, N, O, StrKey, Type, notArr, rawItem } from '../../types'
 import { Field, type Path } from '../field'
 import type { Expr } from '../types'
 import { mapExactToObject1, type MapK } from '../utils/map-object'
@@ -26,9 +26,9 @@ export type Get<T, P extends string, K extends keyof T = never> = P extends K
 
 export const set =
   <V>() =>
-  <R, Old, C = unknown, K extends keyof Old = never>(
+  <R, Old extends notArr, C = unknown, K extends keyof Old = never>(
     fields: MapK<StrKey<V>, UpdaterHKT<R, Old, V, C, K>>,
-  ): Updater<R, Old, Omit<Old, StrKey<V>> & V, C> => ({
+  ): Updater<R, Old, Omit<Old, StrKey<V>> & V, C> & Updater<R, Arr<Old>, Arr<Omit<Old, StrKey<V>> & V>, C> => ({
     raw: f => {
       type U = UpdaterHKT<R, Old, V, C, K>
       return Object.entries(mapExactToObject1<StrKey<V>, U, U>(fields, v => v)).flatMap(([k, v]) =>

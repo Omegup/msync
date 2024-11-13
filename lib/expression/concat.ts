@@ -85,5 +85,5 @@ export const fieldF =
         ),
     })
 export const field: <T extends object, D, C = unknown>(
-  exprs: ExprsExact<T, D, C, IdHKT<unknown>>,
+  exprs: ExprsExact<T, D, C>,
 ) => Expr<O<T>, D, C> = fieldF<IdHKT>()

@@ -3,14 +3,17 @@ import { $merge } from '../lib/aggregate/$merge'
 import { $replaceWith, $set } from '../lib/aggregate/set'
 import { staging } from '../lib/boot'
 import { $mergeObjects } from '../lib/expression/array'
-import { concat, field } from '../lib/expression/concat'
+import { concat, field, str } from '../lib/expression/concat'
 import { exprMapVal } from '../lib/expression/logic'
+import { $map, $map1 } from '../lib/expression/range'
 import { val } from '../lib/expression/val'
 import { root } from '../lib/field'
 import { $lookup } from '../lib/stream/$lookup'
-import type { Model } from '../lib/types'
-import type { O, OPick, Rec, StrKey, notArr } from '../types'
-import { to } from '../lib/update'
+import type { Model, TS } from '../lib/types'
+import { set, to } from '../lib/update'
+import type { Arr, O, OPick, Rec, StrKey, WriteonlyCollection, doc, notArr } from '../types'
+import { $groupMerge } from '../lib/aggregate/group'
+import { $sum } from '../lib/accumulators'
 
 type NotificationType = 'invoice' | 'payment'
 type Notification = {
@@ -203,3 +206,35 @@ export const fillDataNotification2 = (
       }),
     )
 }
+
+type WithRange = doc & Rec<'item', Arr<number>>
+
+$set<Rec<'item', Arr<doc>>>()({
+  item: [
+    'item',
+    to($map(root<WithRange>().of('item').expr(), item => field({ _id: ['_id', str(item)] }))),
+  ],
+})
+
+type T = doc & Rec<'item', Arr<Rec<'x', number>>>
+
+$set<Rec<'item', Arr<Rec<'x', Arr<string>>>>>()({
+  item: [
+    'item',
+    set<Rec<'x', Arr<string>>>()({
+      x: ['x', to($map1(root<T>().of('item').expr(), item => str(item.of('x').expr())))],
+    }),
+  ],
+})
+
+type Source = O<{ x: number; id: string }>
+const collection: WriteonlyCollection<TS & doc & { x: number }> = null!
+$groupMerge<Source, string, O<{ x: number }>, '_id'>(
+  root<Source>().of('id').expr(),
+  {
+    x: ['x', $sum(root<Source>().of('x').expr())],
+  },
+  collection,
+  '_id',
+  (ts, gid) => ({ ...ts, _id: ['_id', gid('_id')] }),
+)

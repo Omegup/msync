@@ -1,6 +1,5 @@
 import type { App, HKT, WriteonlyCollection } from '../../../types'
 import type { AsLiteral, ID, O, RORec, Rec, notArr } from '../../../types/json'
-import { $sum } from '../../accumulators'
 import { mergeExpr, type ExprsExact, type ExprsExactHKT } from '../../expression/concat'
 import { root } from '../../field'
 import type { Delta, DeltaAccumulators, Expr, RawStages, TS } from '../../types'
@@ -47,14 +46,3 @@ export const $groupMerge = <T extends O, Grp extends notArr, V extends O, GG ext
     .with<unknown, 'out'>(subMerge<T, Grp, V, GG>(args, out, gid, group)).stages
 }
 
-type Source = O<{ x: number; id: string }>
-const collection: WriteonlyCollection<TS & ID & Rec<'_grp', string> & O<{ x: number }>> = null!
-$groupMerge<Source, string, O<{ x: number }>, '_grp'>(
-  root<Source>().of('id').expr(),
-  {
-    x: ['x', $sum(root<Source>().of('x').expr())],
-  },
-  collection,
-  '_grp',
-  (ts, gid) => ({ ...ts, _grp: ['_grp', gid('_grp')] }),
-)

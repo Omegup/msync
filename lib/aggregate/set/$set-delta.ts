@@ -42,7 +42,7 @@ export const $setDelta = <T extends O, V extends doc, C = unknown>(
           )
           .with<unknown, V>($set_(updater))
           .with<unknown, O & { readonly _id: string; readonly docs: Arr<V> }>(
-            $group_<Rec<'docs', Arr<V>>>()(val(''), {
+            $group_<Rec<'docs', Arr<V>>>()<'', V>(val(''), {
               docs: ['docs', $push(root<V>().expr())],
             }),
           )

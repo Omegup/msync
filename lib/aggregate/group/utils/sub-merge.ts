@@ -26,7 +26,8 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
   ) => Exact<TS & ID & RORec<GI<GG>, Grp>, F>,
 ): RawStages<unknown, Rec<GI<GG>, Grp> & Omit<VV, Not<GI<GG>>>, 'out'> => {
   type GID = GI<GG>
-  type Out = TS & ID & Rec<GID, Grp> & V
+  type V_Grp = Rec<GID, Grp> & V
+  type Out = TS & ID & V_Grp
   type Denied = No | GID
   type V = Omit<VV, Denied>
   type Ctx = RORec<'new', Out>
@@ -44,8 +45,8 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
       vars: { new: ['new', root<Out>().expr()] },
       whenMatched: $replaceWith_(field(x)),
     })
-  interface GetFromVHKT extends HKT<keyof (Rec<GID, Grp> & V)> {
-    readonly out: (Rec<GID, Grp> & V)[I<keyof (Rec<GID, Grp> & V), this>]
+  interface GetFromVHKT extends HKT<keyof (V_Grp)> {
+    readonly out: (V_Grp)[I<keyof (V_Grp), this>]
   }
 
   const eq = <K extends Denied>(): Equal<
@@ -56,7 +57,7 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
   interface UpdaterTF<V> extends HKT {
     readonly out: Updater<unknown, I<unknown, this>, V>
   }
-  type UpdaterT<E> = Updater<Rec<GID, Grp> & V, Rec<GID, Grp> & V, O & TS & ID & E>
+  type UpdaterT<E> = Updater<V_Grp, V_Grp, O & TS & ID & E>
   interface UpdaterVF<E> extends HKT {
     readonly out: UpdaterT<E & I<unknown, this>>
   }
@@ -64,7 +65,7 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
     readonly out: UpdaterT<RORec<GID, Grp> & Pick<VV, I<keyof VV, this>>>
   }
 
-  const patch = set<TS & ID>()<Rec<GID, Grp> & V, Rec<GID, Grp> & V>({
+  const patch:Updater<V_Grp, V_Grp, O & TS & ID & Omit<V_Grp, No>> = set<TS & ID>()<V_Grp, V_Grp>({
     touchedAt: ['touchedAt', to(now)],
     _id: ['_id', eq<'_id'>().backward<UpdaterTF<string>>(to($rand))],
   })
@@ -74,9 +75,9 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
 
   const omit1 = omitRORec<GG, never, No, Grp>()
   const exclude = excludeIdem<keyof VV, No | GID, No>()
-  return link<Rec<GID, Grp> & V>()
+  return link<V_Grp>()
     .with<unknown, Out>(
-      addTS<Rec<GID, Grp> & V, TS & ID & Rec<GID, Grp> & V>(
+      addTS<V_Grp, TS & ID & V_Grp>(
         exclude.backward<UpdaterKF>(omit1.backward<UpdaterVF<Omit<V, No>>>(patch as any) as any),
       ),
     )
@@ -102,3 +103,6 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
       ),
     ).stages
 }
+
+
+
