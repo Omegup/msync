@@ -13,7 +13,7 @@ import { $replaceWith_, $set_ } from '../../mongo-stages'
 import { $merge_ } from '../../out'
 import { link } from '../../prefix'
 
-type GI<GG> = Exclude<GG, No>
+type GI<GG> = Exclude<GG, keyof TS>
 type Not<GID> = No | GID
 type No = keyof (TS & ID)
 export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG extends string>(
@@ -77,7 +77,7 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
   return link<Rec<GID, Grp> & V>()
     .with<unknown, Out>(
       addTS<Rec<GID, Grp> & V, TS & ID & Rec<GID, Grp> & V>(
-        exclude.backward<UpdaterKF>(omit1.backward<UpdaterVF<Omit<V, No>>>(patch)),
+        exclude.backward<UpdaterKF>(omit1.backward<UpdaterVF<Omit<V, No>>>(patch as any) as any),
       ),
     )
     .with<unknown, 'out'>(

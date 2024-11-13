@@ -1,8 +1,9 @@
 import type { App, HKT, WriteonlyCollection } from '../../../types'
 import type { AsLiteral, ID, O, RORec, Rec, notArr } from '../../../types/json'
+import { $sum } from '../../accumulators'
 import { mergeExpr, type ExprsExact, type ExprsExactHKT } from '../../expression/concat'
 import { root } from '../../field'
-import type { DeltaAccumulators, Delta, Expr, RawStages, TS } from '../../types'
+import type { Delta, DeltaAccumulators, Expr, RawStages, TS } from '../../types'
 import { omitPick } from '../../utils/guard'
 import { map1 } from '../../utils/json'
 import type { Exact } from '../../utils/map-object'
@@ -25,8 +26,7 @@ const addGrp =
       ),
     )
   }
-type GI<GG> = Exclude<GG, No>
-type No = keyof (TS & ID)
+type GI<GG> = Exclude<GG, keyof TS>
 
 export const $groupMerge = <T extends O, Grp extends notArr, V extends O, GG extends string>(
   id: Expr<Grp, T>,
@@ -46,3 +46,15 @@ export const $groupMerge = <T extends O, Grp extends notArr, V extends O, GG ext
     )
     .with<unknown, 'out'>(subMerge<T, Grp, V, GG>(args, out, gid, group)).stages
 }
+
+type Source = O<{ x: number; id: string }>
+const collection: WriteonlyCollection<TS & ID & Rec<'_grp', string> & O<{ x: number }>> = null!
+$groupMerge<Source, string, O<{ x: number }>, '_grp'>(
+  root<Source>().of('id').expr(),
+  {
+    x: ['x', $sum(root<Source>().of('x').expr())],
+  },
+  collection,
+  '_grp',
+  (ts, gid) => ({ ...ts, _grp: ['_grp', gid('_grp')] }),
+)
