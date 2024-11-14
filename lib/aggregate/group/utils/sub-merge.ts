@@ -12,6 +12,7 @@ import { mapExact, type Exact } from '../../../utils/map-object'
 import { $replaceWith_, $set_ } from '../../mongo-stages'
 import { $merge_ } from '../../out'
 import { link } from '../../prefix'
+import { $set } from '../../set'
 
 type GI<GG> = Exclude<GG, keyof TS>
 type Not<GID> = No | GID
@@ -43,7 +44,7 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
       on,
       whenNotMatched: 'insert',
       vars: { new: ['new', root<Out>().expr()] },
-      whenMatched: $replaceWith_(field(x)),
+      whenMatched: $set_(set()(x)),
     })
   interface GetFromVHKT extends HKT<keyof V_Grp> {
     readonly out: V_Grp[I<keyof V_Grp, this>]
@@ -79,17 +80,19 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
       replaceWithOut(
         mergeExpr<VV, TS & ID & RORec<GID, Grp>, Out, Ctx, O>(
           mapExact<V, DeltaAccumulatorHKT<T>, ExprHKT<Out, Ctx>>(args, (v, k) =>
-            v.sum<Out, Ctx>(
-              $ifNull(root<O<V>>().of(k).expr(), v.zero),
-              $ifNull(ctx<O<V>>()('new').of(k).expr(), v.zero),
+            to(
+              v.sum<Out, Ctx>(
+                $ifNull(root<O<V>>().of(k).expr(), v.zero),
+                $ifNull(ctx<O<V>>()('new').of(k).expr(), v.zero),
+              ),
             ),
           ),
           group(
             {
               _id: ['_id', to($rand)],
-              touchedAt: ['touchedAt', now],
+              touchedAt: ['touchedAt', to(now)],
             },
-            gid => root<Out>().of(gid).expr(),
+            gid => to(root<Out>().of(gid).expr()),
           ),
         ),
         out,
