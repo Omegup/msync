@@ -67,7 +67,6 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
   }
 
   const patch: Updater<V_Grp, V_Grp, O & TS & ID & Omit<V_Grp, No>> = set<TS & ID>()<V_Grp, V_Grp>({
-    touchedAt: ['touchedAt', to(now)],
     _id: ['_id', eq<'_id'>().backward<UpdaterTF<string>>(to($rand))],
   })
 
@@ -75,7 +74,7 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
     $set_<unknown, V, Out>(patch)
 
   return link<V_Grp>()
-    .with<unknown, Out>([])
+    .with<unknown, Out>(addTS<V_Grp, TS & ID & V_Grp>(patch as any))
     .with<unknown, 'out'>(
       replaceWithOut(
         mergeExpr<VV, TS & ID & RORec<GID, Grp>, Out, Ctx, O>(
@@ -89,7 +88,7 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
           ),
           group(
             {
-              _id: ['_id', to($rand)],
+              _id: ['_id', to(root<Out>().of('_id').expr())],
               touchedAt: ['touchedAt', to(now)],
             },
             gid => to(root<Out>().of(gid).expr()),
