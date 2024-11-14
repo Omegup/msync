@@ -45,8 +45,8 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
       vars: { new: ['new', root<Out>().expr()] },
       whenMatched: $replaceWith_(field(x)),
     })
-  interface GetFromVHKT extends HKT<keyof (V_Grp)> {
-    readonly out: (V_Grp)[I<keyof (V_Grp), this>]
+  interface GetFromVHKT extends HKT<keyof V_Grp> {
+    readonly out: V_Grp[I<keyof V_Grp, this>]
   }
 
   const eq = <K extends Denied>(): Equal<
@@ -65,7 +65,7 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
     readonly out: UpdaterT<RORec<GID, Grp> & Pick<VV, I<keyof VV, this>>>
   }
 
-  const patch:Updater<V_Grp, V_Grp, O & TS & ID & Omit<V_Grp, No>> = set<TS & ID>()<V_Grp, V_Grp>({
+  const patch: Updater<V_Grp, V_Grp, O & TS & ID & Omit<V_Grp, No>> = set<TS & ID>()<V_Grp, V_Grp>({
     touchedAt: ['touchedAt', to(now)],
     _id: ['_id', eq<'_id'>().backward<UpdaterTF<string>>(to($rand))],
   })
@@ -73,14 +73,8 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
   const addTS = <V extends O, Out extends O>(patch: Updater<V, V, Out>) =>
     $set_<unknown, V, Out>(patch)
 
-  const omit1 = omitRORec<GG, never, No, Grp>()
-  const exclude = excludeIdem<keyof VV, No | GID, No>()
   return link<V_Grp>()
-    .with<unknown, Out>(
-      addTS<V_Grp, TS & ID & V_Grp>(
-        exclude.backward<UpdaterKF>(omit1.backward<UpdaterVF<Omit<V, No>>>(patch as any) as any),
-      ),
-    )
+    .with<unknown, Out>([])
     .with<unknown, 'out'>(
       replaceWithOut(
         mergeExpr<VV, TS & ID & RORec<GID, Grp>, Out, Ctx, O>(
@@ -92,7 +86,7 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
           ),
           group(
             {
-              _id: ['_id', root<Out>().of('_id').expr()],
+              _id: ['_id', to($rand)],
               touchedAt: ['touchedAt', now],
             },
             gid => root<Out>().of(gid).expr(),
@@ -103,6 +97,3 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
       ),
     ).stages
 }
-
-
-
