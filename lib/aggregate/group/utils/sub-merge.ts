@@ -35,7 +35,7 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
 
   return link<V_Grp>()
     .with<unknown, Out>(
-      set()(addGrp({ _id: ['_id', to($rand)] }, gid => to(root<Out>().of(gid).expr()))),
+      $set_(set()(addGrp({ _id: ['_id', to($rand)] }, gid => to(root<Out>().of(gid).expr())))),
     )
     .with<unknown, 'out'>(
       $merge_<Out, Out, RORec<'new', Out>>({
