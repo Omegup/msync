@@ -5,7 +5,7 @@ import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-sta
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
 import { field } from '../expression/concat'
-import { $ifNull, ite } from '../expression/logic'
+import { $ifNull, ite, ne } from '../expression/logic'
 import { nil, val } from '../expression/val'
 import { root } from '../field'
 import { $eq, $gteTs, $ne } from '../predicate'
@@ -20,6 +20,8 @@ import { log } from '../utils/log'
 import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
+import { $expr } from '../predicate/$expr'
+import crypto from 'crypto'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -32,8 +34,15 @@ const executes = <
 >(
   view: View<V, Allowed<KK>>,
   input: DeltaStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result>,
-  streamName: string,
+  _streamName: string,
 ): SnapshotStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
+  const streamName =
+    _streamName +
+    '-' +
+    crypto
+      .createHash('md5')
+      .update(new Error().stack + '')
+      .digest('base64url')
   type T = AllowedPick<V, KK>
   type K = Allowed<KK>
   const { collection, projection, hardMatch, match } = view
@@ -160,7 +169,16 @@ const executes = <
           coll: snapshotCollection,
           input: link<UDelta<T>>().stages,
           exec: link<UDelta<T>>()
-            .with($match_(root<UDelta<T>>().of('updated').has($eq<boolean>(true))))
+            .with(
+              $match_(
+                $and(
+                  root<UDelta<T>>().of('updated').has($eq<boolean>(true)),
+                  $expr(
+                    ne(root<UDelta<T>>().of('after').expr())(root<UDelta<T>>().of('before').expr()),
+                  ),
+                ),
+              ),
+            )
             .with(
               $set_<UDelta<T>, UDelta<T>, UDelta<T> & Delta<T>>(
                 set<Before<T | null>>()({
