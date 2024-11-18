@@ -1,4 +1,4 @@
-import type { ChangeStream, Timestamp } from 'mongodb'
+import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
 import type { O2, O3, N, O, OPickD, RORec, StrKey, View } from '../../types'
 import type { HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
@@ -44,8 +44,44 @@ const executes = <
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
   })
+  collection
+    .createIndex(
+      { touchedAt: 1 },
+      hardMatch
+        ? {
+            partialFilterExpression: hardMatch,
+            name: 'touchedAt_hard_' + new UUID().toString('base64'),
+          }
+        : {},
+    )
+    .catch(e => {
+      e.code == 85 || e.code == 86 || console.error(e)
+    })
+
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
+  snapshotCollection
+    .createIndex(
+      { updated: 1 },
+      {
+        partialFilterExpression: { updated: true },
+        name: 'updated_' + new UUID().toString('base64'),
+      },
+    )
+    .catch(e => {
+      e.code == 85 || console.error(e)
+    })
+  snapshotCollection
+    .createIndex(
+      { updated: 1 },
+      {
+        partialFilterExpression: { updated: true, after: null, before: null },
+        name: 'updated_nulls_' + new UUID().toString('base64'),
+      },
+    )
+    .catch(e => {
+      e.code == 85 || console.error(e)
+    })
   // TODO create indexes (if snapshot is in sources)
   type WithDel = 'deletedAt' | '_id' | Exclude<K, 'deletedAt' | '_id'>
   const projectInput = $project_<V, WithDel>(
@@ -114,8 +150,10 @@ const executes = <
       return next(step4(r), 'run the aggregation')
     }
 
+    type C = Pick<ChangeStream, 'close' | 'tryNext'>
+
     // Step 4 : run the aggregation // idempotent
-    const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
+    const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt)
     const step4 = (result: AggregateCommand<'out'>) => async (): Next => {
       const aggResult = await aggregate<Result2>(c =>
         c<UDelta<T>, UDelta<T>>({
@@ -150,7 +188,7 @@ const executes = <
     type L = {
       aggResult: AggregateCommand<Result2>
       result: AggregateCommand<'out'>
-      stream: ChangeStream
+      stream: C
     }
 
     // Step 6 : update snapshot aggregation

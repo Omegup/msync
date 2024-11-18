@@ -1,4 +1,4 @@
-import type { Db } from 'mongodb'
+import type { Collection, Db } from 'mongodb'
 import type { Del, Model, Query } from '../lib/types'
 import type { ExactKeys, MapKDom } from '../lib/utils/map-object'
 import type { ConstHKT, HKT } from './hkt'
@@ -10,6 +10,7 @@ interface CommonCollection {
   collectionName: string
   namespace: string
   dbName: string
+  createIndex: Collection['createIndex']
 }
 
 export interface ReadonlyCollection<out T> extends CommonCollection {

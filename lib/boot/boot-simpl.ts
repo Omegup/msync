@@ -1,4 +1,4 @@
-import type { ChangeStream, Timestamp } from 'mongodb'
+import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
 import type { O2, O3, N, O, OPickD, RORec, StrKey, View } from '../../types'
 import type { HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
@@ -35,6 +35,17 @@ const executes = <
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
   })
+  collection
+    .createIndex(
+      { touchedAt: 1 },
+      {
+        partialFilterExpression: { deletedAt: { $eq: null } },
+        name: 'touchedAt_' + new UUID().toString('base64'),
+      },
+    )
+    .catch(e => {
+      e.code == 85 || console.error(e)
+    })
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   type D_ID = 'deletedAt' | '_id'
   // TODO create indexes (if snapshot is in sources)
@@ -71,8 +82,9 @@ const executes = <
     const step1 = (): Next =>
       last.findOne({ _id: streamName }).then(ts => next(step4(ts), 'clone into new collection'))
 
+    type C = Pick<ChangeStream, 'close' | 'tryNext'>
     // Step 4 : run the aggregation // idempotent
-    const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
+    const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const hardQuery: Query<V> | undefined = $and(
         lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
@@ -101,7 +113,7 @@ const executes = <
     type L = {
       aggResult: AggregateCommand<Result2>
       result: AggregateCommand<Result2>
-      stream: ChangeStream
+      stream: C
     }
 
     // Step 7 : update __last

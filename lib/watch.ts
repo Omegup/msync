@@ -23,7 +23,7 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
   { collection, match, projection: p, hardMatch }: View<V, K>,
   startAt: Timestamp,
 ) => {
-  const projection = mapExactToObject(p, v=>v)
+  const projection = mapExactToObject(p, v => v)
   const pipeline: BSON.Document[] = [
     { $match: { $or: changeKeys.map(k => ({ [k]: { $ne: null } })) } },
   ]
@@ -47,9 +47,15 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
     $match: { $expr: { $ne: ['$fullDocument', '$fullDocumentBeforeChange'] } },
   })
 
-  return db.collection(collection.collectionName).watch(pipeline, {
+  const stream = db.collection(collection.collectionName).watch(pipeline, {
     fullDocument: 'required',
     fullDocumentBeforeChange: 'required',
     startAtOperationTime: startAt,
   })
+  const tryNext = async () => {
+    const doc = await stream.tryNext()
+    if (doc) await new Promise(resolve => setTimeout(resolve, 100))
+    return doc
+  }
+  return { tryNext, close: () => stream.close() }
 }
