@@ -84,6 +84,11 @@ export const $mergeObjects = <T1, T2, D, C = unknown>(
     raw: f => asExprRaw({ $mergeObjects: exprs.map(x => x.raw(f).get()) }),
   })
 
+export const $in = <T, D, C = unknown>(...exprs: readonly [Expr<T, D, C>, Expr<Arr<T>, D, C>]) =>
+  asExpr<boolean, D, C>({
+    raw: f => asExprRaw({ $in: exprs.map(x => x.raw(f).get()) }),
+  })
+
 export const $except = <T, D, C>(a: Expr<Arr<T>, D, C>, b: Expr<Arr<T>, D, C>) =>
   asExpr<Arr<T>, D, C>({
     raw: f =>
