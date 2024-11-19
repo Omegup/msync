@@ -1,4 +1,4 @@
-import type { Arr, doc, O, Rec, RORec } from '../../../types'
+import type { Arr, AsLiteral, doc, O, Rec, RORec } from '../../../types'
 import { $mergeObjects } from '../../expression/array'
 import { field, fieldM } from '../../expression/concat'
 import { root } from '../../field'
@@ -14,7 +14,7 @@ type s = string
 type LR<T, U> = O<{ readonly left: T; readonly right: U }>
 
 export const $unwind = <T extends doc, K extends s, U extends doc>(
-  k: K,
+  k: AsLiteral<K>,
   dict: RORec<K, 'key'>,
 ): DeltaStages<T, T & Rec<K, Arr<U>>, T & Rec<K, U>> => ({
   delta: link<Delta<T & Rec<K, Arr<U>>>>()
