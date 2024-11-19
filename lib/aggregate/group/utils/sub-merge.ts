@@ -12,6 +12,7 @@ import { mapExact, type Exact } from '../../../utils/map-object'
 import { $replaceWith_, $set_ } from '../../mongo-stages'
 import { $merge_ } from '../../out'
 import { link } from '../../prefix'
+import { $set } from '../../set'
 
 type GI<GG> = Exclude<GG, keyof TS>
 type Not<GID> = No | GID
@@ -20,7 +21,7 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
   args: DeltaAccumulators<T, Omit<VV, Not<GI<GG>>>>,
   out: WriteonlyCollection<TS & ID & Rec<GI<GG>, Grp> & Omit<VV, Not<GI<GG>>>>,
   gid: GI<GG>,
-  group: <F extends HKT>(
+  addGrp: <F extends HKT>(
     ts: Exact<TS & ID, F>,
     gid: (gid: GI<GG>) => App<F, Grp>,
   ) => Exact<TS & ID & RORec<GI<GG>, Grp>, F>,
@@ -32,77 +33,38 @@ export const subMerge = <T extends O, Grp extends notArr, VV extends O, GG exten
   type V = Omit<VV, Denied>
   type Ctx = RORec<'new', Out>
 
-  const replaceWithOut = <Out extends O>(
-    x: ExprsExact<Out, Out, RORec<'new', Out>, IdHKT>,
-    out: WriteonlyCollection<Out>,
-    on: Field<Out, Grp, unknown>,
-  ) =>
-    $merge_<Out, Out, RORec<'new', Out>>({
-      stages: 'ctx',
-      into: out,
-      on,
-      whenNotMatched: 'insert',
-      vars: { new: ['new', root<Out>().expr()] },
-      whenMatched: $replaceWith_(field(x)),
-    })
-  interface GetFromVHKT extends HKT<keyof (V_Grp)> {
-    readonly out: (V_Grp)[I<keyof (V_Grp), this>]
-  }
-
-  const eq = <K extends Denied>(): Equal<
-    unknown,
-    K extends (keyof O | GID) | Exclude<keyof VV, Denied | K> ? App<GetFromVHKT, K> : undefined,
-    K extends keyof O | GID ? App<GetFromVHKT, K> : undefined
-  > => notExtendExcluded<K, keyof O | GID, keyof VV, Denied, GetFromVHKT, undefined>()
-  interface UpdaterTF<V> extends HKT {
-    readonly out: Updater<unknown, I<unknown, this>, V>
-  }
-  type UpdaterT<E> = Updater<V_Grp, V_Grp, O & TS & ID & E>
-  interface UpdaterVF<E> extends HKT {
-    readonly out: UpdaterT<E & I<unknown, this>>
-  }
-  interface UpdaterKF extends HKT<keyof VV> {
-    readonly out: UpdaterT<RORec<GID, Grp> & Pick<VV, I<keyof VV, this>>>
-  }
-
-  const patch:Updater<V_Grp, V_Grp, O & TS & ID & Omit<V_Grp, No>> = set<TS & ID>()<V_Grp, V_Grp>({
-    touchedAt: ['touchedAt', to(now)],
-    _id: ['_id', eq<'_id'>().backward<UpdaterTF<string>>(to($rand))],
-  })
-
-  const addTS = <V extends O, Out extends O>(patch: Updater<V, V, Out>) =>
-    $set_<unknown, V, Out>(patch)
-
-  const omit1 = omitRORec<GG, never, No, Grp>()
-  const exclude = excludeIdem<keyof VV, No | GID, No>()
   return link<V_Grp>()
     .with<unknown, Out>(
-      addTS<V_Grp, TS & ID & V_Grp>(
-        exclude.backward<UpdaterKF>(omit1.backward<UpdaterVF<Omit<V, No>>>(patch as any) as any),
-      ),
+      $set_(set()(addGrp({ _id: ['_id', to($rand)] }, gid => to(root<Out>().of(gid).expr())))),
     )
     .with<unknown, 'out'>(
-      replaceWithOut(
-        mergeExpr<VV, TS & ID & RORec<GID, Grp>, Out, Ctx, O>(
-          mapExact<V, DeltaAccumulatorHKT<T>, ExprHKT<Out, Ctx>>(args, (v, k) =>
-            v.sum<Out, Ctx>(
-              $ifNull(root<O<V>>().of(k).expr(), v.zero),
-              $ifNull(ctx<O<V>>()('new').of(k).expr(), v.zero),
+      $merge_<Out, Out, RORec<'new', Out>>({
+        stages: 'ctx',
+        into: out,
+        on: root<Out>().of(gid),
+        whenNotMatched: 'insert',
+        vars: { new: ['new', root<Out>().expr()] },
+        whenMatched: $set_(
+          set()(
+            mergeExpr<VV, TS & ID & RORec<GID, Grp>, Out, Ctx, O>(
+              mapExact<V, DeltaAccumulatorHKT<T>, ExprHKT<Out, Ctx>>(args, (v, k) =>
+                to(
+                  v.sum<Out, Ctx>(
+                    $ifNull(root<O<V>>().of(k).expr(), v.zero),
+                    $ifNull(ctx<O<V>>()('new').of(k).expr(), v.zero),
+                  ),
+                ),
+              ),
+              addGrp(
+                {
+                  _id: ['_id', to(root<Out>().of('_id').expr())],
+                  touchedAt: ['touchedAt', to(now)],
+                },
+                gid => to(root<Out>().of(gid).expr()),
+              ),
             ),
           ),
-          group(
-            {
-              _id: ['_id', root<Out>().of('_id').expr()],
-              touchedAt: ['touchedAt', now],
-            },
-            gid => root<Out>().of(gid).expr(),
-          ),
         ),
-        out,
-        root<Out>().of(gid),
-      ),
+      }),
     ).stages
 }
-
-
-

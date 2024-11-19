@@ -84,43 +84,63 @@ export const $mergeObjects = <T1, T2, D, C = unknown>(
     raw: f => asExprRaw({ $mergeObjects: exprs.map(x => x.raw(f).get()) }),
   })
 
-  export const $except = <T, D, C>(a: Expr<Arr<T>, D, C>, b: Expr<Arr<T>, D, C>) =>
-    asExpr<Arr<T>, D, C>({
-      raw: f => asExprRaw({
-        $reduce: {
-          input: a.raw(f).get(), // The input array you want to iterate
-          initialValue: { out: [], except: b.raw(f).get() }, // The initial value of the accumulator
-          in: {
-            $let: {
-              vars: {
-                currentElem: "$$this",
-                currentExcept: "$$value.except",
-                indexInExcept: {
-                  $indexOfArray: ["$$value.except", "$$this"]
-                }
-              },
-              in: {
-                $cond: [
-                  { $gte: ["$$indexInExcept", 0] }, // If element is in 'except'
-                  {
-                    // Remove it from 'except'
-                    out: "$$value.out",
-                    except: {
-                      $concatArrays: [
-                        { $cond: [{ $eq: ["$$indexInExcept", 0] }, [], {$slice: ["$$currentExcept", 0, "$$indexInExcept"] }]},
-                        { $slice: ["$$currentExcept", { $add: ["$$indexInExcept", 1] }, { $size: "$$currentExcept" }] }
-                      ]
-                    }
+export const $except = <T, D, C>(a: Expr<Arr<T>, D, C>, b: Expr<Arr<T>, D, C>) =>
+  asExpr<Arr<T>, D, C>({
+    raw: f =>
+      asExprRaw({
+        $let: {
+          vars: {
+            res: {
+              $reduce: {
+                input: a.raw(f).get(), // The input array you want to iterate
+                initialValue: { out: [], except: b.raw(f).get() }, // The initial value of the accumulator
+                in: {
+                  $let: {
+                    vars: {
+                      currentElem: '$$this',
+                      currentExcept: '$$value.except',
+                      indexInExcept: {
+                        $indexOfArray: ['$$value.except', '$$this'],
+                      },
+                    },
+                    in: {
+                      $cond: [
+                        { $gte: ['$$indexInExcept', 0] }, // If element is in 'except'
+                        {
+                          // Remove it from 'except'
+                          out: '$$value.out',
+                          except: {
+                            $concatArrays: [
+                              {
+                                $cond: [
+                                  { $eq: ['$$indexInExcept', 0] },
+                                  [],
+                                  { $slice: ['$$currentExcept', 0, '$$indexInExcept'] },
+                                ],
+                              },
+                              {
+                                $slice: [
+                                  '$$currentExcept',
+                                  { $add: ['$$indexInExcept', 1] },
+                                  { $size: '$$currentExcept' },
+                                ],
+                              },
+                            ],
+                          },
+                        },
+                        {
+                          // Add it to 'out'
+                          out: { $concatArrays: ['$$value.out', ['$$currentElem']] },
+                          except: '$$value.except',
+                        },
+                      ],
+                    },
                   },
-                  {
-                    // Add it to 'out'
-                    out: { $concatArrays: ["$$value.out", ["$$currentElem"]] },
-                    except: "$$value.except"
-                  }
-                ]
-              }
-            }
-          }
-        }
-      })
-    })
+                },
+              },
+            },
+          },
+          in: '$$res.out',
+        },
+      }),
+  })

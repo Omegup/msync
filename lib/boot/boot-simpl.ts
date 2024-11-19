@@ -1,4 +1,4 @@
-import type { ChangeStream, Timestamp } from 'mongodb'
+import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
 import type { O2, O3, N, O, OPickD, RORec, StrKey, View } from '../../types'
 import type { HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
@@ -13,6 +13,7 @@ import type { D, Del, Model, SimpleStreamExecutionResult } from '../types/stream
 import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
+import crypto from 'crypto'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -24,8 +25,15 @@ const executes = <
 >(
   view: View<V, Allowed<KK>>,
   input: RawStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result, unknown, 1>,
-  streamName: string,
+  _streamName: string,
 ): SimpleStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
+  const streamName =
+    _streamName +
+    '-' +
+    crypto
+      .createHash('md5')
+      .update(new Error().stack + '')
+      .digest('base64url')
   type K = Allowed<KK>
   const { collection, projection, hardMatch, match } = view
   const job = {}
@@ -35,6 +43,17 @@ const executes = <
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
   })
+  collection
+    .createIndex(
+      { touchedAt: 1 },
+      {
+        partialFilterExpression: { deletedAt: { $eq: null } },
+        name: 'touchedAt_' + new UUID().toString('base64'),
+      },
+    )
+    .catch(e => {
+      e.code == 85 || console.error(e)
+    })
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   type D_ID = 'deletedAt' | '_id'
   // TODO create indexes (if snapshot is in sources)
@@ -71,8 +90,9 @@ const executes = <
     const step1 = (): Next =>
       last.findOne({ _id: streamName }).then(ts => next(step4(ts), 'clone into new collection'))
 
+    type C = Pick<ChangeStream, 'close' | 'tryNext'>
     // Step 4 : run the aggregation // idempotent
-    const makeStream = (startAt: Timestamp): ChangeStream => makeWatchStream(db, view, startAt)
+    const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const hardQuery: Query<V> | undefined = $and(
         lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
@@ -101,7 +121,7 @@ const executes = <
     type L = {
       aggResult: AggregateCommand<Result2>
       result: AggregateCommand<Result2>
-      stream: ChangeStream
+      stream: C
     }
 
     // Step 7 : update __last

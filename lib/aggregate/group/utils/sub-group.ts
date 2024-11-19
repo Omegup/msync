@@ -45,7 +45,7 @@ export const subGroup = <T extends O, Grp, V extends O, GID extends string>(
         nil,
         field<Part, Rec<'before', T>>({
           v: ['v', root<Rec<'before', T>>().of('before').expr()],
-          old: ['old', val(false)],
+          old: ['old', val(true)],
         }),
       ),
     ),

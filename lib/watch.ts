@@ -4,6 +4,7 @@ import { sub } from './expression/logic'
 import { root, type Field } from './field'
 import { $or } from './query/logic'
 import type { Model, Query } from './types'
+import { mapExactToObject } from './utils/map-object'
 
 export const changeKeys = ['fullDocument', 'fullDocumentBeforeChange'] as const
 export type ChangeKey = (typeof changeKeys)[number]
@@ -19,9 +20,10 @@ export const subQ = <D extends O, C, DeltaD extends O>(
 
 export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
   db: Db,
-  { collection, match, projection, hardMatch }: View<V, K>,
+  { collection, match, projection: p, hardMatch }: View<V, K>,
   startAt: Timestamp,
 ) => {
+  const projection = mapExactToObject(p, v => v)
   const pipeline: BSON.Document[] = [
     { $match: { $or: changeKeys.map(k => ({ [k]: { $ne: null } })) } },
   ]
@@ -45,9 +47,15 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
     $match: { $expr: { $ne: ['$fullDocument', '$fullDocumentBeforeChange'] } },
   })
 
-  return db.collection(collection.collectionName).watch(pipeline, {
+  const stream = db.collection(collection.collectionName).watch(pipeline, {
     fullDocument: 'required',
     fullDocumentBeforeChange: 'required',
     startAtOperationTime: startAt,
   })
+  const tryNext = async () => {
+    const doc = await stream.tryNext()
+    if (doc) await new Promise(resolve => setTimeout(resolve, 100))
+    return doc
+  }
+  return { tryNext, close: () => stream.close() }
 }
