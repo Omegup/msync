@@ -15,35 +15,13 @@ const $setCore = <Q, T extends Q & O, V extends Q & ID & O, C = unknown>(
 })
 
 type RmId<V> = Omit<RemoveSignature<V>, '_id'> & O
-export type Replace<R, V, W = RmId<V>> = Omit<R, StrKey<W>> & W & ID
+type Replace<R, V> = Omit<R, StrKey<V>> & V & doc
 export const $set =
   <V extends O>() =>
   <R extends doc, C = unknown>(
     fields: MapK<StrKey<RmId<V>>, UpdaterHKT<R, R, RmId<V>, C>>,
   ): DeltaStages<O, R, Replace<R, V>, C> & LinStages<O, R, Replace<R, V>, C> => {
-    type W = RmId<V>
-    type s = keyof any
-    type K = keyof RemoveSignature<V>
-    interface LiteralF extends HKT<s> {
-      readonly out: Literal<I<s, this>>
-    }
-    interface GetF<T> extends HKT<keyof T> {
-      readonly out: T[I<keyof T, this>]
-    }
-    const renamed: Equal<s, K, Literal<keyof V>> = renamedFields<keyof V, LiteralF, GetF<V>>()
-    type UpdaterT<T> = Updater<R, R, Omit<R, StrKey<W>> & W & T, C>
-
-    interface PickF extends HKT<'_id'> {
-      readonly out: UpdaterT<Pick<ID, I<'_id', this>>>
-    }
-    interface ExcludeF extends HKT<s> {
-      readonly out: App<PickF, Exclude<'_id', string & Exclude<I<s, this>, keyof ID>>>
-    }
-    return $setCore<O, R, Replace<R, V>, C>(
-      doubleExclude<'_id', string, keyof V>().backward<PickF>(
-        renamed.forward<ExcludeF>(set<RmId<V>>()(fields)),
-      ),
-    )
+    return $setCore<O, R, Replace<R, V>, C>(set<V>()(fields))
   }
 
 export const $replaceWith = <T extends O, V extends O>(

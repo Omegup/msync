@@ -191,21 +191,21 @@ const executes = <
           coll: snapshotCollection,
           input: link<UDelta<T>>().stages,
           exec: link<UDelta<T>>()
-            .with(
-              $match_(
-                $and(
-                  root<UDelta<T>>().of('updated').has($eq<boolean>(true)),
-                  $expr(
-                    ne(root<UDelta<T>>().of('after').expr())(root<UDelta<T>>().of('before').expr()),
-                  ),
-                ),
-              ),
-            )
+            .with($match_(root<UDelta<T>>().of('updated').has($eq<boolean>(true))))
             .with(
               $set_<UDelta<T>, UDelta<T>, UDelta<T> & Delta<T>>(
                 set<Before<T | null>>()({
                   before: ['before', to($ifNull(root<UDelta<T>>().of('before').expr(), nil))],
                 }),
+              ),
+            )
+            .with(
+              $match_(
+                $expr(
+                  ne(root<UDelta<T> & Delta<T>>().of('after').expr())(
+                    root<UDelta<T> & Delta<T>>().of('before').expr(),
+                  ),
+                ),
               ),
             )
             .with(input.delta)
