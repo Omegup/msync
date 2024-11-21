@@ -1,5 +1,5 @@
 import type { App, AppMap, AppMapRW, HKT, PromiseHKT } from './hkt'
-import type { RORec } from './json'
+import type { RORec, StrKey } from './json'
 
 export type AsNum<R> = R extends `${infer A extends number}` ? A : never
 export type GetDom<Dom = unknown> = readonly [readonly Dom[], keyof any]
@@ -10,7 +10,7 @@ declare global {
   interface ObjectConstructor {
     entries<T, _ = 0>(object?: T): readonly Entry<T>[]
     fromEntries<T, _ = 0>(entries: readonly Entry<T>[]): T
-    keys<T, _ extends 1>(obj: T): readonly (keyof T)[]
+    keys<T, _ extends 1>(obj: T): readonly StrKey<T>[]
   }
   interface ReadonlyArray<T> {
     includes<T, V extends T>(this: ReadonlyArray<V>, item: T, fromIndex?: number): item is V

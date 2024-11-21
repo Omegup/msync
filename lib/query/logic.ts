@@ -1,5 +1,4 @@
-import type { O, N, rawItem } from '../../types'
-import { asExpr, asExprRaw } from '../expression/expr-base'
+import type { N, O, rawItem } from '../../types'
 import type { Query } from '../types'
 import { defined } from '../utils/json'
 
@@ -24,14 +23,7 @@ export const combine =
   (op: string, make: Maker): Combiner =>
   <T extends O, C>(...args: Many<Query<T, C>>): Query<T, C> => {
     const q = make<Query<T, C>>(op, args)
-    return (
-      q! && {
-        raw: field => q(x => x.raw(field)),
-        expr: asExpr<boolean, T, C>({
-          raw: f => asExprRaw(q(x => x.expr.raw(f).get())),
-        }),
-      }
-    )
+    return q! && { raw: field => q(x => x.raw(field)) }
   }
 const all: Alter = (op, x) => (x.length === 0 ? undefined : f => ({ [op]: x.map(f) }))
 const first: Alter = (op, x) => (x.length === 1 ? f => f(x[0]) : all(op, x))

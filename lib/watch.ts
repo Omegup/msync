@@ -1,6 +1,5 @@
 import type { BSON, Db, Timestamp } from 'mongodb'
 import type { O, StrKey, View } from '../types'
-import { sub } from './expression/logic'
 import { root, type Field } from './field'
 import { $or } from './query/logic'
 import type { Model, Query } from './types'
@@ -16,7 +15,7 @@ export type Change<T extends Model> = O<{
 export const subQ = <D extends O, C, DeltaD extends O>(
   a: Query<D, C>,
   f: Field<DeltaD, D>,
-): Query<DeltaD, C> => ({ raw: g => a.raw(g.with(f)), expr: sub(a.expr, f) })
+): Query<DeltaD, C> => ({ raw: g => a.raw(g.with(f)) })
 
 export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
   db: Db,

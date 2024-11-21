@@ -10,10 +10,7 @@ export class Field<in R, out V, in C = unknown> {
   has<R extends O>(this: Field<R, V>, p: Predicate<V>): Query<R, C>
   has<R extends O, V>(this: Field<R, Arr<V>>, p: Predicate<V>): Query<R, C>
   has<R extends O>(this: Field<R, V | Arr<V>>, p: Predicate<V | Arr<V>>): Query<R, C> {
-    return {
-      raw: f => ({ [f.with(this).str()]: p.raw }),
-      expr: p.expr(this),
-    }
+    return { raw: f => ({ [f.with(this).str()]: p.raw }) }
   }
   private constructor(
     private field: string,

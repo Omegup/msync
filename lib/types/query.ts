@@ -1,4 +1,3 @@
-import type { Expr } from '.'
 import type { O, RawObj, Type } from '../../types'
 import type { Field } from '../field'
 
@@ -12,5 +11,4 @@ export type QueryRaw<T, C> = RawObj & {
 export type Query<in T extends O, in C = unknown> = {
   [Type]?(x: typeof Query, y: T, c: C): void
   raw: <DeltaT extends O>(f: Field<DeltaT, T>) => QueryRaw<DeltaT, C>
-  expr: Expr<boolean, T, C>
 }

@@ -1,14 +1,24 @@
+import crypto from 'crypto'
 import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
-import type { O2, O3, N, O, OPickD, RORec, StrKey, View } from '../../types'
+import type { Arr, N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
 import type { HKT, I, IdHKT } from '../../types/hkt'
-import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
+import {
+  $documents_,
+  $match_,
+  $project_,
+  $replaceWith_,
+  $set_,
+  $simpleLookup_,
+} from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
+import { $array, $first } from '../expression/array'
 import { field } from '../expression/concat'
-import { $ifNull, ite, ne } from '../expression/logic'
+import { $ifNull, ne } from '../expression/logic'
 import { nil, val } from '../expression/val'
-import { root } from '../field'
+import { ctx, root } from '../field'
 import { $eq, $gteTs, $ne } from '../predicate'
+import { $expr } from '../predicate/$expr'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
 import type { AggregateCommand, Before, SnapshotStreamExecutionResult } from '../types'
@@ -20,8 +30,6 @@ import { log } from '../utils/log'
 import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
-import { $expr } from '../predicate/$expr'
-import crypto from 'crypto'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -135,14 +143,28 @@ const executes = <
         hardMatch,
       )
       const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
-      const replaceRaw: RawStages<O, T & D, After<T> & { updated: true; _id: string }> =
-        $replaceWith_(
-          field<After<T> & { updated: true; _id: string }, T & D>({
-            after: ['after', ite($and<T & D>(notDeleted, match).expr, root<T>().expr(), nil)],
-            updated: ['updated', val(true)],
-            _id: ['_id', root<T & D>().of('_id').expr()],
+      type Updated = { readonly updated: true; readonly _id: string }
+      const replaceRaw: RawStages<O, T & D, After<T> & Updated> = link<T & D>()
+        .with<T & D, T & RORec<'root', Arr<T & D>>>(
+          $simpleLookup_<T & D, T & D, T, 'root', RORec<'x', T & D>>({
+            k: 'root',
+            vars: {
+              x: ['x', root<T & D>().expr()],
+            },
+            pipeline: link<null, RORec<'x', T & D>>()
+              .with($documents_($array(ctx<T & D>()('x').expr())))
+              .with($match_($and<T & D>(notDeleted, match))).stages,
           }),
         )
+        .with(
+          $replaceWith_(
+            field<After<T> & Updated, T & RORec<'root', Arr<T>>>({
+              after: ['after', $first(root<T & RORec<'root', Arr<T>>>().of('root').expr())],
+              updated: ['updated', val(true)],
+              _id: ['_id', root<T & D>().of('_id').expr()],
+            }),
+          ),
+        ).stages
       const cloneIntoNew = link<V>()
         .with(projectInput)
         .with(replaceRaw)

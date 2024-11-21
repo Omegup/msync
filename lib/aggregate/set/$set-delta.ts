@@ -1,4 +1,4 @@
-import type { App, Arr, ID, O, Rec, doc, jsonItem } from '../../../types'
+import type { App, Arr, ID, O, RORec, Rec, doc, jsonItem } from '../../../types'
 import { $push } from '../../accumulators'
 import { $array, $filterDefined, $first, $last } from '../../expression/array'
 import { field } from '../../expression/concat'
@@ -16,10 +16,10 @@ export const $replaceWithDelta = <T extends O, V extends jsonItem>(expr: Expr<V,
     sub(expr, root<App<ParDeltaHKT<K, T, unknown>, T>>().of(field)),
   )
 
-export const $setDelta = <T extends O, V extends doc, C = unknown>(
-  updater: Updater<T, T, V, C>,
-): RawStages<unknown, Delta<T>, Delta<V>, C> => {
-  type Ctx = { a: T | null; b: T | null }
+export const deltaDocs = <T extends O, V extends doc, C = unknown>(
+  stage: RawStages<unknown, T, V, RORec<'a' | 'b', T | null> & C>,
+) => {
+  type Ctx = RORec<'a' | 'b', T | null>
   const docs = root<Rec<'docs', Arr<V>>>().of('docs')
   return link<Delta<T>, C>()
     .with<unknown, Rec<'root', Arr<Delta<V> & ID>>>(
@@ -40,7 +40,7 @@ export const $setDelta = <T extends O, V extends doc, C = unknown>(
               ),
             ),
           )
-          .with<unknown, V>($set_(updater))
+          .with<unknown, V>(stage)
           .with<unknown, O & { readonly _id: string; readonly docs: Arr<V> }>(
             $group_<Rec<'docs', Arr<V>>>()<'', V>(val(''), {
               docs: ['docs', $push(root<V>().expr())],
@@ -68,3 +68,6 @@ export const $setDelta = <T extends O, V extends doc, C = unknown>(
       ),
     ).stages
 }
+export const $setDelta = <T extends O, V extends doc, C = unknown>(
+  updater: Updater<T, T, V, C>,
+): RawStages<unknown, Delta<T>, Delta<V>, C> => deltaDocs($set_(updater))
