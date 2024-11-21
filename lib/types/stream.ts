@@ -82,7 +82,7 @@ export type SimpleStream<in out Q extends O, out T extends Q> = <Q2 extends O, R
 
 export type BA = 'before' | 'after'
 export type PreDelta<T, K extends BA = BA, E = unknown> = Rec<K, T> & E
-export type Delta<T, K extends BA = BA, E = unknown> = PreDelta<T | null, K, E>
+export type Delta<T, K extends BA = BA, E = ID> = PreDelta<T | null, K, E>
 export type Before<T> = PreDelta<T, 'before'>
 export type After<T> = Delta<T, 'after'>
 export type UDelta<T, E = { readonly updated: boolean }> = Delta<T | null, 'after', ID> &

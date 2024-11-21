@@ -1,7 +1,7 @@
 import type { Iterator, IteratorResult, HasJob } from './types'
 import { firstWorksMerge } from './utils/merge/combiners'
 
-export class Machine<Result> {
+export class Machine<Result = unknown> {
   private sources: Iterator<Result, HasJob>[]
 
   constructor(root?: Iterator<Result, HasJob>) {

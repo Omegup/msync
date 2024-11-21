@@ -1,4 +1,4 @@
-import type { App, Arr, ID, O, RORec, Rec, doc, jsonItem } from '../../../types'
+import type { App, Arr, O, RORec, Rec, doc, jsonItem } from '../../../types'
 import { $push } from '../../accumulators'
 import { $array, $filterDefined, $first, $last } from '../../expression/array'
 import { field } from '../../expression/concat'
@@ -16,18 +16,19 @@ export const $replaceWithDelta = <T extends O, V extends jsonItem>(expr: Expr<V,
     sub(expr, root<App<ParDeltaHKT<K, T, unknown>, T>>().of(field)),
   )
 
-export const deltaDocs = <T extends O, V extends doc, C = unknown>(
+export const deltaDocs = <T extends O, V extends O, C = unknown>(
   stage: RawStages<unknown, T, V, RORec<'a' | 'b', T | null> & C>,
 ) => {
-  type Ctx = RORec<'a' | 'b', T | null>
+  type Ctx = RORec<'a' | 'b', T | null> & RORec<'_id', string>
   const docs = root<Rec<'docs', Arr<V>>>().of('docs')
   return link<Delta<T>, C>()
-    .with<unknown, Rec<'root', Arr<Delta<V> & ID>>>(
-      $simpleLookup_<Delta<T>, Delta<V> & ID, never, 'root', Ctx, C>({
+    .with<unknown, Rec<'root', Arr<Delta<V>>>>(
+      $simpleLookup_<Delta<T>, Delta<V>, never, 'root', Ctx, C>({
         k: 'root',
         vars: {
           a: ['a', root<Delta<T>>().of('after').expr()],
           b: ['b', root<Delta<T>>().of('before').expr()],
+          _id: ['_id', root<Delta<T>>().of('_id').expr()],
         },
         pipeline: link<null, Ctx & C>()
           .with<unknown, T>(
@@ -46,28 +47,25 @@ export const deltaDocs = <T extends O, V extends doc, C = unknown>(
               docs: ['docs', $push(root<V>().expr())],
             }),
           )
-          .with<unknown, Delta<V> & ID>(
-            $replaceWith_<O & { readonly _id: string; readonly docs: Arr<V> }, Delta<V> & ID, Ctx>(
+          .with<unknown, Delta<V>>(
+            $replaceWith_<O & { readonly _id: string; readonly docs: Arr<V> }, Delta<V>, Ctx>(
               field({
                 after: ['after', ite(ctx<T | null>()('a').expr(), $first(docs.expr()), nil)],
                 before: ['before', ite(ctx<T | null>()('b').expr(), $last(docs.expr()), nil)],
-                _id: [
-                  '_id',
-                  $first(docs.of<V, '_id', 0>('_id').expr()) as Expr<string, Rec<'docs', Arr<V>>>,
-                ],
+                _id: ['_id', root<doc>().of('_id').expr()],
               }),
             ),
           ).stages,
       }),
     )
-    .with<unknown, Delta<V> & ID>(
+    .with<unknown, Delta<V>>(
       $replaceWith_(
-        $first<Delta<V> & ID, Rec<'root', Arr<Delta<V> & ID>>, C>(
-          root<Rec<'root', Arr<Delta<V> & ID>>>().of('root').expr(),
-        ) as Expr<Delta<V> & ID, Rec<'root', Arr<Delta<V> & ID>>>,
+        $first<Delta<V>, Rec<'root', Arr<Delta<V>>>, C>(
+          root<Rec<'root', Arr<Delta<V>>>>().of('root').expr(),
+        ) as Expr<Delta<V>, Rec<'root', Arr<Delta<V>>>>,
       ),
     ).stages
 }
-export const $setDelta = <T extends O, V extends doc, C = unknown>(
+export const $setDelta = <T extends O, V extends O, C = unknown>(
   updater: Updater<T, T, V, C>,
 ): RawStages<unknown, Delta<T>, Delta<V>, C> => deltaDocs($set_(updater))
