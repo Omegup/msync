@@ -1,1 +1,2 @@
-export const uri = 'mongodb://localhost:27017/msync?authSource=admin&directConnection=true'
+require('dotenv').config()
+export const uri = process.env['MONGO_URL']!
