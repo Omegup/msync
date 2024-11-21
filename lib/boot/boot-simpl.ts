@@ -14,9 +14,11 @@ import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 import crypto from 'crypto'
+import { streamNames } from './boot'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
+
 const executes = <
   q extends O,
   V extends Model,
@@ -25,15 +27,14 @@ const executes = <
 >(
   view: View<V, Allowed<KK>>,
   input: RawStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result, unknown, 1>,
-  _streamName: string,
+  streamName: string,
 ): SimpleStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
-  const streamName =
-    _streamName +
-    '-' +
-    crypto
-      .createHash('md5')
-      .update(new Error().stack + '')
-      .digest('base64url')
+  const hash = crypto
+    .createHash('md5')
+    .update(new Error().stack + '')
+    .digest('base64url')
+  if (!streamNames[streamName]) streamNames[streamName] = hash
+  else if (streamNames[streamName] != hash) throw new Error('streamName already used')
   type K = Allowed<KK>
   const { collection, projection, hardMatch, match } = view
   const job = {}

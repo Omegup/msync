@@ -13,7 +13,7 @@ import {
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
 import { $array, $first } from '../expression/array'
-import { field } from '../expression/concat'
+import { field, str } from '../expression/concat'
 import { $ifNull, ne } from '../expression/logic'
 import { nil, val } from '../expression/val'
 import { ctx, root } from '../field'
@@ -34,6 +34,7 @@ import { makeWatchStream } from '../watch'
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
 
+export const streamNames: Record<string, string> = {}
 const executes = <
   q extends O,
   V extends Model,
@@ -42,15 +43,14 @@ const executes = <
 >(
   view: View<V, Allowed<KK>>,
   input: DeltaStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result>,
-  _streamName: string,
+  streamName: string,
 ): SnapshotStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
-  const streamName =
-    _streamName +
-    '-' +
-    crypto
-      .createHash('md5')
-      .update(new Error().stack + '')
-      .digest('base64url')
+  const hash = crypto
+    .createHash('md5')
+    .update(new Error().stack + '')
+    .digest('base64url')
+  if (!streamNames[streamName]) streamNames[streamName] = hash
+  else if (streamNames[streamName] != hash) throw new Error('streamName already used')
   type T = AllowedPick<V, KK>
   type K = Allowed<KK>
   const { collection, projection, hardMatch, match } = view
