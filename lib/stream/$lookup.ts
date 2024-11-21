@@ -42,7 +42,8 @@ const join = <
   stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE>, Result>,
 ): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
   const rightJoinField = { field1: lField, field2: rField }
-  const joinId = lField.str() === '_id' ? 'right' : rField.str() === '_id' ? 'left' : false
+  // const joinId = lField.str() === '_id' ? 'right' : rField.str() === '_id' ? 'left' : false
+  const joinId = 'left'
   const joinR_Snapshot: RawStages<
     Before<LQ | Q2>,
     Before<LE>,
