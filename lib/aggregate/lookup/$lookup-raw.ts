@@ -59,7 +59,9 @@ export const $lookupRaw =
         })(f),
       )
       .with<App<F, LE>, App<F, D>>($unwind1<LE, As, RE>(k2)(f))
-      .with<App<F, LE>, App<F, LE & Rec<As, RE> & ID>>(
-        $set1(set<RORec<'_id', string>>()<D, D>({ _id: ['_id', idVal] }))(f),
+      .with<App<F, LE>, App<F, D>>(
+        k === 'left'
+          ? link<App<F, D>>().stages
+          : $set1(set<RORec<'_id', string>>()<D, D>({ _id: ['_id', idVal] }))(f),
       ).stages
   }
