@@ -12,7 +12,7 @@ import type {
   rawItem,
 } from '../../types'
 import type { ExprHKT, ExprsExact } from '../expression/concat'
-import type { Field } from '../field'
+import { root, type Field } from '../field'
 import type {
   AccumulatorHKT,
   Accumulators,
@@ -101,18 +101,22 @@ export const rawVars = <T, Ctx, C, V extends O>(
 ) => mapExactToObject<Ctx, ExprHKT<T, C>, ConstHKT<rawItem>>(vars, v => v.raw(f).get())
 
 export const $simpleLookup1 =
-  <T extends O, U extends O, R, K extends s, Ctx, C = unknown>(
-    args: LookupArgs<T, U, R, K, Ctx, C>,
+  <T extends O, U extends O, R, K extends s, Ctx, C = unknown, S = string>(
+    args: LookupArgs<T, U, R, K, Ctx, C, S>,
   ): FRawStages<T, T, T & Rec<K, Arr<U>>, C, 1> =>
   f => {
-    const { coll, k, pipeline, vars } = args
+    const { coll, k, vars, fields, ...etc } = args
     return asStages([
       {
         $lookup: {
           ...(coll && { from: coll.collectionName }),
+          ...(fields && {
+            localField: fields.local.expr().raw(f()).get(),
+            foreignField: fields.foreign.expr().raw(root<R & O>()).get(),
+          }),
           as: f<Rec<K, Arr<U>>>().of(k).str(),
           let: rawVars(vars, f<T>()),
-          pipeline,
+          ...etc,
         },
       },
     ])

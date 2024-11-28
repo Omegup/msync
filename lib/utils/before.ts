@@ -4,4 +4,4 @@ import type { FRawStages } from '../types'
 
 export const asBefore = <Q extends O, S extends Q, R extends Q, C = unknown>(
   f: FRawStages<Q, S, R, C>,
-) => f<RecHKT<'before', O>>(<T extends O>() => root<Rec<'before', T>>().of('before'))
+) => f<RecHKT<'before'>>(<T extends O>() => root<Rec<'before', T>>().of('before'))

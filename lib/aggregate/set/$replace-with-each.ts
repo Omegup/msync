@@ -13,7 +13,7 @@ export interface ParDeltaHKT<K extends BA, T extends jsonItem, E> extends HKT<js
 
 const deltaExpr =
   <T extends jsonItem, V extends jsonItem, E>(
-    expr: <K extends BA>(field: K) => Expr<V, Rec<K, T> & Delta<T> & E>,
+    expr: <K extends BA>(field: K) => Expr<V | null, Rec<K, T> & Delta<T> & E>,
   ) =>
   <K extends BA>(field: K): Expr<V | null, Delta<T> & E> => {
     type F = ParDeltaHKT<K, T, E>
@@ -50,7 +50,7 @@ export const $setEach = <T extends O, V extends jsonItem, E = unknown, C = unkno
   $setEach1<T, V, E, C>(updater)<IdHKT<O>>(root)
 
 export const $replaceWithEach = <T extends O, V extends jsonItem, E>(
-  expr: <K extends BA>(field: K) => Expr<V, Rec<K, T> & Delta<T> & E>,
+  expr: <K extends BA>(field: K) => Expr<V | null, Rec<K, T> & Delta<T> & E>,
 ): RawStages<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>> => {
   const t = deltaExpr<T, V, E>(expr)
   return $setEach<T, V, E>(k => to(t(k)))

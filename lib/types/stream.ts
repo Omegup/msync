@@ -1,7 +1,7 @@
 import type { Timestamp } from 'mongodb'
 import type { App, HKT, ID, O, RawObj, ReadonlyCollection, Rec, Type } from '../../types'
 import type { Field } from '../field'
-import type { Runner, HasJob } from './machine'
+import type { HasJob, Runner } from './machine'
 
 declare const RawStage: unique symbol
 
@@ -39,8 +39,8 @@ export type TStages<
   input: RawStages<unknown, S, B, unknown, M>
   exec: RawStages<Q, B, R, unknown, M>
 }
-export type Stages<out Q, out R extends Q, M extends number = number> = <E>(
-  consume: <S, B extends Q>(value: TStages<S, Q, B, R, M>) => E,
+export type Stages<out Q, out R extends Q, out SDom> = <E>(
+  consume: <S extends SDom, B extends Q>(value: TStages<S, Q, B, R>) => E,
 ) => E
 
 export type StreamRunner<out V> = <Result>(
@@ -54,7 +54,7 @@ export type SimpleStreamExecutionResult<out Q, out V extends Q> = {
 
 export type SnapshotStreamExecutionResult<out Q, out V extends Q> = {
   readonly out: StreamRunner<Delta<V>>
-  readonly stages: Stages<Before<Q>, Before<V>>
+  readonly stages: Stages<Before<Q>, Before<V>, UBefore<Q>>
 }
 
 export type Stream<
@@ -85,8 +85,9 @@ export type PreDelta<T, K extends BA = BA, E = unknown> = Rec<K, T> & E
 export type Delta<T, K extends BA = BA, E = ID> = PreDelta<T | null, K, E>
 export type Before<T> = PreDelta<T, 'before'>
 export type After<T> = Delta<T, 'after'>
+export type UBefore<T> = O & Partial<Delta<T | null, 'before'>>
 export type UDelta<T, E = { readonly updated: boolean }> = Delta<T | null, 'after', ID> &
-  Partial<Delta<T | null, 'before'>> &
+  UBefore<T> &
   E
 
 // this type of streams is based on the separation between

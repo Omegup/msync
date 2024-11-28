@@ -1,14 +1,12 @@
 import type { Arr, AsLiteral, ID, N, O, RORec, Rec } from '../../../types'
-import { $filter } from '../../expression/array'
 import { field, mergeExpr, type ExprsExactHKT } from '../../expression/concat'
-import { eq } from '../../expression/logic'
-import { Field, ctx, root } from '../../field'
-import { $expr } from '../../predicate/$expr'
-import { $or } from '../../query/logic'
-import type { BA, Before, Delta, Expr, RawStages, TStages } from '../../types'
+import { eq, ite } from '../../expression/logic'
+import { nil } from '../../expression/val'
+import { Field, root } from '../../field'
+import type { BA, Before, Delta, Expr, RawStages, TStages, UBefore } from '../../types'
 import { omitRORec } from '../../utils/guard'
 import { map1 } from '../../utils/json'
-import { $match_, $simpleLookup_ } from '../mongo-stages'
+import { $simpleLookup_ } from '../mongo-stages'
 import { link } from '../prefix'
 import { $replaceWithDelta, $replaceWithEach } from '../set'
 import { $unwindDelta } from '../unwind'
@@ -19,68 +17,85 @@ type Both<K1 extends s, LE, KK2 extends s, RE> = Delta<
 >
 
 export const $lookupDelta = <
-  LQ,
+  LQ extends O,
   LE extends LQ & O,
   RQ extends O,
   RE extends RQ,
-  BRB extends Before<RQ>,
-  RS,
+  BRB extends UBefore<RQ>,
+  RS extends UBefore<RQ>,
   S,
   K1 extends s,
   KK2 extends s,
 >(
-  { field1, field2 }: { field1: Field<LQ, S>; field2: Field<RQ, S> },
-  { coll, exec, input }: TStages<RS, Before<RQ>, BRB, Before<RE>>,
+  { field1, field2 }: { field1: Field<LQ, S | N>; field2: Field<RQ, S | N> },
+  { coll, exec, input }: TStages<RS, UBefore<RQ>, BRB, Before<RE>>,
   k1: AsLiteral<K1>,
-  k2: AsLiteral<Exclude<KK2, BA | K1 | K1>>,
+  k2: AsLiteral<Exclude<KK2, BA | K1>>,
   k: K1 | Exclude<KK2, BA | K1> | false,
 ): RawStages<unknown, Delta<LE>, Both<K1, LE, KK2, RE>> => {
   type K2 = Exclude<KK2, BA | K1>
   type BU = Before<RE>
-  type DeltaS = RORec<BA, S | N>
-  const f2: Expr<S, BRB> = root<BRB>().of('before').with(field2).expr()
-  type Both<K extends BA> = Rec<K, Rec<K1, LE>> & Rec<K2, Arr<BU>>
+
   return link<Delta<LE>>()
     .with<unknown, Delta<Rec<K1, LE>>>(
       $replaceWithDelta<LE, Rec<K1, LE>>(field<RORec<K1, LE>, LE>(map1(k1, root<LE>().expr()))),
     )
-    .with<unknown, Delta<Rec<K1, LE>> & Rec<K2, Arr<BU>>>(
-      $simpleLookup_({
+    .with<unknown, Delta<Rec<K1, LE>> & Rec<'a', Arr<BU>>>(
+      $simpleLookup_<Delta<Rec<K1, LE>>, Before<RE>, RS, 'a', unknown, unknown, S | N>({
         coll,
-        k: k2,
-        vars: {
-          after: ['after', root<Delta<Rec<K1, LE>>>().of('after').of(k1).with(field1).expr()],
-          before: ['before', root<Delta<Rec<K1, LE>>>().of('before').of(k1).with(field1).expr()],
+        k: 'a' as const,
+        fields: {
+          foreign: root<UBefore<RQ>>().of('before').with(field2),
+          local: root<Delta<Rec<K1, LE>>>().of('after').of(k1).with(field1),
         },
-        pipeline: link<RS, DeltaS>()
-          .with(input)
-          .with(
-            $match_(
-              $or(
-                $expr(eq<S | N, BRB, DeltaS>(ctx<S | N>()('before').expr())(f2)),
-                $expr(eq<S | N, BRB, DeltaS>(ctx<S | N>()('after').expr())(f2)),
-              ),
-            ),
-          )
-          .with(exec).stages,
+        vars: {},
+        pipeline: link<RS>().with(input).with(exec).stages,
       }),
     )
-    .with(
-      $replaceWithEach<Rec<K1, LE>, Rec<K1, LE> & Rec<K2, Arr<RE>>, Rec<K2, Arr<BU>>>(
-        <K extends BA>(f: K): Expr<Rec<K1, LE> & Rec<K2, Arr<RE>>, Both<K>> => {
+    .with<unknown, Delta<Rec<K1, LE>> & Rec<'a' | 'b', Arr<BU>>>(
+      $simpleLookup_<
+        Delta<Rec<K1, LE>> & Rec<'a', Arr<BU>>,
+        Before<RE>,
+        RS,
+        'b',
+        unknown,
+        unknown,
+        S | N
+      >({
+        coll,
+        k: 'b' as const,
+        fields: {
+          foreign: root<UBefore<RQ>>().of('before').with(field2),
+          local: root<Delta<Rec<K1, LE>>>().of('before').of(k1).with(field1),
+        },
+        vars: {},
+        pipeline: link<RS>().with(input).with(exec).stages,
+      }),
+    )
+    .with<unknown, Delta<Rec<K1, LE> & Rec<K2, Arr<RE>>>>(
+      $replaceWithEach<Rec<K1, LE>, Rec<K1, LE> & Rec<K2, Arr<RE>>, Rec<'a' | 'b', Arr<BU>>>(
+        <K extends BA>(
+          f: K,
+        ): Expr<
+          (Rec<K1, LE> & Rec<K2, Arr<RE>>) | null,
+          Delta<Rec<K1, LE>> & Rec<'a' | 'b', Arr<BU>>
+        > => {
+          const f1 = f === 'after' ? 'a' : 'b'
+          type R = Delta<Rec<K1, LE>> & Rec<'a' | 'b', Arr<BU>>
           const omit = omitRORec<KK2, BA, K1, Arr<RE>>()
-          const a = $filter<RE, Both<K>, 'before'>({
-            as: 'before',
-            cond: eq<S | N, Both<K>, { readonly before: RE }>(
-              ctx<RE>()('before').with(field2).expr(),
-            )(root<Rec<K, Rec<K1, LE>>>().of(f).of(k1).with(field1).expr()),
-            expr: root<Rec<K2, Arr<BU>>>().of(k2).of('before').expr(),
-          })
-          return field<RORec<K1, LE> & RORec<K2, Arr<RE>>, Both<K>>(
-            omit.backward<ExprsExactHKT<RORec<K1, LE>, Both<K>>>(
-              mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, LE>, Both<K>>(
-                omit.forward<ExprsExactHKT<{}, Both<K>>>(map1(k2, a)),
-                map1(k1, root<Rec<K, Rec<K1, LE>>>().of(f).of(k1).expr()),
+          const a = root<R>().of(f1).of('before').expr()
+
+          const part: Field<Delta<Rec<K1, LE>>, Rec<K1, LE> | N> = root<Delta<Rec<K1, LE>>>().of(f)
+
+          return ite(
+            eq(root<R>().of(f).expr())(nil),
+            nil,
+            field<RORec<K1, LE> & RORec<K2, Arr<RE>>, R>(
+              omit.backward<ExprsExactHKT<RORec<K1, LE>, R>>(
+                mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, LE | N>, R>(
+                  omit.forward<ExprsExactHKT<{}, R>>(map1(k2, a)),
+                  map1(k1, part.of(k1).expr()),
+                ),
               ),
             ),
           )

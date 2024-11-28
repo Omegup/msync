@@ -8,7 +8,7 @@ export type notObj = jsonPrim | U
 export type notArr = notObj | O
 export type jsonItem = unknown
 export type rawItem = jsonPrim | raw | U
-export type Undef<I extends U> = I | (I extends never ? I : notObj)
+export type Undef<I extends N> = I | (I extends never ? I : notObj)
 export declare const object: unique symbol
 export declare const array: unique symbol
 export interface JsonArr {
