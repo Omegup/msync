@@ -5,8 +5,14 @@ import { $replaceWithDelta } from '../aggregate/set'
 import { $mergeObjects } from '../expression/array'
 import { fieldM } from '../expression/concat'
 import { root, type Field } from '../field'
-import type { Before, Delta, DeltaStages, HasJob, IteratorResult, Runner, TStages } from '../types'
-import type { RawStages, SnapshotStream, SnapshotStreamExecutionResult } from '../types/stream'
+import type { Delta, DeltaStages, HasJob, IteratorResult, Runner, TStages } from '../types'
+import type {
+  Before,
+  RawStages,
+  SnapshotStream,
+  SnapshotStreamExecutionResult,
+  UBefore
+} from '../types/stream'
 
 import { asBefore } from '../utils/before'
 import { mergeIterators } from '../utils/merge'
@@ -24,15 +30,15 @@ const merge = <Result, LD extends HasJob, RD extends HasJob>({
 
 const join = <
   As extends string,
-  LQ extends O,
+  LQ extends doc,
   Q2 extends O,
   LE extends LQ,
-  LS,
+  LS extends UBefore<LQ>,
   BLB extends Before<LQ>,
   RQ extends O,
   RE extends RQ & doc,
   S extends notArr,
-  RS,
+  RS extends UBefore<RQ>,
   BRB extends Before<RQ>,
   Result extends Q2,
 >(
@@ -128,7 +134,7 @@ type LookupParams<
 export const $lookup1 =
   <
     As extends string,
-    LQ extends O,
+    LQ extends doc,
     LE extends LQ,
     RQ extends O,
     RE extends RQ & doc,
@@ -139,14 +145,19 @@ export const $lookup1 =
   <Q2 extends O, Result extends Q2>(
     input: DeltaStages<Q2 | (LE & RORec<As, RE>), LE & RORec<As, RE>, Result>,
   ) =>
-    p.left.stages(<LS, BLB extends Before<LQ>>(lStages: TStages<LS, Before<LQ>, BLB, Before<LE>>) =>
-      p.right.stages(
-        <RS, BRB extends Before<RQ>>(rStages: TStages<RS, Before<RQ>, BRB, Before<RE>>) =>
-          join<As, LQ, Q2, LE, LS, BLB, RQ, RE, S, RS, BRB, Result>(p, lStages, rStages, input),
-      ),
+    p.left.stages(
+      <LS extends UBefore<LQ>, BLB extends Before<LQ>>(
+        lStages: TStages<LS, Before<LQ>, BLB, Before<LE>, number>,
+      ) =>
+        p.right.stages(
+          <RS extends UBefore<RQ>, BRB extends Before<RQ>>(
+            rStages: TStages<RS, Before<RQ>, BRB, Before<RE>>,
+          ) =>
+            join<As, LQ, Q2, LE, LS, BLB, RQ, RE, S, RS, BRB, Result>(p, lStages, rStages, input),
+        ),
     )
 export const $lookup =
-  <As extends string, LQ extends O, RQ extends O, RE extends RQ & doc, S extends notArr>(
+  <As extends string, LQ extends doc, RQ extends O, RE extends RQ & doc, S extends notArr>(
     p: Params<As, LQ, RQ, RE, S>,
   ) =>
   <LE extends LQ>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE>> =>

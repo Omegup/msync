@@ -2,7 +2,7 @@ import type { Stages } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
 import { log } from '../utils/log'
 
-export const aggregate = <Result>(input: Stages<unknown, Result>) =>
+export const aggregate = <Result>(input: Stages<unknown, Result, unknown>) =>
   input(({ coll, exec, input }) => {
     const req = {
       aggregate: coll.collectionName,

@@ -38,6 +38,6 @@ export const $documents_ = <T extends O, C>(docs: Expr<Arr<T>, unknown, C>) =>
 
 export const $project_ = $project1
 
-export const $simpleLookup_ = <T extends O, U extends O, R, K extends s, Ctx, C = unknown>(
-  args: LookupArgs<T, U, R, K, Ctx, C>,
+export const $simpleLookup_ = <T extends O, U extends O, R, K extends s, Ctx, C = unknown, S = string>(
+  args: LookupArgs<T, U, R, K, Ctx, C, S>,
 ) => $simpleLookup1(args)<IdHKT<O>>(root)

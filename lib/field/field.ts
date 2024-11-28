@@ -36,11 +36,11 @@ export class Field<in R, out V, in C = unknown> {
     k: AsLiteral<K>,
   ): Field<R, Arr<V[K]>, C>
   public of<V, K extends keyof V, _ extends 1 = 1>(this: Field<R, O<V>, C>, k: K): Field<R, V[K], C>
-  public of<V, K extends keyof V, I extends U = never, _ extends 2 = 2>(
+  public of<V, K extends keyof V, I extends N = never, _ extends 2 = 2>(
     this: Field<R, Arr<V> | Undef<I>, C>,
     k: K,
   ): Field<R, Arr<V[K]> | I, C>
-  public of<V, K extends keyof V, I extends U = never, _ extends 3 = 3>(
+  public of<V, K extends keyof V, I extends N = never, _ extends 3 = 3>(
     this: Field<R, O<V> | Undef<I>, C>,
     k: K,
   ): Field<R, V[K] | I, C>
@@ -57,11 +57,11 @@ export class Field<in R, out V, in C = unknown> {
     this: Field<R, Arr<V>, C>,
     k: Field<O<V>, Arr<W> | O<W>, C2>,
   ): Field<R, Arr<W>, C & C2>
-  public with<V, W, I extends U = never, C2 = unknown, _ extends 2 = 2>(
+  public with<V, W, I extends N = never, C2 = unknown, _ extends 2 = 2>(
     this: Field<R, O<V> | Undef<I>, C>,
     k: Field<O<V>, W, C2>,
   ): Field<R, W | I, C & C2>
-  public with<V, W, I extends U = never, C2 = unknown, _ extends 3 = 3>(
+  public with<V, W, I extends N = never, C2 = unknown, _ extends 3 = 3>(
     this: Field<R, Arr<V> | Undef<I>, C>,
     k: Field<O<V>, Arr<W> | O<W>, C2>,
   ): Field<R, Arr<W> | I, C & C2>

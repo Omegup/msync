@@ -1,4 +1,4 @@
-import type { App, Arr, AsLiteral, HKT, ID, O, Rec, RORec } from '../../../types'
+import type { App, Arr, AsLiteral, HKT, ID, N, O, Rec, RORec } from '../../../types'
 import { concat } from '../../expression/concat'
 import { eq } from '../../expression/logic'
 import { val } from '../../expression/val'
@@ -48,7 +48,7 @@ export const $lookupRaw =
             .with<unknown, BRB>(
               $match_(
                 $expr(
-                  eq<S, BRB, { readonly local: S }>(ctx<S>()('local').expr())(
+                  eq<S | N, BRB, { readonly local: S }>(ctx<S>()('local').expr())(
                     root<BRB>().of('before').with(field2).expr(),
                   ),
                 ),
