@@ -1,13 +1,13 @@
 import type { App, ConstHKT, HKT, I, IdHKT, OPick, WriteonlyCollection } from '../../types'
-import type { ID, N, O, RORec, Rec, StrKey, U } from '../../types/json'
+import type { ID, N, O, RORec, Rec, StrKey } from '../../types/json'
 import {
   field,
   type ExprHKT,
   type ExprsExact,
   type ExprsExactHKT
 } from '../expression/concat'
-import { $ifNull, eqTyped, ite } from '../expression/logic'
-import { nil, now, val } from '../expression/val'
+import { eqTyped, ite } from '../expression/logic'
+import { nil, now } from '../expression/val'
 import { root } from '../field'
 import type { Expr, Model, OutInput, RawStages, TS } from '../types'
 import { omitPick, omitRORec, type Equal } from '../utils/guard'
@@ -62,13 +62,7 @@ export const $merge =
           spread<RORec<K, N>, ID & TS, ExprHKT<OutInput<T, null>>>(
             mapExact<RORec<K, 1>, IdHKT, ConstHKT<Expr<null, unknown>>>(keys, () => nil),
             {
-              _id: [
-                '_id',
-                $ifNull(
-                  root<OutInput<T>>().of('before').of<ID, '_id', U, 3>('_id').expr(),
-                  val(''),
-                ),
-              ],
+              _id: ['_id', root<OutInput<T, null>>().of('_id').expr()],
               touchedAt: ['touchedAt', now],
             },
           ),

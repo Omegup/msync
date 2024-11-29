@@ -31,8 +31,13 @@ export const ite = (<T, D1, D2, C>(
   ): Expr<T, App<F, R1 | R2>, C>
 }
 
+export const and = <D, C = unknown>(...expr: [Expr<boolean, D, C>, Expr<boolean, D, C>]) =>
+  asExpr<boolean, D, C>({
+    raw: f => asExprRaw({ $and: expr.map(e => e.raw(f).get()) }),
+  })
+
 export const eq =
-  <T, D, C>(a: Expr<T, D, C>) =>
+  <T, D, C = unknown>(a: Expr<T, D, C>) =>
   (b: Expr<T, D, C>) =>
     asExpr<boolean, D, C>({
       raw: f => asExprRaw({ $eq: [a.raw(f).get(), b.raw(f).get()] }),

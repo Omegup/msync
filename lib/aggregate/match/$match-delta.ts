@@ -1,15 +1,17 @@
 import type { doc } from '../../../types'
+import { ite } from '../../expression/logic'
+import { nil } from '../../expression/val'
 import { root } from '../../field'
 import { $ne } from '../../predicate'
 import { $or } from '../../query/logic'
-import type { Delta, Query } from '../../types'
+import type { Delta, Expr } from '../../types'
 import { $match_ } from '../mongo-stages'
 import { concatStages } from '../prefix'
-import { deltaDocs } from '../set/$set-delta'
+import { $replaceWithDelta } from '../set/$set-delta'
 
-export const $matchDelta = <T extends doc>(query: Query<T>) =>
+export const $matchDelta = <T extends doc>(query: Expr<boolean, T>) =>
   concatStages<unknown, Delta<T>, Delta<T | null>, Delta<T>, unknown>(
-    deltaDocs($match_(query)),
+    $replaceWithDelta(ite(query, root<T>().expr(), nil)),
     $match_(
       $or(
         root<Delta<T>>().of('after').has($ne<T | null>(null)),

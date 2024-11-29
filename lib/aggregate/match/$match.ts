@@ -1,9 +1,10 @@
 import { $matchDelta } from '.'
-import type { O } from '../../../types'
-import type { DeltaStages, Query } from '../../types'
+import type { doc } from '../../../types'
+import { $expr } from '../../predicate/$expr'
+import type { DeltaStages, Expr } from '../../types'
 import { $match1 } from '../raws'
 
-export const $match = <T extends O>(query: Query<T>): DeltaStages<T, T, T> => ({
-  raw: $match1(query),
-  delta: $matchDelta(query),
+export const $match = <T extends doc>(query: Expr<boolean, T>): DeltaStages<T, T, T> => ({
+  raw: $match1($expr(query)),
+  delta: $matchDelta<T>(query),
 })

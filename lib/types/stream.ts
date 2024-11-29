@@ -71,7 +71,7 @@ export type Del = O<{ readonly deletedAt: Timestamp } & ID & TS>
 export type D = O<{ readonly deletedAt: Timestamp | null | undefined } & ID>
 export type Model = D & TS
 
-export type OutInput<T, A = T | null> = Rec<'before', O<ID> | null> & Rec<'after', A>
+export type OutInput<T, A = T | null> = ID & Rec<'after', A>
 
 export type SimpleStream<in out Q extends O, out T extends Q> = <Q2 extends O, Result extends Q2>(
   input: LinStages<Q2 | T, T, Result>,

@@ -1,5 +1,5 @@
 import type { Collection, Db } from 'mongodb'
-import type { Del, Model, Query } from '../lib/types'
+import type { Del, Expr, Model, Query } from '../lib/types'
 import type { ExactKeys, MapKDom } from '../lib/utils/map-object'
 import type { ConstHKT, HKT } from './hkt'
 import type { O, StrKey } from './json'
@@ -34,6 +34,6 @@ export type OPickD<V extends Model, K extends StrKey<V>> = OPick<V, K, 'deletedA
 export type View<V extends Model, K extends StrKey<V>> = {
   collection: ReadonlyCollection<V | Del>
   projection: ExactKeys<K>
-  match?: Query<OPickD<V, K>>
+  match?: Expr<boolean, OPickD<V, K>>
   hardMatch?: Query<V>
 }

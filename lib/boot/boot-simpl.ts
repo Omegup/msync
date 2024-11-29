@@ -1,10 +1,12 @@
+import crypto from 'crypto'
 import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
-import type { O2, O3, N, O, OPickD, RORec, StrKey, View } from '../../types'
+import type { N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
 import type { HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
 import { concatStages, link, pipe } from '../aggregate/prefix'
 import { root } from '../field'
 import { $eq, $gteTs } from '../predicate'
+import { $expr } from '../predicate/$expr'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
 import type { Frame, HasJob, Iterator, Query, RawStages, Runner } from '../types'
@@ -13,7 +15,6 @@ import type { D, Del, Model, SimpleStreamExecutionResult } from '../types/stream
 import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
-import crypto from 'crypto'
 import { streamNames } from './boot'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
@@ -99,13 +100,12 @@ const executes = <
         lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
         hardMatch,
         notDeleted,
-        match,
+        match && $expr(match),
       )
       const aggResult = await aggregate<Result2>(c =>
         c<V | Del, V | Del>({
           coll: collection,
-          input: link<V | Del>().stages,
-          exec: link<V | Del>()
+          input: link<V | Del>()
             .with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
             .with(projectInput)
             .with<unknown, Result>(input)

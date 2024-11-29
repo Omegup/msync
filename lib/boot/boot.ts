@@ -1,27 +1,19 @@
 import crypto from 'crypto'
 import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
-import type { Arr, N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
+import type { N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
 import type { HKT, I, IdHKT } from '../../types/hkt'
-import {
-  $documents_,
-  $match_,
-  $project_,
-  $replaceWith_,
-  $set_,
-  $simpleLookup_,
-} from '../aggregate/mongo-stages'
+import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
-import { $array, $first } from '../expression/array'
-import { field, str } from '../expression/concat'
-import { $ifNull, ne } from '../expression/logic'
+import { field } from '../expression/concat'
+import { $ifNull, and, eq, ite, ne } from '../expression/logic'
 import { nil, val } from '../expression/val'
-import { ctx, root } from '../field'
+import { root } from '../field'
 import { $eq, $gteTs, $ne } from '../predicate'
 import { $expr } from '../predicate/$expr'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
-import type { AggregateCommand, Before, SnapshotStreamExecutionResult } from '../types'
+import type { AggregateCommand, Before, Expr, SnapshotStreamExecutionResult } from '../types'
 import type { Frame, HasJob, Iterator, Runner } from '../types/machine'
 import type { After, D, Del, Delta, DeltaStages, Model, RawStages, UDelta } from '../types/stream'
 import { set, to } from '../update'
@@ -142,41 +134,23 @@ const executes = <
         lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
         hardMatch,
       )
-      const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
-      type Updated = { readonly updated: true; readonly _id: string }
-      const replaceRaw: RawStages<O, T & D, After<T> & Updated> = link<T & D>()
-        .with<T & D, T & RORec<'root', Arr<T & D>>>(
-          $simpleLookup_<T & D, T & D, T, 'root', RORec<'x', T & D>>({
-            k: 'root',
-            vars: {
-              x: ['x', root<T & D>().expr()],
-            },
-            pipeline: link<null, RORec<'x', T & D>>()
-              .with($documents_($array(ctx<T & D>()('x').expr())))
-              .with($match_($and<T & D>(notDeleted, match))).stages,
+      const notDeleted: Expr<boolean, T, unknown> = eq(root<D>().of('deletedAt').expr())(nil)
+      const query = match ? and<T & D>(notDeleted, match) : notDeleted
+      const replaceRaw: RawStages<O, T & D, After<T> & { updated: true; _id: string }> =
+        $replaceWith_(
+          field<After<T> & { updated: true; _id: string }, T & D>({
+            after: ['after', ite(query, root<T>().expr(), nil)],
+            updated: ['updated', val(true)],
+            _id: ['_id', root<T & D>().of('_id').expr()],
           }),
         )
-        .with(
-          $replaceWith_(
-            field<After<T> & Updated, T & RORec<'root', Arr<T>>>({
-              after: ['after', $first(root<T & RORec<'root', Arr<T>>>().of('root').expr())],
-              updated: ['updated', val(true)],
-              _id: ['_id', root<T & D>().of('_id').expr()],
-            }),
-          ),
-        ).stages
-      const cloneIntoNew = link<V>()
+      const cloneIntoNew = link<V | Del>()
+        .with($match_(hardQuery) as RawStages<O, V | Del, V>)
         .with(projectInput)
         .with(replaceRaw)
         .with($merge_({ into: snapshotCollection, on: root<UDelta<T>>().of('_id') })).stages
 
-      const r = await aggregate<'out'>(c =>
-        c({
-          coll: collection,
-          input: $match_(hardQuery) as RawStages<O, V | Del, V>,
-          exec: cloneIntoNew,
-        }),
-      )
+      const r = await aggregate<'out'>(c => c({ coll: collection, input: cloneIntoNew }))
       await snapshotCollection.deleteMany({ updated: true, after: null, before: null })
       return next(step4(r), 'run the aggregation')
     }
@@ -189,8 +163,7 @@ const executes = <
       const aggResult = await aggregate<Result2>(c =>
         c<UDelta<T>, UDelta<T>>({
           coll: snapshotCollection,
-          input: link<UDelta<T>>().stages,
-          exec: link<UDelta<T>>()
+          input: link<UDelta<T>>()
             .with($match_(root<UDelta<T>>().of('updated').has($eq<boolean>(true))))
             .with(
               $set_<UDelta<T>, UDelta<T>, UDelta<T> & Delta<T>>(
