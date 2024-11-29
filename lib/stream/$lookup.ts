@@ -11,7 +11,7 @@ import type {
   RawStages,
   SnapshotStream,
   SnapshotStreamExecutionResult,
-  UBefore
+  UBefore,
 } from '../types/stream'
 
 import { asBefore } from '../utils/before'
@@ -47,6 +47,13 @@ const join = <
   rightSnapshot: TStages<RS, Before<RQ>, BRB, Before<RE>>,
   stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE>, Result>,
 ): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
+  leftSnapshot.coll.createIndex({ [lField.str()]: 1 }).catch(e => {
+    e.code == 85 || e.code == 86 || console.error(e)
+  })
+  rightSnapshot.coll.createIndex({ [rField.str()]: 1 }).catch(e => {
+    e.code == 85 || e.code == 86 || console.error(e)
+  })
+
   const rightJoinField = { field1: lField, field2: rField }
   // const joinId = lField.str() === '_id' ? 'right' : rField.str() === '_id' ? 'left' : false
   const joinId = 'left'
