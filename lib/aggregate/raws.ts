@@ -111,8 +111,8 @@ export const $simpleLookup1 =
         $lookup: {
           ...(coll && { from: coll.collectionName }),
           ...(fields && {
-            localField: fields.local.expr().raw(f()).get(),
-            foreignField: fields.foreign.expr().raw(root<R & O>()).get(),
+            localField: f<T>().with(fields.local).str(),
+            foreignField: root<R & O>().with(fields.foreign).str(),
           }),
           as: f<Rec<K, Arr<U>>>().of(k).str(),
           let: rawVars(vars, f<T>()),

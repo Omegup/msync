@@ -91,7 +91,6 @@ const executes = <
     .catch(e => {
       e.code == 85 || console.error(e)
     })
-  // TODO create indexes (if snapshot is in sources)
   type WithDel = 'deletedAt' | '_id' | Exclude<K, 'deletedAt' | '_id'>
   const projectInput = $project_<V, WithDel>(
     spread<RORec<K, 1>, RORec<'deletedAt' | '_id', 1>, IdHKT>(projection, {
@@ -121,9 +120,14 @@ const executes = <
     const stop: It = withStop(step0)
 
     // Step 1 : empty new collection
-    const step1 = (): Next =>
-      snapshotCollection.deleteMany({ updated: true }).then(() => next(step2, 'get last update'))
-
+    const step1 = async (): Next => {
+      await snapshotCollection.updateMany(
+        { updated: true },
+        { $set: { updated: false, after: null } },
+      )
+      // we don't need to remove null before because they will be reinserted anyway in step 3
+      return next(step2, 'get last update')
+    }
     // Step 2 : get last update
     const step2 = (): Next =>
       last.findOne({ _id: streamName }).then(ts => next(step3(ts), 'clone into new collection'))
@@ -134,7 +138,9 @@ const executes = <
         lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
         hardMatch,
       )
-      const notDeleted: Expr<boolean, T, unknown> = eq(root<D>().of('deletedAt').expr())(nil)
+      const notDeleted: Expr<boolean, T, unknown> = eq(
+        $ifNull(root<D>().of('deletedAt').expr(), nil),
+      )(nil)
       const query = match ? and<T & D>(notDeleted, match) : notDeleted
       const replaceRaw: RawStages<O, T & D, After<T> & { updated: true; _id: string }> =
         $replaceWith_(
@@ -193,7 +199,9 @@ const executes = <
 
     // Step 5 : remove handled deleted updated
     const step5 = (l: L) => async (): Next => {
-      log('remove handled deleted updated')
+      log(
+        `remove handled deleted updated db['${snapshotCollection.collectionName}'].deleteMany({ updated: true, after: null })`,
+      )
       await snapshotCollection.deleteMany({ updated: true, after: null })
       log('removed handled deleted updated')
       return next(step6(l), 'update snapshot aggregation')
@@ -204,9 +212,12 @@ const executes = <
       stream: C
     }
 
-    // Step 6 : update snapshot aggregation
+    // Step 6 : commit changes on snapshot
     const step6 = (l: L) => async (): Next => {
-      log('update snapshot aggregation')
+      log(
+        'update snapshot aggregation',
+        `db['${snapshotCollection.collectionName}'].updateMany({ updated: true }, [ { $set: { updated: false, after: null, before: '$after' } } ])`,
+      )
       await snapshotCollection.updateMany({ updated: true }, [
         {
           $set: {
@@ -235,7 +246,7 @@ const executes = <
         data: l.aggResult.cursor.firstBatch,
         info: { job: undefined, debug: 'wait for change' },
         cont: withStop(() =>
-          l.stream.tryNext().then(doc => (doc ? next(step1, 'restart') : step8(l))),
+          l.stream.tryNext().then(doc => (doc ? next(step2, 'restart') : step8(l))),
         ),
       }
     }
