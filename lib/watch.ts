@@ -19,18 +19,17 @@ export const subQ = <D extends O, C, DeltaD extends O>(
 
 export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
   db: Db,
-  { collection, match, projection: p, hardMatch }: View<V, K>,
+  { collection, projection: p, hardMatch: m }: View<V, K>,
   startAt: Timestamp,
 ) => {
   const projection = mapExactToObject(p, v => v)
-  const pipeline: BSON.Document[] = [
-    { $match: { $or: changeKeys.map(k => ({ [k]: { $ne: null } })) } },
-  ]
-  for (const m of [hardMatch, match]) {
-    if (m) {
-      const q = $or(...changeKeys.map((k): Query<Change<V>> => subQ(m, root<Change<V>>().of(k))))
-      if (q) pipeline.push({ $match: q.raw(root()) })
-    }
+  const pipeline: BSON.Document[] = []
+  if (m) {
+    const q = $or(...changeKeys.map((k): Query<Change<V>> => subQ(m, root<Change<V>>().of(k))))
+    if (q)
+      pipeline.push({
+        $match: { $or: [q.raw(root()), Object.fromEntries(changeKeys.map(k => [k, null]))] },
+      })
   }
   pipeline.push({
     $project: {
@@ -43,8 +42,19 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
   })
 
   pipeline.push({
-    $match: { $expr: { $ne: ['$fullDocument', '$fullDocumentBeforeChange'] } },
+    $match: {
+      $or: [
+        { $expr: { $ne: ['$fullDocument', '$fullDocumentBeforeChange'] } },
+        Object.fromEntries(changeKeys.map(k => [k, null])),
+      ],
+    },
   })
+
+  // log('pipeline', collection.collectionName, pipeline, {
+  //   fullDocument: 'required',
+  //   fullDocumentBeforeChange: 'required',
+  //   startAtOperationTime: startAt,
+  // })
 
   const stream = db.collection(collection.collectionName).watch(pipeline, {
     fullDocument: 'required',
@@ -53,6 +63,7 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
   })
   const tryNext = async () => {
     const doc = await stream.tryNext()
+    // console.log('doc', startAt, collection.collectionName, doc)
     if (doc) await new Promise(resolve => setTimeout(resolve, 100))
     return doc
   }

@@ -1,5 +1,5 @@
 import type { App, HKT, O2, O3, O, RawObj } from '../../types'
-import type { Delta, DeltaStages, RawStages, Stream, TStages } from '../types'
+import type { Delta, DeltaStages, FRawStages, RawStages, Stream, TStages } from '../types'
 import type { Equal } from '../utils/guard'
 
 type n = number
@@ -24,6 +24,14 @@ export const concatStages = <Q, T extends Q, V extends Q, W extends Q, C, M exte
   part2: RawStages<Q, V, W, C, M>,
 ): RawStages<Q, T, W, C, M> => asStages([...part1, ...part2])
 
+export const concatFStages =
+  <Q, T extends Q & O, V extends Q & O, W extends Q & O, C, M extends n = n>(
+    part1: FRawStages<Q, T, V, C, M>,
+    part2: FRawStages<Q, V, W, C, M>,
+  ): FRawStages<Q, T, W, C, M> =>
+  f =>
+    concatStages(part1(f), part2(f))
+
 export const concatDelta = <Q extends O, T extends Q, V extends Q, W extends Q>(
   part1: DeltaStages<Q, T, V>,
   part2: DeltaStages<Q, V, W>,
@@ -35,6 +43,10 @@ export const concatDelta = <Q extends O, T extends Q, V extends Q, W extends Q>(
 type Concat<out Q, in T extends Q, out V extends Q, in out C, in out M extends n = n> = {
   with: <Q2, W extends Q2>(extra: RawStages<Q | Q2, V, W, C, M>) => Concat<Q | Q2, T, W, C, M>
   stages: RawStages<Q, T, V, C, M>
+}
+type FConcat<out Q, in T extends Q & O, out V extends Q & O, in out C, in out M extends n = n> = {
+  with: <Q2, W extends Q2 & O>(extra: FRawStages<Q | Q2, V, W, C, M>) => FConcat<Q | Q2, T, W, C, M>
+  stages: FRawStages<Q, T, V, C, M>
 }
 export type DeltaPipe<Q extends O, T extends Q, F extends HKT<O2>, G extends HKT<O3>> = {
   with: <Q2 extends O, V extends Q2>(
@@ -75,12 +87,24 @@ const concat = <Q, T extends Q, V extends Q, C = unknown, M extends n = n>(
   with: extra => concat(concatStages(stages, extra)),
   stages,
 })
+const fconcat = <Q, T extends Q & O, V extends Q & O, C = unknown, M extends n = n>(
+  stages: FRawStages<Q, T, V, C, M>,
+): FConcat<Q, T, V, C, M> => ({
+  with: extra => fconcat(concatFStages(stages, extra)),
+  stages,
+})
 
 type Link = <T, C = unknown, M extends n = n>() => Concat<T, T, T, C, M>
+type FLink = <T extends O, C = unknown, M extends n = n>() => FConcat<T, T, T, C, M>
 
 export const link: Link = () => ({
   with: extra => concat(extra),
   stages: asStages([]),
+})
+
+export const flink: FLink = () => ({
+  with: extra => fconcat(extra),
+  stages: () => asStages([]),
 })
 
 export const emptyDelta = <T extends O>() => ({

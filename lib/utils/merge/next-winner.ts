@@ -9,7 +9,7 @@ export const nextWinner = async <K extends KEYS, Result, Info extends Record<K, 
   interrupt?: (key: KEYS) => boolean
 ): Promise<RaceWinner<K, Result, Info>> => {
   const { frame: previousFrame, key } = previousWinner
-  // If we have an interruptable job, we will wait for it to complete before doing anything else
+  // If we have a non interruptable job, we will wait for it to complete before doing anything else
   if (!interrupt?.(key) && previousFrame.info.job) {
     // If the received iteration is a job, wait for it to complete before doing anything else.
     const previousFrameSuccessor = await previousWinnerNextFrame

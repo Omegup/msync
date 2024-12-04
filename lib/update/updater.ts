@@ -11,7 +11,7 @@ export type Updater<in R, in T, out V, in C = unknown> = {
 
 export const subUpdater = <P extends O, D, T, V, Ctx>(
   a: Updater<D, T, V, Ctx>,
-  f: Path<P, D | N>,
+  f: Path<P, D>,
 ): Updater<P, T, V, Ctx> => ({ raw: <R extends O>(g: Field<R, P | N>) => a.raw(g.with(f)) })
 
 export interface UpdaterHKT<R, Old, V, C, K extends keyof Old = keyof Old> extends HKT<StrKey<V>> {
@@ -28,7 +28,7 @@ export const set =
   <V>() =>
   <R, Old extends notArr, C = unknown, K extends keyof Old = never>(
     fields: MapK<StrKey<V>, UpdaterHKT<R, Old, V, C, K>>,
-  ): Updater<R, Old, Omit<Old, StrKey<V>> & V, C> & Updater<R, Arr<Old>, Arr<Omit<Old, StrKey<V>> & V>, C> => ({
+  ): Updater<R, Old, O & Omit<Old, StrKey<V>> & V, C> & Updater<R, Arr<Old>, Arr<Omit<Old, StrKey<V>> & V>, C> => ({
     raw: f => {
       type U = UpdaterHKT<R, Old, V, C, K>
       return Object.entries(mapExactToObject1<StrKey<V>, U, U>(fields, v => v)).flatMap(([k, v]) =>
@@ -39,7 +39,7 @@ export const set =
 
 export const weaken = <R, T, V, C = unknown>(
   updater: Updater<R, T, V, C>,
-): Updater<R, T | null, V | null, C> => ({ raw: f => updater.raw(f) })
+): Updater<R | null, T | N, V | null, C> => ({ raw: f => updater.raw(f) })
 
 export const to = <R, V, C = unknown>(expr: Expr<V, R, C>): Updater<R, unknown, V, C> => ({
   raw: f => [['', expr.raw(f).get()]],

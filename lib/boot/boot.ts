@@ -246,7 +246,7 @@ const executes = <
         data: l.aggResult.cursor.firstBatch,
         info: { job: undefined, debug: 'wait for change' },
         cont: withStop(() =>
-          l.stream.tryNext().then(doc => (doc ? next(step2, 'restart') : step8(l))),
+          l.stream.tryNext().then(doc => (doc ? next(step2, 'restart') : new Promise(res=>res(0)).then(()=>step8(l)))),
         ),
       }
     }
