@@ -2,7 +2,7 @@ import type { App, HKT, O, U, Undef, jsonItem, rawItem } from '../../types'
 import type { Field, Path } from '../field'
 import type { BoolExpr, Expr } from '../types'
 import { asBoolExpr, asExpr, asExprRaw } from './expr-base'
-import { val } from './val'
+import { nil, val } from './val'
 
 export const ite = (<T, D1, D2, C>(
   cond: BoolExpr<D1, D2, C>,
@@ -70,6 +70,9 @@ export const ne =
     asExpr<boolean, D, C>({
       raw: f => asExprRaw({ $ne: [a.raw(f).get(), b.raw(f).get()] }),
     })
+
+export const notNull =
+<T, K, D, C>(a: Expr<T, D, C>) => ne($ifNull(a, nil))(nil)
 
 export const $ifNull = <R, D, C>(...expr: [...Expr<R | null | undefined, D, C>[], Expr<R, D, C>]) =>
   asExpr<R, D, C>({

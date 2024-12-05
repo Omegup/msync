@@ -1,4 +1,4 @@
-import type { Arr, O, RORec, Rec, RecHKT } from '../../../../types'
+import type { Arr, ID, O, RORec, Rec, RecHKT } from '../../../../types'
 import { $push, subAcc } from '../../../accumulators'
 import { $array, $filter, $filterDefined, $first } from '../../../expression/array'
 import { field, type ExprHKT, type ExprsExact } from '../../../expression/concat'
@@ -29,8 +29,8 @@ export const subGroup = <T extends O, Grp, V extends O, GID extends string>(
 
   const part = $filterDefined<Part, Delta<T>>(
     $array<Part | null, Delta<T>>(
-      ite<Part | null, null, T, RecHKT<'after'>>(
-        eqTyped<null, T, RecHKT<'after'>>(root<After<T>>().of('after').expr(), nil),
+      ite<Part | null, null, T, RecHKT<'after', unknown, ID>>(
+        eqTyped<null, T, RecHKT<'after', unknown, ID>>(root<After<T>>().of('after').expr(), nil),
         nil,
         field<Part, Rec<'after', T>>({
           v: ['v', root<Rec<'after', T>>().of('after').expr()],
