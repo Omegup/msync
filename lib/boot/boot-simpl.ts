@@ -140,7 +140,7 @@ const executes = <
         data: l.aggResult.cursor.firstBatch,
         info: { job: undefined, debug: 'wait for change' },
         cont: withStop(() =>
-          l.stream.tryNext().then(doc => (doc ? next(step1, 'restart') : new Promise(res=>setTimeout(res, 0)).then(()=>step8(l)))),
+          l.stream.tryNext().then(doc => (doc ? next(step1, 'restart') : step8(l))),
       ),
       }
     }

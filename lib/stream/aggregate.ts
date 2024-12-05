@@ -3,18 +3,21 @@ import type { ReadonlyCollection } from '../../types'
 import type { RawStages } from '../types'
 import { log } from '../utils/log'
 
-export const aggregate = <Result>(input: <E>(
-  consume: <S, B>(value: {
-    coll: ReadonlyCollection<S>
-    input: RawStages<unknown, B, Result>
-  }) => E,
-) => E) =>
+export const aggregate = <Result>(
+  input: <E>(
+    consume: <S, B>(value: {
+      coll: ReadonlyCollection<S>
+      input: RawStages<unknown, B, Result>
+    }) => E,
+  ) => E,
+  snapshot = true,
+) =>
   input(({ coll, input }) => {
     const req = {
       aggregate: coll.collectionName,
       pipeline: input,
       cursor: {},
-      readConcern: { level: 'snapshot' },
+      ...(snapshot && { readConcern: { level: 'snapshot' } }),
     }
     log('exec', req)
     const start = Date.now()
