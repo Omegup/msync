@@ -1,8 +1,8 @@
 import crypto from 'crypto'
-import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
+import { UUID, type ChangeStream, type Timestamp, Collection } from 'mongodb'
 import type { N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
 import type { HKT, I, IdHKT } from '../../types/hkt'
-import { $match_, $project_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
+import { $match_, $project_, $replaceWith_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
 import { field } from '../expression/concat'
@@ -16,7 +16,6 @@ import { aggregate } from '../stream/aggregate'
 import type { AggregateCommand, Before, Expr, SnapshotStreamExecutionResult } from '../types'
 import type { Frame, HasJob, Iterator, Runner } from '../types/machine'
 import type { After, D, Del, Delta, DeltaStages, Model, RawStages, UDelta } from '../types/stream'
-import { set, to } from '../update'
 import { asBefore } from '../utils/before'
 import { log } from '../utils/log'
 import { spread } from '../utils/map-object'
@@ -166,18 +165,16 @@ const executes = <
     // Step 4 : run the aggregation // idempotent
     const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt)
     const step4 = (result: AggregateCommand<'out'>) => async (): Next => {
+      const start = Date.now()
+      await snapshotCollection.updateMany(
+        { before: null },
+        { $set: { before: null } },
+      )
       const aggResult = await aggregate<Result2>(c =>
-        c<UDelta<T>, UDelta<T>>({
-          coll: snapshotCollection,
-          input: link<UDelta<T>>()
-            .with($match_(root<UDelta<T>>().of('updated').has($eq<boolean>(true))))
-            .with(
-              $set_<UDelta<T>, UDelta<T>, UDelta<T> & Delta<T>>(
-                set<Before<T | null>>()({
-                  before: ['before', to($ifNull(root<UDelta<T>>().of('before').expr(), nil))],
-                }),
-              ),
-            )
+        c<UDelta<T>, UDelta<T> & Delta<T>>({
+          coll: snapshotCollection as Collection<UDelta<T> & Delta<T>>,
+          input: link<UDelta<T> & Delta<T>>()
+            .with($match_(root<UDelta<T> & Delta<T>>().of('updated').has($eq<boolean>(true))))
             .with(
               $match_(
                 $expr(
@@ -191,6 +188,7 @@ const executes = <
             .with(finalInput).stages,
         }),
         false,
+        start
       )
       const stream = makeStream(result.cursor.atClusterTime)
       return next(step5({ result, aggResult, stream }), 'remove handled deleted updated', () =>

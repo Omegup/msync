@@ -86,7 +86,7 @@ export type Delta<T, K extends BA = BA, E = ID> = PreDelta<T | null, K, E>
 export type Before<T> = PreDelta<T, 'before'>
 export type After<T> = Delta<T, 'after'>
 export type UBefore<T> = O & Partial<Delta<T | null, 'before'>>
-export type UDelta<T, E = { readonly updated: boolean }> = Delta<T | null, 'after', ID> &
+export type UDelta<T, E = { readonly updated: boolean }> = Delta<T, 'after', ID> &
   UBefore<T> &
   E
 

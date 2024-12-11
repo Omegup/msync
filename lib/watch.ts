@@ -50,12 +50,6 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
     },
   })
 
-  // log('pipeline', collection.collectionName, pipeline, {
-  //   fullDocument: 'required',
-  //   fullDocumentBeforeChange: 'required',
-  //   startAtOperationTime: startAt,
-  // })
-
   const stream = db.collection(collection.collectionName).watch(pipeline, {
     fullDocument: 'required',
     fullDocumentBeforeChange: 'required',
@@ -63,7 +57,7 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
   })
   const tryNext = async () => {
     const doc = await stream.tryNext()
-    // console.log('doc', startAt, collection.collectionName, doc)
+    // wait a bit for bulk operations so we run the stream for once
     if (doc) await new Promise(resolve => setTimeout(resolve, 100))
     return doc
   }

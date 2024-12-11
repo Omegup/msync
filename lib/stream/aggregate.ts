@@ -11,6 +11,7 @@ export const aggregate = <Result>(
     }) => E,
   ) => E,
   snapshot = true,
+  start = Date.now()
 ) =>
   input(({ coll, input }) => {
     const req = {
@@ -20,7 +21,6 @@ export const aggregate = <Result>(
       ...(snapshot && { readConcern: { level: 'snapshot' } }),
     }
     log('exec', req)
-    const start = Date.now()
     return coll.s.db.command(req).then(
       result => {
         log('execed', req, result, 'took', Date.now() - start)
