@@ -1,7 +1,7 @@
 import { writeFile } from 'fs/promises'
 import { Collection, MongoClient } from 'mongodb'
 import type { AsynIter, Iterator, IteratorResult } from '../lib/types'
-import type { doc } from '../types'
+import type { ID, doc } from '../types'
 import { uri } from './uri'
 import type { CommandStartedEvent, Db, OptionalUnlessRequiredId } from 'mongodb'
 
@@ -40,7 +40,7 @@ export const prepare = async (testName?: string) => {
   return client
 }
 const clears: (() => Promise<void>)[] = []
-export const makeCol = async <T extends doc>(
+export const makeCol = async <T extends ID>(
   docs: readonly OptionalUnlessRequiredId<T>[],
   database: Db,
   name?: string,

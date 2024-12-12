@@ -14,10 +14,10 @@ interface AfterHKT<T> extends HKT {
   readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
 }
 
-type ND = { readonly deletedAt: null }
-export type Merge<T extends doc> = (T & ND & TS) | Del
+type ND = { readonly deletedAt?: null }
+export type Merge<T extends ID> = (T & ND & TS) | Del
 
-export const $replace = <T extends doc>(
+export const $upsert = <T extends doc>(
   out: WriteonlyCollection<Merge<T>>,
 ): RawStages<unknown, OutInput<T>, 'out'> => {
   const replacer = ite<Merge<T>, null, T, AfterHKT<T>>(

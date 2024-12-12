@@ -68,7 +68,7 @@ export type Stream<
 
 export type TS = { readonly touchedAt: Timestamp }
 export type Del = O<{ readonly deletedAt: Timestamp } & ID & TS>
-export type D = O<{ readonly deletedAt: Timestamp | null | undefined } & ID>
+export type D = O<{ readonly deletedAt?: Timestamp | null | undefined } & ID>
 export type Model = D & TS
 
 export type OutInput<T, A = T | null> = ID & Rec<'after', A>
