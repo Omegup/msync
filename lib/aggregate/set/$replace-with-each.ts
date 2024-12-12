@@ -1,19 +1,9 @@
-import type {
-  ConstHKT,
-  HKT,
-  I,
-  IdHKT,
-  N,
-  O,
-  RORec,
-  Rec,
-  jsonItem
-} from '../../../types'
+import type { ConstHKT, HKT, I, IdHKT, N, O, RORec, Rec, jsonItem } from '../../../types'
 import { eqTyped, ite } from '../../expression/logic'
 import { nil } from '../../expression/val'
 import { root } from '../../field'
 import type { BA, Delta, Expr, FRawStages, RawStages } from '../../types'
-import { set, to, type Updater } from '../../update'
+import { set, to, type Updater, type UpdaterHKT } from '../../update'
 import { mapExact1, type MapK } from '../../utils/map-object'
 import { $set1 } from '../mongo-stages'
 
@@ -48,7 +38,9 @@ export const $setEach1 = <
   type R = Delta<T> & Partial<RORec<BA2, T | null>> & E
   type DV = RORec<BA2, V | null>
   return $set1<unknown, R, Rec<BA2, V | null> & Omit<R, BA2>, C>(
-    set<DV>()<R, R, C, BA2>(mapExact1(dict, updater)),
+    set<DV>()<R, R, C, BA2>(
+      mapExact1<BA2, ConstHKT<BA>, UpdaterHKT<R, R, DV, C, BA2>>(dict, updater),
+    ),
   )
 }
 export const $setEach = <

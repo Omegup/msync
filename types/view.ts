@@ -1,7 +1,6 @@
 import type { Collection, Db } from 'mongodb'
 import type { Del, Expr, Model, Query } from '../lib/types'
-import type { ExactKeys, MapKDom } from '../lib/utils/map-object'
-import type { ConstHKT, HKT } from './hkt'
+import type { ExactKeys } from '../lib/utils/map-object'
 import type { O, StrKey } from './json'
 import type { RawStage } from './mongo'
 
@@ -19,14 +18,8 @@ export interface ReadonlyCollection<out T> extends CommonCollection {
 
 export interface WriteonlyCollection<in R> extends CommonCollection {
   [RawStage]: { (_: 1, x: R): unknown }
-  insertOne(x: Omit<R, keyof O>): unknown
+  insertOne(x: R): unknown
 }
-
-export type KDom<
-  RK extends KDom<RK, K, F>,
-  K extends string,
-  F extends HKT<K> = ConstHKT<1>,
-> = MapKDom<RK, F, K>
 
 export type OPick<V, K extends StrKey<V>, E extends StrKey<V> = never> = O & Pick<V, K | E>
 export type OPickD<V extends Model, K extends StrKey<V>> = OPick<V, K, 'deletedAt' | '_id'>

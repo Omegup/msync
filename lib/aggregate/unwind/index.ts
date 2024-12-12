@@ -16,7 +16,7 @@ type LR<T, U> = O<{ readonly left: T; readonly right: U }>
 export const $unwind = <T extends doc, K extends s, U extends doc>(
   k: AsLiteral<K>,
   dict: RORec<K, 'key'>,
-): DeltaStages<T, T & Rec<K, Arr<U>>, T & Rec<K, U>> => ({
+): DeltaStages<O, T & Rec<K, Arr<U>>, T & Rec<K, U>> => ({
   delta: link<Delta<T & Rec<K, Arr<U>>>>()
     .with<unknown, Delta<LR<T & Rec<K, Arr<U>>, Arr<U>>>>(
       $replaceWithDelta(
