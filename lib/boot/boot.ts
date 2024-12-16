@@ -21,6 +21,7 @@ import { log } from '../utils/log'
 import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
+import { createIndex } from '../utils/db-indexes'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -41,7 +42,7 @@ const executes = <
     .update(new Error().stack + '')
     .digest('base64url')
   if (!streamNames[streamName]) streamNames[streamName] = hash
-  else if (streamNames[streamName] != hash) throw new Error('streamName already used')
+  else if (streamNames[streamName] != hash) throw new Error(`streamName ${streamName} already used`)
   type T = AllowedPick<V, KK>
   type K = Allowed<KK>
   const { collection, projection, hardMatch, match } = view
@@ -52,44 +53,37 @@ const executes = <
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
   })
-  collection
-    .createIndex(
-      { touchedAt: 1 },
-      hardMatch
-        ? {
-            partialFilterExpression: hardMatch,
-            name: 'touchedAt_hard_' + new UUID().toString('base64'),
-          }
-        : {},
-    )
-    .catch(e => {
-      e.code == 85 || e.code == 86 || console.error(e)
-    })
+  createIndex(
+    collection,
+    { touchedAt: 1 },
+    hardMatch
+      ? {
+          partialFilterExpression: hardMatch,
+          name: 'touchedAt_hard_' + new UUID().toString('base64'),
+        }
+      : {},
+  ).catch(e => e.code == 86 || Promise.reject(e))
 
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
-  snapshotCollection
-    .createIndex(
-      { updated: 1 },
-      {
-        partialFilterExpression: { updated: true },
-        name: 'updated_' + new UUID().toString('base64'),
-      },
-    )
-    .catch(e => {
-      e.code == 85 || console.error(e)
-    })
-  snapshotCollection
-    .createIndex(
-      { updated: 1 },
-      {
-        partialFilterExpression: { updated: true, after: null, before: null },
-        name: 'updated_nulls_' + new UUID().toString('base64'),
-      },
-    )
-    .catch(e => {
-      e.code == 85 || console.error(e)
-    })
+
+  createIndex(
+    snapshotCollection,
+    { updated: 1 },
+    {
+      partialFilterExpression: { updated: true },
+      name: 'updated_' + new UUID().toString('base64'),
+    },
+  )
+
+  createIndex(
+    snapshotCollection,
+    { updated: 1 },
+    {
+      partialFilterExpression: { updated: true, after: null, before: null },
+      name: 'updated_nulls_' + new UUID().toString('base64'),
+    },
+  )
   type WithDel = 'deletedAt' | '_id' | Exclude<K, 'deletedAt' | '_id'>
   const projectInput = $project_<V, WithDel>(
     spread<RORec<K, 1>, RORec<'deletedAt' | '_id', 1>, IdHKT>(projection, {
@@ -166,29 +160,27 @@ const executes = <
     const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt)
     const step4 = (result: AggregateCommand<'out'>) => async (): Next => {
       const start = Date.now()
-      await snapshotCollection.updateMany(
-        { before: null },
-        { $set: { before: null } },
-      )
-      const aggResult = await aggregate<Result2>(c =>
-        c<UDelta<T>, UDelta<T> & Delta<T>>({
-          coll: snapshotCollection as Collection<UDelta<T> & Delta<T>>,
-          input: link<UDelta<T> & Delta<T>>()
-            .with($match_(root<UDelta<T> & Delta<T>>().of('updated').has($eq<boolean>(true))))
-            .with(
-              $match_(
-                $expr(
-                  ne(root<UDelta<T> & Delta<T>>().of('after').expr())(
-                    root<UDelta<T> & Delta<T>>().of('before').expr(),
+      await snapshotCollection.updateMany({ before: null }, { $set: { before: null } })
+      const aggResult = await aggregate<Result2>(
+        c =>
+          c<UDelta<T>, UDelta<T> & Delta<T>>({
+            coll: snapshotCollection as Collection<UDelta<T> & Delta<T>>,
+            input: link<UDelta<T> & Delta<T>>()
+              .with($match_(root<UDelta<T> & Delta<T>>().of('updated').has($eq<boolean>(true))))
+              .with(
+                $match_(
+                  $expr(
+                    ne(root<UDelta<T> & Delta<T>>().of('after').expr())(
+                      root<UDelta<T> & Delta<T>>().of('before').expr(),
+                    ),
                   ),
                 ),
-              ),
-            )
-            .with(input.delta)
-            .with(finalInput).stages,
-        }),
+              )
+              .with(input.delta)
+              .with(finalInput).stages,
+          }),
         false,
-        start
+        start,
       )
       const stream = makeStream(result.cursor.atClusterTime)
       return next(step5({ result, aggResult, stream }), 'remove handled deleted updated', () =>

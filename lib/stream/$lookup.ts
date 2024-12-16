@@ -15,6 +15,7 @@ import type {
 } from '../types/stream'
 
 import { asBefore } from '../utils/before'
+import { createIndex } from '../utils/db-indexes'
 import { mergeIterators } from '../utils/merge'
 
 type Next<L, R> = ({ key: 'L'; value: L } | { key: 'R'; value: R }) & HasJob
@@ -47,12 +48,12 @@ const join = <
   rightSnapshot: TStages<RS, Before<RQ>, BRB, Before<RE>>,
   stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE>, Result>,
 ): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
-  leftSnapshot.coll.createIndex({ [lField.str()]: 1 }).catch(e => {
-    e.code == 85 || e.code == 86 || console.error(e)
-  })
-  rightSnapshot.coll.createIndex({ [rField.str()]: 1 }).catch(e => {
-    e.code == 85 || e.code == 86 || console.error(e)
-  })
+  createIndex(leftSnapshot.coll, { [lField.str()]: 1 }).catch(
+    e => e.code == 86 || Promise.reject(e),
+  )
+  createIndex(rightSnapshot.coll, { [rField.str()]: 1 }).catch(
+    e => e.code == 86 || Promise.reject(e),
+  )
 
   const rightJoinField = { field1: lField, field2: rField }
   // const joinId = lField.str() === '_id' ? 'right' : rField.str() === '_id' ? 'left' : false

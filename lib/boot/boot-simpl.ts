@@ -16,6 +16,7 @@ import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 import { streamNames } from './boot'
+import { createIndex } from '../utils/db-indexes'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -45,17 +46,15 @@ const executes = <
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
   })
-  collection
-    .createIndex(
-      { touchedAt: 1 },
-      {
-        partialFilterExpression: { deletedAt: { $eq: null } },
-        name: 'touchedAt_' + new UUID().toString('base64'),
-      },
-    )
-    .catch(e => {
-      e.code == 85 || console.error(e)
-    })
+
+  createIndex(
+    collection,
+    { touchedAt: 1 },
+    {
+      partialFilterExpression: { deletedAt: { $eq: null } },
+      name: 'touchedAt_' + new UUID().toString('base64'),
+    },
+  )
   const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   type D_ID = 'deletedAt' | '_id'
   // TODO create indexes (if snapshot is in sources)
@@ -141,7 +140,7 @@ const executes = <
         info: { job: undefined, debug: 'wait for change' },
         cont: withStop(() =>
           l.stream.tryNext().then(doc => (doc ? next(step1, 'restart') : step8(l))),
-      ),
+        ),
       }
     }
     return stop
