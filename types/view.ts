@@ -18,7 +18,6 @@ export interface ReadonlyCollection<out T> extends CommonCollection {
 
 export interface WriteonlyCollection<in R> extends CommonCollection {
   [RawStage]: { (_: 1, x: R): unknown }
-  insertOne(x: R): unknown
 }
 
 export type OPick<V, K extends StrKey<V>, E extends StrKey<V> = never> = O & Pick<V, K | E>
