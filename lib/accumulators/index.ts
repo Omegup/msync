@@ -7,14 +7,14 @@ import type { Accumulator, AccumulatorRaw, DeltaAccumulator, Expr } from '../typ
 
 const asAccumulator = <T, V, C = unknown>(x: RawObj) => x as AccumulatorRaw<T, V, C>
 
-export const $sum = <D extends O, C>(expr: Expr<number, D, C>): DeltaAccumulator<D, number, C> => ({
+export const $sum = <D extends O, C = unknown>(expr: Expr<number, D, C>): DeltaAccumulator<D, number, C> => ({
   raw: f => asAccumulator({ $sum: expr.raw(f).get() }),
   diff: subtract,
   sum: add,
   zero: val(0),
 })
 
-export const $push = <D extends O, T, C>(expr: Expr<T, D, C>): DeltaAccumulator<D, Arr<T>, C> => ({
+export const $push = <D extends O, T, C = unknown>(expr: Expr<T, D, C>): DeltaAccumulator<D, Arr<T>, C> => ({
   raw: f => asAccumulator({ $push: expr.raw(f).get() }),
   diff: $except,
   sum: $concat,
