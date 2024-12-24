@@ -1,4 +1,4 @@
-import type { App, HKT, I, WriteonlyCollection } from '../../types'
+import type { App, HKT, I, RWCollection } from '../../types'
 import type { ID, O, RORec, doc } from '../../types/json'
 import { $mergeObjects } from '../expression/array'
 import { field } from '../expression/concat'
@@ -14,11 +14,11 @@ interface AfterHKT<T> extends HKT {
   readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
 }
 
-type ND = { readonly deletedAt?: null }
+export type ND = { readonly deletedAt?: null }
 export type Merge<T extends ID> = (T & ND & TS) | Del
 
 export const $upsert = <T extends doc>(
-  out: WriteonlyCollection<Merge<T>>,
+  out: RWCollection<Merge<T>>,
 ): RawStages<unknown, OutInput<T>, 'out'> => {
   const replacer = ite<Merge<T>, null, T, AfterHKT<T>>(
     eqTyped<null, T, AfterHKT<T>>(root<OutInput<T>>().of('after').expr(), nil),
@@ -38,6 +38,8 @@ export const $upsert = <T extends doc>(
       $merge_<Merge<T>, Merge<T>>({
         into: out,
         on: root<O<ID>>().of('_id'),
+        whenMatched: 'merge',
+        whenNotMatched: 'insert',
       }),
     ).stages
 }

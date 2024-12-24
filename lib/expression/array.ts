@@ -1,7 +1,12 @@
-import type { App, Arr, HKT, N, RORec, notArr } from '../../types'
+import type { App, Arr, ConstHKT, HKT, N, RORec, Rec, jsonItem, notArr, rawItem } from '../../types'
 import { ctx } from '../field'
 import type { Expr } from '../types'
+import { mapExactToObject } from '../utils/map-object'
+import { $gte, add } from './arith'
+import { field, type ExprHKT, type ExprsExact } from './concat'
 import { asBoolExpr, asExpr, asExprRaw } from './expr-base'
+import { eq, ite } from './logic'
+import { val } from './val'
 
 export const $size = <T, D, C>(expr: Expr<Arr<T>, D, C>) =>
   asExpr<number, D, C>({
@@ -89,63 +94,99 @@ export const $in = <T, D, C = unknown>(...exprs: readonly [Expr<T, D, C>, Expr<A
     raw: f => asExprRaw({ $in: exprs.map(x => x.raw(f).get()) }),
   })
 
-export const $except = <T, D, C>(a: Expr<Arr<T>, D, C>, b: Expr<Arr<T>, D, C>) =>
-  asExpr<Arr<T>, D, C>({
+type Reduce<T, V> = RORec<'value', V> & RORec<'this', T>
+const $reduce = <T, V, D, C>(
+  input: Expr<Arr<T>, D, C>,
+  initialValue: Expr<V, D, C>,
+  inExpr: Expr<V, D, C & Reduce<T, V>>,
+) =>
+  asExpr<V, D, C>({
     raw: f =>
       asExprRaw({
-        $let: {
-          vars: {
-            res: {
-              $reduce: {
-                input: a.raw(f).get(), // The input array you want to iterate
-                initialValue: { out: [], except: b.raw(f).get() }, // The initial value of the accumulator
-                in: {
-                  $let: {
-                    vars: {
-                      currentElem: '$$this',
-                      currentExcept: '$$value.except',
-                      indexInExcept: {
-                        $indexOfArray: ['$$value.except', '$$this'],
-                      },
-                    },
-                    in: {
-                      $cond: [
-                        { $gte: ['$$indexInExcept', 0] }, // If element is in 'except'
-                        {
-                          // Remove it from 'except'
-                          out: '$$value.out',
-                          except: {
-                            $concatArrays: [
-                              {
-                                $cond: [
-                                  { $eq: ['$$indexInExcept', 0] },
-                                  [],
-                                  { $slice: ['$$currentExcept', 0, '$$indexInExcept'] },
-                                ],
-                              },
-                              {
-                                $slice: [
-                                  '$$currentExcept',
-                                  { $add: ['$$indexInExcept', 1] },
-                                  { $size: '$$currentExcept' },
-                                ],
-                              },
-                            ],
-                          },
-                        },
-                        {
-                          // Add it to 'out'
-                          out: { $concatArrays: ['$$value.out', ['$$currentElem']] },
-                          except: '$$value.except',
-                        },
-                      ],
-                    },
-                  },
-                },
-              },
-            },
-          },
-          in: '$$res.out',
+        $reduce: {
+          input: input.raw(f).get(),
+          initialValue: initialValue.raw(f).get(),
+          in: inExpr.raw(f).get(),
         },
       }),
   })
+
+const $indexOfArray = <T, D, C>(array: Expr<Arr<T>, D, C>, item: Expr<T, D, C>) =>
+  asExpr<number, D, C>({
+    raw: f =>
+      asExprRaw({
+        $indexOfArray: [array.raw(f).get(), item.raw(f).get()],
+      }),
+  })
+const $let = <T, D, C, V extends RORec<string, jsonItem>>(
+  vars: ExprsExact<V, D, C>,
+  inExpr: Expr<T, D, C & V>,
+) =>
+  asExpr<T, D, C>({
+    raw: f =>
+      asExprRaw({
+        $let: {
+          vars: mapExactToObject<V, ExprHKT<D, C>, ConstHKT<rawItem>>(vars, v => v.raw(f).get()),
+          in: inExpr.raw(f).get(),
+        },
+      }),
+  })
+type DiffArr<T> = Rec<'out' | 'except', Arr<T>>
+export const $slice = <T, D, C>(
+  array: Expr<Arr<T>, D, C>,
+  start: Expr<number, D, C>,
+  end: Expr<number, D, C>,
+) =>
+  asExpr<Arr<T>, D, C>({
+    raw: f =>
+      asExprRaw({
+        $slice: [array.raw(f).get(), start.raw(f).get(), end.raw(f).get()],
+      }),
+  })
+export const $except = <T, D, C>(a: Expr<Arr<T>, D, C>, b: Expr<Arr<T>, D, C>) => {
+  type C1 = C & Reduce<T, DiffArr<T>>
+  type C2 = C1 & RORec<'indexInExcept', number>
+  const value = ctx<DiffArr<T>>()('value')
+  const out = value.of('out').expr()
+  const except = value.of('except').expr()
+  const curr = ctx<T>()('this').expr()
+  const indexInExcept = ctx<number>()('indexInExcept').expr()
+  return $let<Arr<T>, D, C, RORec<'res', DiffArr<T>>>(
+    {
+      res: [
+        'res',
+        $reduce<T, DiffArr<T>, D, C>(
+          a,
+          field({ out: ['out', $array<T, D>()], except: ['except', b] }),
+          $let<DiffArr<T>, D, C1, RORec<'indexInExcept', number>>(
+            {
+              indexInExcept: ['indexInExcept', $indexOfArray<T, D, C1>(except, curr)],
+            },
+            ite<DiffArr<T>, D, C2>(
+              $gte(indexInExcept, val(0)),
+              field({
+                out: ['out', out],
+                except: [
+                  'except',
+                  $concat<T, D, C2>(
+                    ite<Arr<T>, D, C2>(
+                      eq(indexInExcept)(val(0)),
+                      $array<T, D>(),
+                      $slice<T, D, C2>(except, val(0), indexInExcept),
+                    ),
+                    $slice<T, D, C2>(except, add(indexInExcept, val(1)), $size(except)),
+                  ),
+                ],
+              }),
+              field({
+                out: ['out', $concat<T, D, Reduce<T, DiffArr<T>>>(out, $array(curr))],
+                except: ['except', except],
+              }),
+            ),
+          ),
+        ),
+      ],
+    },
+    ctx<DiffArr<T>>()('res').of('out').expr(),
+  )
+}

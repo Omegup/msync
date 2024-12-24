@@ -1,19 +1,19 @@
+import type { Expr } from '.'
 import type {
-  ConstHKT,
   HKT,
   I,
+  N,
   O,
   RORec,
   RawObj,
-  StrKey,
+  Rec,
   Type,
   U,
   Undef,
-  jsonItem,
+  jsonItem
 } from '../../types'
 import type { Field } from '../field'
-import type { Exact, MapKDom } from '../utils/map-object'
-import type { Expr } from './expr'
+import type { Exact } from '../utils/map-object'
 
 declare const AccumulatorRaw: unique symbol
 declare const Accumulator: unique symbol
@@ -50,20 +50,9 @@ export type Accumulator<in Doc, out T, in Ctx = unknown> = {
     ): AccumulatorRaw<T | I, DeltaD, Ctx & C>
   }
 }
+export type Part<Doc> = Rec<'v', Doc> & RORec<'old', boolean>
 
-export type DeltaAccumulator<in out Doc, in out T, in out Ctx = unknown> = {
-  raw: {
-    <DeltaD extends O, I extends U, C = unknown>(
-      f: Field<DeltaD, Doc | Undef<I>, C>,
-    ): AccumulatorRaw<T | I, DeltaD, Ctx & C>
-  }
-  zero: Expr<T, unknown, Ctx>
-  sum: <D, C = Ctx>(a: Expr<T, D, C>, b: Expr<T, D, C>) => Expr<T, D, C>
-  diff: <D, C = Ctx>(a: Expr<T, D, C>, b: Expr<T, D, C>) => Expr<T, D, C>
-}
-
-export type ConstAccumulatorHKT<T, C> = ConstHKT<Accumulator<T, unknown, C>>
-export type ConstDeltaAccumulatorHKT<T, C> = ConstHKT<DeltaAccumulator<T, unknown, C>>
-export type AccumulatorArgs<T, A extends MapKDom<A, ConstAccumulatorHKT<T, C>>, C = unknown> = {
-  readonly [K in StrKey<A>]: A[K] extends Accumulator<T, infer V, C> ? V : never
+export type DeltaAccumulator<in out Doc, in out T, in out Ctx> = {
+  group: Accumulator<Part<Doc>, T, Ctx>
+  merge: <D, C = Ctx>(a: Expr<T | N, D, C>, b: Expr<T, D, C>) => Expr<T, D, C>
 }

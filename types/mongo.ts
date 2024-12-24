@@ -5,8 +5,8 @@ export declare const RawStage: unique symbol
 declare module 'mongodb' {
   export interface Collection<TSchema extends BSON.Document = BSON.Document> {
     [RawStage]:{
-      (_: 1, x: TSchema): unknown
       (_: 2): TSchema
+      (_: 1, x: TSchema): TSchema
     }
     s: { db: Db }
   }

@@ -14,8 +14,8 @@ export const subUpdater = <P extends O, D, T, V, Ctx>(
   f: Path<P, D>,
 ): Updater<P, T, V, Ctx> => ({ raw: <R extends O>(g: Field<R, P | N>) => a.raw(g.with(f)) })
 
-export interface UpdaterHKT<R, Old, V, C, K extends keyof Old = keyof Old> extends HKT<StrKey<V>> {
-  readonly out: Updater<R, Get<Old, I<StrKey<V>, this>, K>, V[I<StrKey<V>, this>], C>
+export interface UpdaterHKT<R, Old, V, C, K extends keyof Old = keyof Old, V2 extends V = V> extends HKT<StrKey<V>> {
+  readonly out: Updater<R, Get<Old, I<StrKey<V>, this>, K>, V2[I<StrKey<V>, this>], C>
 }
 
 export type Get<T, P extends string, K extends keyof T = never> = P extends K
@@ -41,7 +41,7 @@ export const weaken = <R, T, V, C = unknown>(
   updater: Updater<R, T, V, C>,
 ): Updater<R | null, T | N, V | null, C> => ({ raw: f => updater.raw(f) })
 
-export const to = <R, V, C = unknown>(expr: Expr<V, R, C>): Updater<R, unknown, V, C> => ({
+export const to = <R, V, C = unknown, T = unknown>(expr: Expr<V, R, C>): Updater<R, T, V, C> => ({
   raw: f => [['', expr.raw(f).get()]],
 })
 export const items = <R, T, V, C = unknown>(x: Updater<R, T, V, C>) =>

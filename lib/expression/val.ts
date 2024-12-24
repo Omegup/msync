@@ -1,5 +1,5 @@
 import type { Timestamp } from 'mongodb'
-import type { N, StrKey, jsonItem, rawItem } from '../../types'
+import type { Arr, N, O, StrKey, jsonItem, rawItem } from '../../types'
 import type { Expr } from '../types'
 import { asExpr, asExprRaw } from './expr-base'
 
@@ -19,10 +19,13 @@ export const now: Expr<Timestamp, unknown> = asExpr({
 
 export const nil = val(null)
 
-export const $getField = <T, K extends StrKey<T>, D, C = unknown>(
-  expr: Expr<T | N, D, C>,
-  field: K,
-) =>
+export const $getField: {
+  <T, K extends StrKey<T>, D, C = unknown>(expr: Expr<T, D, C>, field: K): Expr<T[K], D, C>
+  <T, K extends StrKey<T>, D, C = unknown>(
+    expr: Expr<T | N, D, C>,
+    field: K,
+  ): Expr<T[K] | null, D, C>
+} = <T, K extends StrKey<T>, D, C = unknown>(expr: Expr<T | N, D, C>, field: K) =>
   asExpr<T[K] | null, D, C>({
     raw: f =>
       asExprRaw({
@@ -33,8 +36,14 @@ export const $getField = <T, K extends StrKey<T>, D, C = unknown>(
       }),
   })
 
+export type NoRaw<T> =
+  T extends Arr<infer U>
+    ? readonly NoRaw<U>[]
+    : T extends O
+      ? { readonly [K in keyof T]: NoRaw<T[K]> }
+      : T
 export const func = <T extends jsonItem, A extends readonly jsonItem[], D, C = unknown>(
-  f: (...args: A) => T,
+  f: (...args: A) => NoRaw<T>,
   ...args: { [X in keyof A]: Expr<A[X], D, C> }
 ) =>
   asExpr<T, D, C>({

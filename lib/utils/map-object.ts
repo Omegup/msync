@@ -87,3 +87,26 @@ export const spread = <T, V, F extends Dom<T, V>, E = unknown, No extends keyof 
   a: Exact<Omit<T, No>, F>,
   b: Exact<V, F>,
 ) => ({ ...a, ...mapExact(b, id) }) as Exact<V & Omit<T, keyof V> & Pick<E, symbol & keyof E>, F>
+
+export interface MergeHKT<T, V, F1 extends HKT<StrKey<Omit<T, No>>>, F2 extends HKT<StrKey<V>>, No extends keyof V = never,>
+  extends HKT<StrKey<V & Omit<T, No>>> {
+  readonly out: I<StrKey<V & Omit<T, No>>, this> extends StrKey<V>
+    ? App<F2, I<StrKey<V>, this>>
+    : App<F1, I<StrKey<Omit<T, No>>, this>>
+}
+
+export const spread0 = <
+  T,
+  V,
+  F1 extends HKT<StrKey<Omit<T, No>>>,
+  F2 extends HKT<StrKey<V>>,
+  E = unknown,
+  No extends keyof V = never,
+>(
+  a: MapO<Omit<T, No>, F1>,
+  b: MapO<V, F2>,
+) =>
+  ({ ...a, ...mapExact0(b, id) }) as MapO<
+    V & Omit<T, No> & Pick<E, symbol & keyof E>,
+    MergeHKT<T, V, F1, F2, No>
+  >

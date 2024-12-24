@@ -20,6 +20,12 @@ export interface WriteonlyCollection<in R> extends CommonCollection {
   [RawStage]: { (_: 1, x: R): unknown }
 }
 
+// RWCollection<A, A | B | C> accepts Collection<A | B>
+export interface RWCollection<in T extends O, out Out extends O = T> extends CommonCollection {
+  [RawStage](_: 2): Out
+  [RawStage](_: 1, x: T): Out
+}
+
 export type OPick<V, K extends StrKey<V>, E extends StrKey<V> = never> = O & Pick<V, K | E>
 export type OPickD<V extends Model, K extends StrKey<V>> = OPick<V, K, 'deletedAt' | '_id'>
 

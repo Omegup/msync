@@ -1,4 +1,4 @@
-import type { O, StrKey, doc } from '../../../types'
+import type { O, Replace, StrKey, doc } from '../../../types'
 import type { DeltaStages, Expr, LinStages } from '../../types'
 import { set, type Updater, type UpdaterHKT } from '../../update'
 import type { MapO } from '../../utils/map-object'
@@ -13,7 +13,6 @@ const $setCore = <Q, T extends Q & O, V extends Q & O, C = unknown>(
   lin: $set_(updater),
 })
 
-type Replace<R, V> = Omit<R, StrKey<V>> & V & O
 export const $set =
   <V extends O>() =>
   <R extends doc, C = unknown>(

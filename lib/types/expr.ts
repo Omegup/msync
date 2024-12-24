@@ -6,12 +6,12 @@ declare const BoolExpr: unique symbol
 declare const ExprRaw: unique symbol
 export type ExprRaw<out T, in Doc, in Ctx = unknown> = {
   [Type]?(x: typeof ExprRaw): void
-  [ExprRaw](doc: Doc, ctx: Ctx): T
+  [ExprRaw]?(doc: Doc, ctx: Ctx): T
   get: () => rawItem
 }
 export type Expr<out T, in Doc, in Ctx = unknown> = {
   [Type]?(x: typeof Expr): void
-  [Expr](doc: Doc, ctx: Ctx): T
+  [Expr]?(doc: Doc, ctx: Ctx): T
   raw: {
     <DeltaD extends O, I extends U, C = unknown>(f: Field<DeltaD, Doc | Undef<I>, C>): ExprRaw<T | I, DeltaD, Ctx & C>
   }

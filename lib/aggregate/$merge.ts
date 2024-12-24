@@ -1,11 +1,14 @@
-import type { App, ConstHKT, HKT, I, IdHKT, OPick, WriteonlyCollection } from '../../types'
-import type { ID, N, O, RORec, Rec, StrKey } from '../../types/json'
-import {
-  field,
-  type ExprHKT,
-  type ExprsExact,
-  type ExprsExactHKT
-} from '../expression/concat'
+import type {
+  App,
+  ConstHKT,
+  HKT,
+  I,
+  IdHKT,
+  OPick,
+  RWCollection
+} from '../../types'
+import type { ID, N, O, RORec, Rec, Replace, StrKey } from '../../types/json'
+import { field, type ExprHKT, type ExprsExact, type ExprsExactHKT } from '../expression/concat'
 import { eqTyped, ite } from '../expression/logic'
 import { nil, now } from '../expression/val'
 import { root } from '../field'
@@ -16,7 +19,7 @@ import {
   mapExactToObject,
   spread,
   type ExactKeys,
-  type WithKey1
+  type WithKey1,
 } from '../utils/map-object'
 import { $replaceWith_ } from './mongo-stages'
 import { $merge_ } from './out'
@@ -25,18 +28,23 @@ interface AfterHKT<T> extends HKT {
   readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
 }
 type Allowed<K extends string> = Exclude<K, keyof (TS & ID)>
-type Outt<V, MKeys extends StrKey<V>> = ID & TS & Omit<V, MKeys> & (OPick<V, MKeys> | Rec<MKeys, N>)
+export type WithKeys<V, MKeys extends StrKey<V>> = ID &
+  TS &
+  Omit<V, MKeys> &
+  (OPick<V, MKeys> | Rec<MKeys, N>)
+
+type Patch<V, KK extends StrKey<V>> = ((OPick<V, Allowed<KK>> & ID) | (Rec<Allowed<KK>, N> & ID)) &
+  TS
 
 export const $merge =
   <V extends Model & ID>() =>
-  <KK extends StrKey<V>>(
-    out: WriteonlyCollection<Outt<V, Allowed<KK>>>,
+  <KK extends StrKey<V>, Out extends O>(
+    out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
     keys: ExactKeys<Allowed<KK>>,
   ): RawStages<unknown, OutInput<OPick<V, Allowed<KK>> & ID>, 'out'> => {
     type K = Allowed<KK>
     type T = OPick<V, K> & ID
     type Patch = (T | (Rec<K, N> & ID)) & TS
-    type Out = Outt<V, K>
     type FromOut<N, E = TS & ID & O> = ExprsExactHKT<E, OutInput<T, N>>
 
     const omRORec: Equal<unknown, RORec<K, N>, Omit<RORec<K, N>, keyof (TS & ID)>> = omitRORec<
@@ -77,6 +85,7 @@ export const $merge =
         ),
       ),
     )
+
     return link<OutInput<T>>()
       .with<unknown, Patch>($replaceWith_(replacer))
       .with<unknown, 'out'>(
@@ -84,6 +93,7 @@ export const $merge =
           into: out,
           on: root<O<ID>>().of('_id'),
           whenNotMatched: 'fail',
+          whenMatched: 'merge',
         }),
       ).stages
   }
