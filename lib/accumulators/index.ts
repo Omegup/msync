@@ -9,19 +9,19 @@ import type { Accumulator, AccumulatorRaw, DeltaAccumulator, Expr, Part } from '
 const asAccumulator = <T, V, C = unknown>(x: RawObj) => x as AccumulatorRaw<T, V, C>
 
 export const $sum_ = <D extends O, C = unknown>(
-  expr: Expr<number, D, C>,
+  expr: Expr<number | N, D, C>,
 ): Accumulator<D, number, C> => ({ raw: f => asAccumulator({ $sum: expr.raw(f).get() }) })
 export const $sum = <D extends O, C = unknown>(
-  expr: Expr<number, D, C>,
+  expr: Expr<number | N, D, C>,
 ): DeltaAccumulator<D, number, C> => ({
   group: $sum_(
     ite(
       root<Part<D>>().of('old').expr(),
-      subtract(val(0), sub(expr, root<Part<D>>().of('v'))),
+      subtract(val(0), $ifNull(sub(expr, root<Part<D>>().of('v')), val(0))),
       sub(expr, root<Part<D>>().of('v')),
     ),
   ),
-  merge: (x, y) => add($ifNull(x, val(0)), $ifNull(y, val(0))),
+  merge: (x, y) => add($ifNull(x, val(0)), y)
 })
 
 export const $accumulator_ = <D, T, Ctx, A extends readonly unknown[]>(
