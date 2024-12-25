@@ -1,12 +1,12 @@
-import type { App, AsLiteral, HKT, ID, O, RORec, Rec, StrKey, notArr } from '../../../../types'
-import { mergeExact0, type ExprHKT, type ExprsExact } from '../../../expression/concat'
+import type { App, AsLiteral, HKT, ID, O, RORec, Rec, Replace, notArr } from '../../../../types'
+import { type ExprHKT, type ExprsExact } from '../../../expression/concat'
 import { $rand, now } from '../../../expression/val'
 import { ctx, root } from '../../../field'
 import type { Expr, RawStages, TS } from '../../../types'
 import type { DeltaAccumulatorHKT, DeltaAccumulators } from '../../../types/accumulator'
 import { set, to, type Updater, type UpdaterHKT } from '../../../update'
 import { map1 } from '../../../utils/json'
-import { mapExact0, type MapO, type MappedHKT, type MergeHKT } from '../../../utils/map-object'
+import { mapExact0, type MapO, type MappedHKT } from '../../../utils/map-object'
 import { $set_ } from '../../mongo-stages'
 import { $merge_, type MergeInto } from '../../out'
 import { link } from '../../prefix'
@@ -33,7 +33,7 @@ export const subMerge = <
   Out extends Loose<Grp, VV, GG, EE> = Loose<Grp, VV, GG, EE>,
 >(
   args: DeltaAccumulators<T, Omit<VV, IdAndTsKeys | GI<GG>>>,
-  out: MergeInto<Strict<Grp, VV, GG, EE>, Out>,
+  out: MergeInto<Strict<Grp, VV, GG, EE>, Replace<Out, Partial<V<VV, GG>>>>,
   gid: AsLiteral<GI<GG>>,
   // ExprsExact<Extra, V_Grp>
   extra: ExprsExact<
@@ -51,12 +51,23 @@ export const subMerge = <
   type New = RORec<'new', ReadyForMerge>
   type Extra = Omit<EE, IdAndTsKeys | GID | keyof V>
 
-  const aggregates: MapO<V, Update<V_Grp, V, New>> = mapExact0<
-    V,
-    MappedHKT<V, DeltaAccumulatorHKT<T>>,
-    Update<V_Grp, V, New>
-  >(args, (v, k) =>
-    to(v.merge<V_Grp, New>(root<O<PV>>().of(k).expr(), ctx<O<V>>()('new').of(k).expr())),
+  const doubleReplace = (x: RawStages<O, Replace<Out, PV>, Replace<Replace<Out, PV>, V>, New>) =>
+    x as RawStages<O, Replace<Out, PV>, Replace<Out, V>, New>
+  const sss: RawStages<O, Replace<Out, PV>, Replace<Out, V>, New> = doubleReplace(
+    $set_<O, Replace<Out, PV>, Replace<Replace<Out, PV>, V>, New>(
+      set<V>()(
+        mapExact0<V, MappedHKT<V, DeltaAccumulatorHKT<T>>, Update<Replace<Out, PV>, V, New>>(
+          args,
+          (v, k) =>
+            to(
+              v.merge<Replace<Out, PV>, New>(
+                root<O<PV>>().of(k).expr(),
+                ctx<O<V>>()('new').of(k).expr(),
+              ),
+            ),
+        ),
+      ),
+    ),
   )
 
   type Update<R, X, C = unknown, Subset extends X = X> = UpdaterHKT<R, R, X, C, never, Subset>
@@ -76,6 +87,7 @@ export const subMerge = <
     Update<V_Grp, RORec<GID, Grp>>,
     Grp
   >(gid, to(gidPath as Expr<(TS & ID & RORec<GID, Grp> & Extra)[GID], V_Grp>))
+
   type Added = ID & TS & RORec<GID, Grp> & Extra
   const addExtraAndMerge = {
     ...mapExact0<Extra, MappedHKT<Extra, ExprHKT<V_Grp>>, Update<V_Grp, Extra>>(extra, to),
@@ -83,22 +95,16 @@ export const subMerge = <
     ...F2,
   } as MapO<Added, Update<V_Grp, Added>>
 
-  const vgrpToOut: MapO<
-    Added & Omit<V, StrKey<Added>>,
-    MergeHKT<
-      V,
-      Added,
-      Update<V_Grp, Omit<V, StrKey<Added>>, New, V>,
-      Update<V_Grp, Added>,
-      StrKey<Added>
-    >
-  > = mergeExact0(
-    aggregates as MapO<Omit<V, StrKey<Added>>, Update<V_Grp, Omit<V, StrKey<Added>>, New, V>>,
-    addExtraAndMerge,
+  const updater: Updater<
+    Replace<Out, PV>,
+    Replace<Out, PV>,
+    Replace<Replace<Out, PV>, V>,
+    New
+  > = set<V>()<Replace<Out, PV>, Replace<Out, PV>, New>(
+    addExtraAndMerge as MapO<V, Update<Replace<Out, PV>, V, New>>,
   )
-  const updater: Updater<Out, Out, Out, New> = set<Out>()<Out, Out, New>(
-    vgrpToOut as MapO<Out, Update<Out, Out, New>>,
-  )
+
+  const xx: RawStages<O, Replace<Out, PV>, Replace<Replace<Out, PV>, V>, New> = $set_(updater)
 
   return (
     link<V_Grp>()
@@ -113,12 +119,14 @@ export const subMerge = <
       )
       // TODO filter out documents with 0 change
       .with<unknown, 'out'>(
-        $merge_<ReadyForMerge, Out, New>({
+        $merge_<ReadyForMerge, Replace<Out, PV>, New>({
           stages: 'ctx',
           ...out,
           on: root<ReadyForMerge>().of(gid),
           vars: { new: ['new', root<ReadyForMerge>().expr()] },
-          whenMatched: $set_(updater),
+          whenMatched: link<Replace<Out, PV>, New>()
+            .with<O, Replace<Out, V>>(sss)
+            .with<O, Replace<Out, V>>(doubleReplace(xx)).stages,
         }),
       ).stages
   )
