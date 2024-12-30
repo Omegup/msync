@@ -12,8 +12,8 @@ interface CommonCollection {
   createIndex: Collection['createIndex']
 }
 
-export interface ReadonlyCollection<out T> extends CommonCollection {
-  [RawStage](_: 2): T
+export interface ReadonlyCollection<out Out> extends CommonCollection {
+  [RawStage](_: 2): Out
 }
 
 export interface WriteonlyCollection<in R> extends CommonCollection {
@@ -21,9 +21,9 @@ export interface WriteonlyCollection<in R> extends CommonCollection {
 }
 
 // RWCollection<A, A | B | C> accepts Collection<A | B>
-export interface RWCollection<in T extends O, out Out extends O = T> extends CommonCollection {
+export interface RWCollection<in R extends O, out Out extends O = R> extends CommonCollection {
   [RawStage](_: 2): Out
-  [RawStage](_: 1, x: T): Out
+  [RawStage](_: 1, x: R): unknown
 }
 
 export type OPick<V, K extends StrKey<V>, E extends StrKey<V> = never> = O & Pick<V, K | E>

@@ -1,5 +1,5 @@
-import type { RWCollection } from '../../../types'
-import type { AsLiteral, ID, O, RORec, Rec, doc, notArr } from '../../../types/json'
+import type { RWCollection, WriteonlyCollection } from '../../../types'
+import type { AsLiteral, ID, O, RORec, Rec, Replace, doc, notArr } from '../../../types/json'
 import { mergeExpr, type ExprsExact, type ExprsExactHKT } from '../../expression/concat'
 import { root } from '../../field'
 import type { Delta, DeltaAccumulators, Expr, RawStages, TS } from '../../types'
@@ -8,7 +8,14 @@ import { map1 } from '../../utils/json'
 import type { MergeInto } from '../out'
 import { link } from '../prefix'
 import { subGroup } from './utils/sub-group'
-import { subMerge, type IdAndTsKeys, type Loose } from './utils/sub-merge'
+import {
+  subMerge,
+  type Extra,
+  type IdAndTsKeys,
+  type Loose,
+  type Strict,
+  type V_Grp,
+} from './utils/sub-merge'
 
 type Denied<GID = never> = keyof (TS & ID) | GID
 type WithGRP<V, Grp, GID extends string> = Rec<GID, Grp> & V
@@ -33,16 +40,17 @@ export const $groupMerge = <
   V extends O,
   GG extends string,
   EE = {},
-  Out extends Loose<Grp, V, GG, EE> = Loose<Grp, V, GG, EE>,
+  Out extends Loose<Grp, V, GG> = Loose<Grp, V, GG>,
 >(
   id: Expr<Grp, T>,
   args: DeltaAccumulators<T, O & Omit<V, Denied<GI<GG>>>>,
-  out: MergeInto<Loose<Grp, V, GG, EE>, Out>,
-  gid: AsLiteral<GI<GG>>,
-  extra: ExprsExact<
-    Omit<EE, IdAndTsKeys | GI<GG> | keyof Omit<V, IdAndTsKeys | GI<GG>>>,
-    Rec<GI<GG>, Grp> & Omit<V, IdAndTsKeys | GI<GG>>
+  out: MergeInto<
+    Strict<Grp, V, GG, EE>,
+    Out,
+    WriteonlyCollection<Replace<Out, Strict<Grp, V, GG, EE>>>
   >,
+  gid: AsLiteral<GI<GG>>,
+  extra: ExprsExact<Extra<EE, V, GG>, V_Grp<V, GG, Grp>>,
 ): RawStages<unknown, Delta<T>, 'out'> => {
   return link<Delta<T>>()
     .with<unknown, WithGRP<Omit<V, Denied<GI<GG>>>, Grp, GI<GG>>>(
@@ -55,11 +63,11 @@ export const $groupId = <
   T extends O,
   V extends O,
   EE = {},
-  Out extends Loose<string, V, '_id', EE> = Loose<string, V, '_id', EE>,
+  Out extends Loose<string, V, '_id'> = Loose<string, V, '_id'>,
 >(
   id: Expr<string, T>,
   args: DeltaAccumulators<T, O & Omit<V, Denied>>,
-  out: RWCollection<Out>,
+  out: RWCollection<Replace<Out, Strict<string, V, '_id', EE>>, Out>,
   extra: ExprsExact<Omit<EE, IdAndTsKeys | keyof Omit<V, IdAndTsKeys>>, doc & Omit<V, IdAndTsKeys>>,
 ): RawStages<unknown, Delta<T>, 'out'> =>
   $groupMerge<T, string, V, '_id', EE, Out>(
@@ -75,11 +83,11 @@ export const $group = <
   Grp extends notArr,
   V extends O,
   EE = {},
-  Out extends Loose<Grp, V, '_grp', EE> = Loose<Grp, V, '_grp', EE>,
+  Out extends Loose<Grp, V, '_grp'> = Loose<Grp, V, '_grp'>,
 >(
   id: Expr<Grp, T>,
   args: DeltaAccumulators<T, O & Omit<V, Denied<'_grp'>>>,
-  out: RWCollection<Loose<Grp, V, '_grp', EE>, Out>,
+  out: RWCollection<Strict<Grp, V, '_grp', EE>, Out>,
   extra: ExprsExact<
     Omit<EE, IdAndTsKeys | '_grp' | keyof Omit<V, IdAndTsKeys | '_grp'>>,
     Rec<'_grp', Grp> & Omit<V, IdAndTsKeys | '_grp'>
