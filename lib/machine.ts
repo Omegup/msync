@@ -20,7 +20,7 @@ export class Machine<Result = unknown> {
     return firstWorksMerge<Result, HasJob>(items)
   }
 
-  start(cb?: (info: HasJob) => void): Promise<never> {
+  start(cb?: (info: HasJob) => void | boolean): Promise<never> {
     const run = this.runner()
     return runCont(run(), cb)
   }
@@ -30,9 +30,14 @@ export const wrap = <Result>(root: Machine<Result>): Machine<Result> => new Mach
 
 const runCont = async <T, Info>(
   { next }: IteratorResult<T, Info>,
-  cb?: (info: Info) => void,
+  cb?: (info: Info) => void | boolean,
 ): Promise<never> => {
   const { cont, info } = await next
-  cb?.(info)
-  return runCont(cont(), cb)
+  const stopped = cb?.(info)
+  const it = cont()
+  if (stopped) {
+    await it.clear()
+    throw new Error('Machine stopped')
+  }
+  return runCont(it, cb)
 }

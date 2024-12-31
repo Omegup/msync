@@ -15,6 +15,7 @@ export type Frame<T, Info> = {
 export type IteratorResult<out T, out Info> = {
   next: NextFrame<T, Info>
   stop: Iterator<T, Info>
+  clear: () => Promise<void>
 }
 
 export type Iterator<out T, out Info> = () => IteratorResult<T, Info>

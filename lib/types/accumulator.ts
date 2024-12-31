@@ -45,14 +45,14 @@ export type AccumulatorsRoot<Acc extends Accumulators<never, RORec<string, jsonI
 export type Accumulator<in Doc, out T, in Ctx = unknown> = {
   [Type]?(_: typeof Accumulator): typeof Accumulator
   raw: {
-    <DeltaD extends O, I extends U, C = unknown>(
-      f: Field<DeltaD, Doc | Undef<I>, C>,
-    ): AccumulatorRaw<T | I, DeltaD, Ctx & C>
+    <DeltaD extends O, I extends U>(
+      f: Field<DeltaD, Doc | Undef<I>>,
+    ): AccumulatorRaw<T | I, DeltaD, Ctx>
   }
 }
 export type Part<Doc> = Rec<'v', Doc> & RORec<'old', boolean>
 
-export type DeltaAccumulator<in out Doc, in out T, in out Ctx> = {
+export type DeltaAccumulator<in out Doc, in out T, in out Ctx = unknown> = {
   group: Accumulator<Part<Doc>, T, Ctx>
   merge: <D, C = Ctx>(a: Expr<T | N, D, C>, b: Expr<T, D, C>) => Expr<T, D, C>
 }
