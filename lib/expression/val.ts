@@ -38,12 +38,22 @@ export const $getField: {
 
 export type NoRaw<T> =
   T extends Arr<infer U>
-    ? readonly NoRaw<U>[]
-    : T extends O
-      ? { readonly [K in keyof T]: NoRaw<T[K]> }
-      : T
+    ? NoRaw<U>[]
+    : T extends readonly unknown[]
+      ? { [K in keyof T]: NoRaw<T[K]>}
+      : T extends O
+        ? { [K in StrKey<T>]: NoRaw<T[K]> }
+        : T
+export type RONoRaw<T> =
+  T extends Arr<infer U>
+    ? readonly RONoRaw<U>[]
+    : T extends readonly unknown[]
+      ? { readonly [K in keyof T]: RONoRaw<T[K]>}
+      : T extends O
+        ? { readonly [K in StrKey<T>]: RONoRaw<T[K]> }
+        : T
 export const func = <T extends jsonItem, A extends readonly jsonItem[], D, C = unknown>(
-  f: (...args: A) => NoRaw<T>,
+  f: (...args: NoRaw<A>) => RONoRaw<T>,
   ...args: { [X in keyof A]: Expr<A[X], D, C> }
 ) =>
   asExpr<T, D, C>({

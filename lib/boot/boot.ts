@@ -147,7 +147,14 @@ const executes = <
         .with($match_(hardQuery) as RawStages<O, V | Del, V>)
         .with(projectInput)
         .with(replaceRaw)
-        .with($merge_({ into: snapshotCollection, on: root<UDelta<T>>().of('_id') })).stages
+        .with(
+          $merge_({
+            into: snapshotCollection,
+            on: root<UDelta<T>>().of('_id'),
+            whenMatched: 'merge',
+            whenNotMatched: 'insert',
+          }),
+        ).stages
 
       const r = await aggregate<'out'>(c => c({ coll: collection, input: cloneIntoNew }))
       await snapshotCollection.deleteMany({ updated: true, after: null, before: null })
