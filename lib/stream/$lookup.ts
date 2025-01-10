@@ -89,7 +89,7 @@ const join = <
         'right',
         joinId,
       )
-      const zefze = concatStages<
+      const mergeForeignIntoDoc = concatStages<
         unknown,
         Delta<LeftRight>,
         Delta<LE & RORec<As, RE>>,
@@ -108,8 +108,8 @@ const join = <
         stagesUntilNextLookup.delta,
       )
 
-      const lRunnerInput = concatStages(joinR_Delta, zefze)
-      const rRunnerInput = concatStages(joinL_Delta, zefze)
+      const lRunnerInput = concatStages(joinR_Delta, mergeForeignIntoDoc)
+      const rRunnerInput = concatStages(joinL_Delta, mergeForeignIntoDoc)
       const lRunner = left.out(concatStages(lRunnerInput, finalInput))
       const rRunner = right.out(concatStages(rRunnerInput, finalInput))
 
