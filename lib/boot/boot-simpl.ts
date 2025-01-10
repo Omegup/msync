@@ -74,8 +74,9 @@ const executes = <
     type It = Iterator<readonly Result2[], W>
     type FrameD = Frame<readonly Result2[], W>
     type Next = Promise<FrameD>
+    const clear = async () => {}
     const withStop = (next: () => Next, tr?: () => void): It => {
-      return addTeardown(() => ({ stop, next: next() }), tr)
+      return addTeardown(() => ({ stop, next: next(), clear }), tr)
     }
     const next = (next: () => Next, debug: string, tr?: () => void): FrameD => ({
       cont: withStop(next, tr),

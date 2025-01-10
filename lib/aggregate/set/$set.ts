@@ -1,4 +1,4 @@
-import type { O, Replace, StrKey, doc } from '../../../types'
+import type { O, Replace } from '../../../types'
 import type { DeltaStages, Expr, LinStages } from '../../types'
 import { set, type Updater, type UpdaterHKT } from '../../update'
 import type { MapO } from '../../utils/map-object'
@@ -15,7 +15,7 @@ const $setCore = <Q, T extends Q & O, V extends Q & O, C = unknown>(
 
 export const $set =
   <V extends O>() =>
-  <R extends doc, C = unknown>(
+  <R extends O, C = unknown>(
     fields: MapO<V, UpdaterHKT<R, R, V, C>>,
   ): DeltaStages<O, R, Replace<R, V>, C> & LinStages<O, R, Replace<R, V>, C> => {
     return $setCore<O, R, Replace<R, V>, C>(set<V>()(fields))

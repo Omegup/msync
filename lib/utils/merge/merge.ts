@@ -35,5 +35,10 @@ export const mergeIterators = <K extends KEYS, Result, Info extends Record<K, Ha
   return {
     stop: () => mergeIterators({ sources: restart(sources), interrupt }),
     next: select(sources).then(reiterate),
+    clear: async () => {
+      for (const key in sources) {
+        await sources[key].clear()
+      }
+    },
   }
 }
