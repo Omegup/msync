@@ -14,7 +14,7 @@ export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extend
     .with<unknown, Rec<K1, Delta<T>> & Rec<K2, Arr<Delta<U>>>>(
       asStages([
         {
-          $replaceWith: {
+          $set: {
             [k1]: {
               before: { $ifNull: [`$before.${k1}`, null] },
               after: { $ifNull: [`$after.${k1}`, null] },
@@ -83,6 +83,7 @@ export const $unwindDelta = <K1 extends s, T extends doc, K2 extends s, U extend
       asStages([
         {
           $replaceWith: {
+            _id: "$_id",
             before: {
               $cond: {
                 if: { $or: [{ $eq: [`$${k1}.before`, null] }, { $eq: [`$${k2}.before`, null] }] },

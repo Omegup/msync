@@ -1,62 +1,76 @@
-import type { App, ConstHKT, HKT, I, jsonItem, Par, Rec, RORec } from '../../types'
+import type { App, HKT, jsonItem, Literal, Par, Rec, RORec } from '../../types'
 
 export type Equal<Dom, T extends Dom, V extends Dom> = {
   forward: <F extends HKT<Dom>>(x: App<F, T>) => App<F, V>
+  forward1: (x: T) => V
   backward: <F extends HKT<Dom>>(x: App<F, V>) => App<F, T>
+  backward1: (x: V) => T
 }
-export const sym = <Dom, T extends Dom, V extends Dom>(eq: Equal<Dom, T, V>): Equal<Dom, V, T> => eq
+export const sym = <Dom, T extends Dom, V extends Dom>(eq: Equal<Dom, T, V>): Equal<Dom, V, T> => ({
+  backward: eq.forward,
+  forward: eq.backward,
+  backward1: eq.forward1,
+  forward1: eq.backward1,
+})
 const id = <T>(x: T) => x
 const assertEqual = <Dom, T extends Dom, V extends Dom>() =>
   ({
     forward: id,
     backward: id,
+    forward1: id,
+    backward1: id,
   }) as Equal<Dom, T, V>
-interface PHKT<s, DF extends HKT<s>> extends HKT<s> {
-  readonly out: HKT<App<DF, I<s, this>>>
-}
 
-const unsafeOmit = <s extends keyof any, DF extends HKT<s>, RecF extends PHKT<s, DF>>() => {
-  type FDom<K extends s, T extends App<DF, K>> = App<App<RecF, K>, T>
-  return <K extends s, E extends s, R extends s, T extends App<DF, Exclude<K, E | R>>>(): Equal<
-    FDom<K, T>,
-    App<App<RecF, Exclude<K, E | R>>, T>,
-    Omit<App<App<RecF, Exclude<K, E | R>>, T>, R>
-  > => assertEqual()
-}
-
-interface RORec1HKT<K extends string> extends HKT<unknown> {
-  readonly out: RORec<K, I<unknown, this>>
-}
-interface RORecHKT extends HKT<string> {
-  readonly out: RORec1HKT<I<string, this>>
-}
-
-interface Par1HKT<K extends string> extends HKT<Rec<K, jsonItem>> {
-  readonly out: Par<K, I<Rec<K, jsonItem>, this>>
-}
-interface ParHKT extends PHKT<string, ParDF> {
-  readonly out: Par1HKT<I<string, this>>
-}
-
-interface ParDF extends HKT<string> {
-  readonly out: Rec<I<string, this>, jsonItem>
-}
-
-export const omitRORec = unsafeOmit<string, ConstHKT<unknown>, RORecHKT>()
-export const omitPar = unsafeOmit<string, ParDF, ParHKT>()
+export const omitRORec = <
+  K extends string,
+  E extends string,
+  R extends string,
+  T extends unknown,
+>() => assertEqual<unknown, RORec<Exclude<K, E | R>, T>, Omit<RORec<Exclude<K, E | R>, T>, R>>()
 
 type s = keyof any
 
-interface PickDF extends HKT<s> {
-  readonly out: RORec<I<s, this>, jsonItem>
-}
-interface Pick1HKT<K extends s> extends HKT<RORec<K, jsonItem>> {
-  readonly out: Pick<I<RORec<K, jsonItem>, this>, K>
-}
-interface PickHKT extends PHKT<s, PickDF> {
-  readonly out: Pick1HKT<I<s, this>>
-}
-export const omitPick = unsafeOmit<s, PickDF, PickHKT>()
+export const omitPick = <
+  K extends s,
+  E extends s,
+  R extends s,
+  T extends RORec<Exclude<K, E | R>, unknown>,
+>() => assertEqual<unknown, Pick<T, Exclude<K, E | R>>, Omit<Pick<T, Exclude<K, E | R>>, R>>()
+
+export const omitExclude = <
+  K extends s,
+  E extends s,
+  R extends s,
+  T extends RORec<Exclude<K, E | R>, unknown>,
+>() => assertEqual<unknown, Omit<T, E & Exclude<K, keyof T>>, Omit<Pick<T, Exclude<K, E | R>>, R>>()
+export const renamedFields = <K extends s, F extends HKT<K, s>, G extends HKT<App<F, K>>>() =>
+  assertEqual<s, keyof { [P in K as App<F, P>]: App<G, P> }, App<F, K>>()
+export const doubleExclude = <
+  K extends string,
+  E extends s,
+  R extends s,
+>() => assertEqual<K, K, Exclude<K, E & Exclude<Literal<R>, K>>>()
+
+export const excludeIdem = <
+  K extends s,
+  E extends s,
+  S extends E = E,
+>() => assertEqual<Exclude<K, E>, Exclude<K, E>, Exclude<Exclude<K, E>, S>>()
 
 export const eqPar = <K extends string, T extends Rec<K, jsonItem>, K2 extends K>() =>
   assertEqual<unknown, Par<K2, T>, Par<K, T>>()
+
+export const notExtendExcluded = <
+  Key extends keyof any,
+  Others extends keyof any,
+  Source extends keyof any,
+  Denied extends keyof any,
+  F extends HKT<Others | Exclude<Source, Denied | Key>, Dom>,
+  Else extends Dom,
+  Dom = unknown,
+>() =>
+  assertEqual<
+    Dom,
+    Key extends Others | Exclude<Source, Denied | Key> ? App<F, Key> : Else,
+    Key extends Others ? App<F, Key> : Else
+  >()

@@ -12,7 +12,8 @@ export const firstWorksMerge = <Result, Info extends HasJob>(
     const sources: RORec<number, IteratorResult<Result, Info>> = { ...results }
     return mergeIterators<string, Result, RORec<string, Info>>({
       sources,
-      interrupt: key => key !== '0',
+      // interrupt: key => key !== '0',
+      interrupt: key => false,
     })
   }
   return iterator

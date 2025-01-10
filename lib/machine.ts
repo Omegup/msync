@@ -1,7 +1,7 @@
 import type { Iterator, IteratorResult, HasJob } from './types'
 import { firstWorksMerge } from './utils/merge/combiners'
 
-export class Machine<Result> {
+export class Machine<Result = unknown> {
   private sources: Iterator<Result, HasJob>[]
 
   constructor(root?: Iterator<Result, HasJob>) {
@@ -17,7 +17,7 @@ export class Machine<Result> {
     if (items.length === 1) {
       return items[0]
     }
-    return firstWorksMerge<Result, HasJob>(this.sources)
+    return firstWorksMerge<Result, HasJob>(items)
   }
 
   start(cb?: (info: HasJob) => void): Promise<never> {

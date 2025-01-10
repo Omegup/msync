@@ -1,3 +1,4 @@
+import type { UBefore } from "../lib/types"
 import type { Rec } from "./json"
 
 export interface HKT<in Dom = unknown, out Im = unknown> {
@@ -62,8 +63,12 @@ export interface FieldHKT<K extends string> extends DeepFieldHKT<Record<K, unkno
 export interface RecordHKT<K extends string, Dom = unknown> extends HKT<Dom, Record<K, Dom>> {
   readonly out: Record<K, I<Dom, this>>
 }
-export interface RecHKT<K extends string, Dom = unknown> extends HKT<Dom, Rec<K, Dom>> {
-  readonly out: Rec<K, I<Dom, this>>
+export interface RecHKT<K extends string, Dom = unknown, E = unknown> extends HKT<Dom, Rec<K, Dom>> {
+  readonly out: Rec<K, I<Dom, this>> & E
+}
+
+export interface UBeforeHKT<Dom = unknown> extends HKT<Dom, UBefore<Dom>> {
+  readonly out: UBefore<I<Dom, this>>
 }
 
 export interface And<E> extends HKT {

@@ -1,7 +1,19 @@
-import type { HKT, I, J, RORec, RawObj, Type, U, Undef, jsonItem } from '../../types'
+import type { Expr } from '.'
+import type {
+  HKT,
+  I,
+  N,
+  O,
+  RORec,
+  RawObj,
+  Rec,
+  Type,
+  U,
+  Undef,
+  jsonItem
+} from '../../types'
 import type { Field } from '../field'
 import type { Exact } from '../utils/map-object'
-import type { Expr } from './expr'
 
 declare const AccumulatorRaw: unique symbol
 declare const Accumulator: unique symbol
@@ -28,24 +40,19 @@ export type DeltaAccumulators<T, V extends RORec<string, jsonItem>, C = unknown>
 >
 
 export type AccumulatorsRoot<Acc extends Accumulators<never, RORec<string, jsonItem>, never>> =
-  Acc extends Accumulators<infer T extends J, RORec<string, jsonItem>, never> ? T : never
+  Acc extends Accumulators<infer T extends O, RORec<string, jsonItem>, never> ? T : never
 
 export type Accumulator<in Doc, out T, in Ctx = unknown> = {
   [Type]?(_: typeof Accumulator): typeof Accumulator
   raw: {
-    <DeltaD extends J, I extends U, C = unknown>(
+    <DeltaD extends O, I extends U, C = unknown>(
       f: Field<DeltaD, Doc | Undef<I>, C>,
     ): AccumulatorRaw<T | I, DeltaD, Ctx & C>
   }
 }
+export type Part<Doc> = Rec<'v', Doc> & RORec<'old', boolean>
 
-export type DeltaAccumulator<in out Doc, in out T, in out Ctx = unknown> = {
-  raw: {
-    <DeltaD extends J, I extends U, C = unknown>(
-      f: Field<DeltaD, Doc | Undef<I>, C>,
-    ): AccumulatorRaw<T | I, DeltaD, Ctx & C>
-  }
-  zero: Expr<T, unknown, Ctx>,
-  sum: <D, C = Ctx>(a: Expr<T, D, C>, b: Expr<T, D, C>) => Expr<T, D, C>
-  diff: <D, C = Ctx>(a: Expr<T, D, C>, b: Expr<T, D, C>) => Expr<T, D, C>
+export type DeltaAccumulator<in out Doc, in out T, in out Ctx> = {
+  group: Accumulator<Part<Doc>, T, Ctx>
+  merge: <D, C = Ctx>(a: Expr<T | N, D, C>, b: Expr<T, D, C>) => Expr<T, D, C>
 }

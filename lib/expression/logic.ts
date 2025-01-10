@@ -1,8 +1,8 @@
-import type { App, HKT, J, U, Undef, jsonItem, rawItem } from '../../types'
+import type { App, HKT, O, U, Undef, jsonItem, rawItem } from '../../types'
 import type { Field, Path } from '../field'
 import type { BoolExpr, Expr } from '../types'
 import { asBoolExpr, asExpr, asExprRaw } from './expr-base'
-import { val } from './val'
+import { nil, val } from './val'
 
 export const ite = (<T, D1, D2, C>(
   cond: BoolExpr<D1, D2, C>,
@@ -10,7 +10,7 @@ export const ite = (<T, D1, D2, C>(
   orelse: Expr<T, D2 | D2, C>,
 ) =>
   asExpr<T, D1 | D2, C>({
-    raw: <DeltaD extends J, I extends U, Ctx>(f: Field<DeltaD, D1 | D2 | Undef<I>, Ctx>) =>
+    raw: <DeltaD extends O, I extends U, Ctx>(f: Field<DeltaD, D1 | D2 | Undef<I>, Ctx>) =>
       asExprRaw<T, DeltaD, C & Ctx>({
         $cond: {
           if: cond.raw(f).get(),
@@ -31,16 +31,21 @@ export const ite = (<T, D1, D2, C>(
   ): Expr<T, App<F, R1 | R2>, C>
 }
 
+export const and = <D, C = unknown>(...expr: [Expr<boolean, D, C>, Expr<boolean, D, C>]) =>
+  asExpr<boolean, D, C>({
+    raw: f => asExprRaw({ $and: expr.map(e => e.raw(f).get()) }),
+  })
+
 export const eq =
-  <T, D, C>(a: Expr<T, D, C>) =>
+  <T, D, C = unknown>(a: Expr<T, D, C>) =>
   (b: Expr<T, D, C>) =>
     asExpr<boolean, D, C>({
       raw: f => asExprRaw({ $eq: [a.raw(f).get(), b.raw(f).get()] }),
     })
 
-export const sub = <T, D, Ctx, P extends J>(a: Expr<T, D, Ctx>, f: Path<P, D, Ctx>) =>
+export const sub = <T, D, Ctx, P extends O>(a: Expr<T, D, Ctx>, f: Path<P, D, Ctx>) =>
   asExpr<T, P, Ctx>({
-    raw: <DeltaD extends J, I extends undefined, C = unknown>(g: Field<DeltaD, P | Undef<I>, C>) =>
+    raw: <DeltaD extends O, I extends undefined, C = unknown>(g: Field<DeltaD, P | Undef<I>, C>) =>
       asExprRaw<T | I, DeltaD, Ctx & C>(a.raw(g.with<P, D, I, Ctx, 2>(f)).get()),
   })
 
@@ -55,7 +60,7 @@ export const eqTyped = <
   b: Expr<T1, App<F, T1 | T2>, C>,
 ): BoolExpr<App<F, T1>, App<F, T2>, C> =>
   asBoolExpr({
-    raw: <DeltaD extends J>(f: Field<DeltaD, App<F, T1> | App<F, T2>>) =>
+    raw: <DeltaD extends O>(f: Field<DeltaD, App<F, T1> | App<F, T2>>) =>
       asExprRaw<never, DeltaD, C>({ $eq: [a.raw(f).get(), b.raw(f).get()] }),
   })
 
@@ -65,6 +70,9 @@ export const ne =
     asExpr<boolean, D, C>({
       raw: f => asExprRaw({ $ne: [a.raw(f).get(), b.raw(f).get()] }),
     })
+
+export const notNull =
+<T, K, D, C>(a: Expr<T, D, C>) => ne($ifNull(a, nil))(nil)
 
 export const $ifNull = <R, D, C>(...expr: [...Expr<R | null | undefined, D, C>[], Expr<R, D, C>]) =>
   asExpr<R, D, C>({

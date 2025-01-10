@@ -1,19 +1,29 @@
-import type { Stages } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
+import type { ReadonlyCollection } from '../../types'
+import type { RawStages } from '../types'
 import { log } from '../utils/log'
 
-export const aggregate = <Result>(input: Stages<unknown, Result>) =>
-  input(({ coll, exec, input }) => {
+export const aggregate = <Result>(
+  input: <E>(
+    consume: <S, B>(value: {
+      coll: ReadonlyCollection<S>
+      input: RawStages<unknown, B, Result>
+    }) => E,
+  ) => E,
+  snapshot = true,
+  start = Date.now()
+) =>
+  input(({ coll, input }) => {
     const req = {
       aggregate: coll.collectionName,
-      pipeline: [...input, ...exec],
+      pipeline: input,
       cursor: {},
-      readConcern: { level: 'snapshot' },
+      ...(snapshot && { readConcern: { level: 'snapshot' } }),
     }
     log('exec', req)
     return coll.s.db.command(req).then(
       result => {
-        log('execed', req)
+        log('execed', req, result, 'took', Date.now() - start)
         return result as AggregateCommand<Result>
       },
       err => {

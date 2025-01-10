@@ -1,20 +1,15 @@
-import type {
-  App,
-  ConstHKT,
-  HKT,
-  I,
-  IdHKT,
-  J,
-  O,
-  RORec,
-  StrKey,
-  U,
-  Undef,
-  rawItem,
-} from '../../types'
+import type { App, ConstHKT, HKT, I, IdHKT, O, RORec, StrKey, U, Undef, rawItem } from '../../types'
 import type { Field } from '../field'
 import type { Expr } from '../types'
-import { mapExactToObject, type Exact, type ExactPart } from '../utils/map-object'
+import {
+  mapExactToObject,
+  spread,
+  type Exact,
+  type ExactPart,
+  type MapO,
+  type MergeHKT,
+  spread0,
+} from '../utils/map-object'
 import { asExpr, asExprRaw } from './expr-base'
 
 export const concat = <D, C>(...expr: Expr<string, D, C>[]) =>
@@ -43,7 +38,7 @@ export const fieldM = <
   m: Pick<M, Dom>,
 ) =>
   asExpr<O<{ readonly [K in Dom]: T[M[K]] }>, D, C>({
-    raw: <DeltaD extends J, I extends U, Ctx>(f: Field<DeltaD, D | Undef<I>, Ctx>) =>
+    raw: <DeltaD extends O, I extends U, Ctx>(f: Field<DeltaD, D | Undef<I>, Ctx>) =>
       asExprRaw<O<{ readonly [K in Dom]: T[M[K]] }>, DeltaD, Ctx & C>(
         Object.fromEntries(
           Object.entries(m).map(<K extends Dom>([dom, ref]: readonly [K, M[K]]) => [
@@ -63,11 +58,27 @@ type MergeExactArgs<T1, T2, F extends HKT<T1[StrKey<T1>] | T2[StrKey<T2>]>> = re
 ]
 export const mergeExact = <T1, T2, F extends HKT<T1[StrKey<T1>] | T2[StrKey<T2>]>, E = unknown>(
   ...[exprsExact1, exprsExact2]: MergeExactArgs<T1, T2, F>
-) =>
-  ({
-    ...exprsExact1,
-    ...exprsExact2,
-  }) as Exact<T2 & Omit<T1, keyof T2> & Pick<E, symbol & keyof E>, F>
+): Exact<T2 & Omit<T1, keyof T2> & Pick<E, symbol & keyof E>, F> =>
+  spread<T1, T2, F, E, keyof T2>(exprsExact1, exprsExact2)
+
+export type MergeMapOArgs<
+  T1,
+  T2,
+  F1 extends HKT<StrKey<Omit<T1, StrKey<T2>>>>,
+  F2 extends HKT<StrKey<T2>>,
+> = readonly [MapO<Omit<T1, StrKey<T2>>, F1>, MapO<T2, F2>]
+export const mergeExact0 = <
+  T1,
+  T2,
+  F1 extends HKT<StrKey<Omit<T1, StrKey<T2>>>>,
+  F2 extends HKT<StrKey<T2>>,
+  E = unknown,
+>(
+  ...[exprsExact1, exprsExact2]: MergeMapOArgs<T1, T2, F1, F2>
+): MapO<
+  T2 & Omit<T1, StrKey<T2>> & Pick<E, symbol & keyof E>,
+  MergeHKT<T1, T2, F1, F2, StrKey<T2>>
+> => spread0<T1, T2, F1, F2, E, StrKey<T2>>(exprsExact1, exprsExact2)
 
 export const mergeExpr = <T1, T2, D, C = unknown, E = unknown>(
   ...exprs: MergeExactArgs<T1, T2, ExprHKT<D, C>>
@@ -101,5 +112,5 @@ export const fieldF =
         ),
     })
 export const field: <T extends object, D, C = unknown>(
-  exprs: ExprsExact<T, D, C, IdHKT<unknown>>,
+  exprs: ExprsExact<T, D, C>,
 ) => Expr<O<T>, D, C> = fieldF<IdHKT>()

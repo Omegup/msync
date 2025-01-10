@@ -1,4 +1,4 @@
-import type { App, HKT, J, rawItem } from '../../types'
+import type { App, HKT, O, rawItem } from '../../types'
 import { asExpr, asExprRaw } from '../expression/expr-base'
 import { $ifNull } from '../expression/logic'
 import { nil } from '../expression/val'
@@ -19,7 +19,7 @@ export const operator =
     type V = App<App<G, D2>, T>
     return {
       raw: { [op]: operand },
-      expr: <D extends J, C>(field: Field<D, V, C>) =>
+      expr: <D extends O, C>(field: Field<D, V, C>) =>
         asExpr<boolean, D, C>({
           raw: f => asExprRaw({ [op]: [$ifNull(field.expr(), nil).raw(f).get(), operand] }),
         }),

@@ -1,73 +1,141 @@
-import type { HKT, I, ID, J, O, RORec, Rec, jsonItem } from '../../../../types'
-import type { WriteonlyCollection } from '../../../../types/view'
-import { field, mergeExpr, type ExprHKT } from '../../../expression/concat'
-import { $ifNull } from '../../../expression/logic'
+import type {
+  App,
+  AsLiteral,
+  HKT,
+  ID,
+  O,
+  RORec,
+  Rec,
+  Replace,
+  WriteonlyCollection,
+  notArr,
+} from '../../../../types'
+import { type ExprHKT, type ExprsExact } from '../../../expression/concat'
 import { $rand, now } from '../../../expression/val'
 import { ctx, root } from '../../../field'
-import type { RawStages, TS } from '../../../types'
+import type { Expr, RawStages, TS } from '../../../types'
 import type { DeltaAccumulatorHKT, DeltaAccumulators } from '../../../types/accumulator'
-import { set, to, type Updater } from '../../../update'
-import { omitPick, omitRORec } from '../../../utils/guard'
-import { mapExact } from '../../../utils/map-object'
-import { $replaceWith_, $set_ } from '../../mongo-stages'
-import { $merge_ } from '../../out'
+import { set, to, type Updater, type UpdaterHKT } from '../../../update'
+import { map1 } from '../../../utils/json'
+import { mapExact0, type MapO, type MappedHKT } from '../../../utils/map-object'
+import { $set_ } from '../../mongo-stages'
+import { $merge_, type MergeInto } from '../../out'
 import { link } from '../../prefix'
 
-type GID = '_grp'
-type Denied = keyof (TS & ID) | GID
-const gid: GID = '_grp'
+type GI<GG> = Exclude<GG, keyof TS>
+export type IdAndTsKeys = keyof (TS & ID)
 
-export const subMerge = <T extends J, Grp extends jsonItem, VV extends RORec<string, jsonItem>>(
-  args: DeltaAccumulators<T, Omit<VV, Denied>>,
-  out: WriteonlyCollection<TS & ID & Rec<GID, Grp> & Omit<VV, Denied>>,
-): RawStages<unknown, Rec<GID, Grp> & Omit<VV, Denied>, 'out'> => {
-  type Out = TS & ID & Rec<GID, Grp> & V
+// TS & ID & V_Grp & Extra
+type V<VV, GG extends string> = Omit<VV, IdAndTsKeys | GI<GG>>
+export type Prepare<Grp, GG extends string> = TS & ID & Rec<GI<GG>, Grp>
+export type Loose<Grp, VV, GG extends string> = Prepare<Grp, GG> & Partial<V<VV, GG>>
+export type Strict<Grp, VV, GG extends string, EE> = Prepare<Grp, GG> &
+  V<VV, GG> &
+  Omit<EE, IdAndTsKeys | GI<GG> | keyof V<VV, GG>>
+export type V_Grp<VV, GG extends string, Grp> = Rec<GI<GG>, Grp> & V<VV, GG>
+export type Extra<EE, VV, GG extends string> = Omit<EE, IdAndTsKeys | GI<GG> | keyof V<VV, GG>>
+export const subMerge = <
+  T extends O,
+  Grp extends notArr,
+  VV extends O,
+  GG extends string,
+  EE = {},
+  Out extends Loose<Grp, VV, GG> = Loose<Grp, VV, GG>,
+>(
+  args: DeltaAccumulators<T, V<VV, GG>>,
+  out: MergeInto<
+    Strict<Grp, VV, GG, EE>,
+    Out,
+    WriteonlyCollection<Replace<Out, Strict<Grp, VV, GG, EE>>>
+  >,
+  gid: AsLiteral<GI<GG>>,
+  // ExprsExact<Extra, V_Grp>
+  extra: ExprsExact<Extra<EE, VV, GG>, V_Grp<VV, GG, Grp>>,
+): RawStages<unknown, V_Grp<VV, GG, Grp>, 'out'> => {
+  type GID = GI<GG>
+  type V_Grp = Rec<GID, Grp> & V
+  // TS & ID & V_Grp & Extra
+  type ReadyForMerge = TS & ID & V_Grp & Extra
+  type Denied = IdAndTsKeys | GID
   type V = Omit<VV, Denied>
-  const omit1 = omitRORec<GID, never, keyof (TS & ID), Grp>()
-  const omit2 = omitPick<keyof VV, GID, keyof (TS & ID), VV>()
-  type Ctx = RORec<'new', Out>
-  interface UpdaterF<E> extends HKT {
-    readonly out: Updater<Rec<GID, Grp> & V, Rec<GID, Grp> & V, O & TS & ID & E & I<unknown, this>>
-  }
-  return link<Rec<GID, Grp> & V>()
-    .with<unknown, Out>(
-      $set_<unknown, Rec<GID, Grp> & V, Out>(
-        omit2.backward<UpdaterF<Rec<Exclude<GID, keyof (TS & ID)>, Grp>>>(
-          omit1.forward<UpdaterF<Omit<Omit<VV, Denied>, keyof (TS & ID)>>>(
-            set({
-              touchedAt: ['touchedAt', to(now)],
-              _id: ['_id', to($rand)],
-            }),
-          ),
-        ),
+  type PV = Partial<V>
+  type New = RORec<'new', ReadyForMerge>
+  type Extra = Omit<EE, IdAndTsKeys | GID | keyof V>
+
+  const doubleReplace = (
+    x: RawStages<O, Replace<Out, V>, Replace<Replace<Out, V>, Extra & TS>, New>,
+  ) => x as RawStages<O, Replace<Out, V>, Replace<Out, ReadyForMerge>, New>
+  const mergeAggregates: RawStages<O, Out, Replace<Out, V>, New> = $set_<
+    O,
+    Out,
+    Replace<Out, V>,
+    New
+  >(
+    set<V>()(
+      mapExact0<V, MappedHKT<V, DeltaAccumulatorHKT<T>>, Update<Out, V, New>>(args, (v, k) =>
+        to(v.merge<Out, New>(root<O<PV>>().of(k).expr(), ctx<O<V>>()('new').of(k).expr())),
       ),
-    )
-    .with<unknown, 'out'>(
-      $merge_<Out, Out, { readonly new: Out }>({
-        stages: 'ctx',
-        into: out,
-        on: root<Rec<GID, Grp>>().of(gid),
-        whenNotMatched: 'insert',
-        vars: { new: ['new', root<Out>().expr()] },
-        whenMatched: link<Out, { readonly new: Out }>().with<unknown, Out>(
-          $replaceWith_(
-            field<Out, Out, Ctx>(
-              mergeExpr<VV, TS & ID & RORec<GID, Grp>, Out, Ctx, O>(
-                mapExact<V, DeltaAccumulatorHKT<T>, ExprHKT<Out, Ctx>>(args, (v, k) =>
-                  v.sum<Out, Ctx>(
-                    $ifNull(root<O<V>>().of(k).expr(), v.zero),
-                    $ifNull(ctx<O<V>>()('new').of(k).expr(), v.zero),
-                  ),
-                ),
-                {
-                  _grp: ['_grp', root<Out>().of('_grp').expr()],
-                  _id: ['_id', root<Out>().of('_id').expr()],
-                  touchedAt: ['touchedAt', now],
-                },
-              ),
-            ),
-          ),
-        ).stages,
-      }),
-    ).stages
+    ),
+  )
+
+  type Update<R, X, C = unknown, Subset extends X = X> = UpdaterHKT<R, R, X, C, never, Subset>
+  const gidPath: Expr<Grp, V_Grp> = root<V_Grp>().of(gid).expr()
+
+  const mapId = <K extends string, F extends HKT<K>, X>(
+    k: AsLiteral<K>,
+    v: App<F, K>,
+  ): MapO<RORec<K, X>, F> => map1(k, v)
+
+  const F1: MapO<ID & TS, Update<V_Grp, ID & TS>> = {
+    _id: ['_id', to($rand)],
+    touchedAt: ['touchedAt', to(now)],
+  }
+  const F2: MapO<RORec<GID, Grp>, Update<V_Grp, RORec<GID, Grp>>> = mapId<
+    GID,
+    Update<V_Grp, RORec<GID, Grp>>,
+    Grp
+  >(gid, to(gidPath as Expr<(TS & ID & RORec<GID, Grp> & Extra)[GID], V_Grp>))
+
+  type Added = ID & TS & RORec<GID, Grp> & Extra
+  const addExtraAndMerge = {
+    ...mapExact0<Extra, MappedHKT<Extra, ExprHKT<V_Grp>>, Update<V_Grp, Extra>>(extra, to),
+    ...F1,
+    ...F2,
+  } as MapO<Added, Update<V_Grp, Added>>
+  const addTSAndExtra = {
+    ...mapExact0<Extra, MappedHKT<Extra, ExprHKT<V_Grp>>, Update<V_Grp, Extra>>(extra, to),
+    touchedAt: ['touchedAt', to(now)],
+  } as MapO<Extra & TS, Update<Replace<Out, V>, Extra & TS, New>>
+
+  const updater: Updater<
+    Replace<Out, V>,
+    Replace<Out, V>,
+    Replace<Replace<Out, V>, Extra & TS>,
+    New
+  > = set<Extra & TS>()<Replace<Out, V>, Replace<Out, V>, New>(addTSAndExtra)
+
+  return (
+    link<V_Grp>()
+      .with<unknown, ReadyForMerge>(
+        $set_<O, V_Grp, ReadyForMerge>(
+          set<TS & ID & RORec<GID, Grp> & Extra>()<V_Grp, V_Grp>(addExtraAndMerge) as Updater<
+            V_Grp,
+            V_Grp,
+            ReadyForMerge
+          >,
+        ),
+      )
+      // TODO filter out documents with 0 change
+      .with<unknown, 'out'>(
+        $merge_<ReadyForMerge, Out, New, Replace<Out, ReadyForMerge>>({
+          ...out,
+          vars: { new: ['new', root<ReadyForMerge>().expr()] },
+          stages: 'ctx',
+          on: root<Out | ReadyForMerge>().of(gid),
+          whenMatched: link<Out, New>()
+            .with<O, Replace<Out, V>>(mergeAggregates)
+            .with<O, Replace<Out, ReadyForMerge>>(doubleReplace($set_(updater))).stages,
+        }),
+      ).stages
+  )
 }
