@@ -51,12 +51,13 @@ export const $groupMerge = <
   >,
   gid: AsLiteral<GI<GG>>,
   extra: ExprsExact<Extra<EE, V, GG>, V_Grp<V, GG, Grp>>,
+  idPrefix = ''
 ): RawStages<unknown, Delta<T>, 'out'> => {
   return link<Delta<T>>()
     .with<unknown, WithGRP<Omit<V, Denied<GI<GG>>>, Grp, GI<GG>>>(
       subGroup<T, Grp, O & Omit<V, Denied<GI<GG>>>, GI<GG>>(id, args, addGrp<V, Grp, GI<GG>>(gid)),
     )
-    .with<unknown, 'out'>(subMerge<T, Grp, V, GG, EE, Out>(args, out, gid, extra)).stages
+    .with<unknown, 'out'>(subMerge<T, Grp, V, GG, EE, Out>(args, out, gid, extra, idPrefix)).stages
 }
 
 export const $groupId = <
@@ -92,5 +93,6 @@ export const $group = <
     Omit<EE, IdAndTsKeys | '_grp' | keyof Omit<V, IdAndTsKeys | '_grp'>>,
     Rec<'_grp', Grp> & Omit<V, IdAndTsKeys | '_grp'>
   >,
+  idPrefix = ''
 ): RawStages<unknown, Delta<T>, 'out'> =>
-  $groupMerge(id, args, { into: out, whenNotMatched: 'insert' }, '_grp', extra)
+  $groupMerge(id, args, { into: out, whenNotMatched: 'insert' }, '_grp', extra, idPrefix)

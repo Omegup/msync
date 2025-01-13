@@ -1,4 +1,4 @@
-import type { App, N, O, RORec, jsonItem } from '../../../types'
+import type { App, O, RORec, jsonItem } from '../../../types'
 import { sub } from '../../expression/logic'
 import { nil } from '../../expression/val'
 import { root } from '../../field'

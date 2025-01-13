@@ -10,8 +10,8 @@ import type {
   WriteonlyCollection,
   notArr,
 } from '../../../../types'
-import { type ExprHKT, type ExprsExact } from '../../../expression/concat'
-import { $rand, now } from '../../../expression/val'
+import { concat, type ExprHKT, type ExprsExact } from '../../../expression/concat'
+import { $rand, now, val } from '../../../expression/val'
 import { ctx, root } from '../../../field'
 import type { Expr, RawStages, TS } from '../../../types'
 import type { DeltaAccumulatorHKT, DeltaAccumulators } from '../../../types/accumulator'
@@ -51,6 +51,7 @@ export const subMerge = <
   gid: AsLiteral<GI<GG>>,
   // ExprsExact<Extra, V_Grp>
   extra: ExprsExact<Extra<EE, VV, GG>, V_Grp<VV, GG, Grp>>,
+  idPrefix: string
 ): RawStages<unknown, V_Grp<VV, GG, Grp>, 'out'> => {
   type GID = GI<GG>
   type V_Grp = Rec<GID, Grp> & V
@@ -87,7 +88,7 @@ export const subMerge = <
   ): MapO<RORec<K, X>, F> => map1(k, v)
 
   const F1: MapO<ID & TS, Update<V_Grp, ID & TS>> = {
-    _id: ['_id', to($rand)],
+    _id: ['_id', to(idPrefix ? concat(val(idPrefix), $rand) : $rand)],
     touchedAt: ['touchedAt', to(now)],
   }
   const F2: MapO<RORec<GID, Grp>, Update<V_Grp, RORec<GID, Grp>>> = mapId<

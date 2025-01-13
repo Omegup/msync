@@ -11,6 +11,7 @@ import {
   spread0,
 } from '../utils/map-object'
 import { asExpr, asExprRaw } from './expr-base'
+import { val } from './val'
 
 export const concat = <D, C>(...expr: Expr<string, D, C>[]) =>
   asExpr<string, D, C>({
@@ -105,12 +106,14 @@ export const pair = <T, D, C, P extends StrKey<T>>(
 export const fieldF =
   <F extends HKT>() =>
   <T extends object, D, C = unknown>(exprs: ExprsExact<T, D, C, F>) =>
-    asExpr<O<{ [K in keyof T]: App<F, T[K]> }>, D, C>({
-      raw: f =>
-        asExprRaw(
-          mapExactToObject<T, ExprHKT<D, C>, ConstHKT<rawItem>>(exprs, e => e.raw(f).get()),
-        ),
-    })
+    Object.keys(exprs).length
+      ? asExpr<O<{ [K in keyof T]: App<F, T[K]> }>, D, C>({
+          raw: f =>
+            asExprRaw(
+              mapExactToObject<T, ExprHKT<D, C>, ConstHKT<rawItem>>(exprs, e => e.raw(f).get()),
+            ),
+        })
+      : val({} as O<{ [K in keyof T]: App<F, T[K]> }>)
 export const field: <T extends object, D, C = unknown>(
   exprs: ExprsExact<T, D, C>,
 ) => Expr<O<T>, D, C> = fieldF<IdHKT>()
