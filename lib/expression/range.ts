@@ -28,7 +28,7 @@ export const $map1 = <T, R, D, C>(
         },
       }),
   })
-export const $map = <T, R, D, C>(
+export const $map = <T, R, D, C = unknown>(
   ex: Expr<Arr<T>, D, C>,
   map: (i: Expr<T, D, RORec<'item', T>>) => Expr<R, D, RORec<'item', T> & C>,
 ) => $map1(ex, i => map(i.expr()))

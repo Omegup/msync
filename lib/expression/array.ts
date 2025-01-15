@@ -1,12 +1,11 @@
-import type { App, Arr, ConstHKT, HKT, N, RORec, Rec, jsonItem, notArr, rawItem } from '../../types'
+import type { App, Arr, HKT, N, RORec, Rec, notArr } from '../../types'
 import { ctx } from '../field'
 import type { Expr } from '../types'
-import { mapExactToObject } from '../utils/map-object'
 import { $gte, add } from './arith'
-import { field, type ExprHKT, type ExprsExact } from './concat'
+import { field } from './concat'
 import { asBoolExpr, asExpr, asExprRaw } from './expr-base'
 import { eq, ite } from './logic'
-import { val } from './val'
+import { $let, val } from './val'
 
 export const $size = <T, D, C>(expr: Expr<Arr<T>, D, C>) =>
   asExpr<number, D, C>({
@@ -116,19 +115,6 @@ const $indexOfArray = <T, D, C>(array: Expr<Arr<T>, D, C>, item: Expr<T, D, C>) 
     raw: f =>
       asExprRaw({
         $indexOfArray: [array.raw(f).get(), item.raw(f).get()],
-      }),
-  })
-const $let = <T, D, C, V extends RORec<string, jsonItem>>(
-  vars: ExprsExact<V, D, C>,
-  inExpr: Expr<T, D, C & V>,
-) =>
-  asExpr<T, D, C>({
-    raw: f =>
-      asExprRaw({
-        $let: {
-          vars: mapExactToObject<V, ExprHKT<D, C>, ConstHKT<rawItem>>(vars, v => v.raw(f).get()),
-          in: inExpr.raw(f).get(),
-        },
       }),
   })
 type DiffArr<T> = Rec<'out' | 'except', Arr<T>>

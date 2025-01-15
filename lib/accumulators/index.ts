@@ -112,11 +112,11 @@ export const $pushDict = <D extends O, V, C = unknown>(
         idx = rmR.findIndex(x => equal(x, v))
       if (idx !== -1) rmR.splice(idx, 1)
       else addR.push(v)
-      return null!
+      return a
     },
     function (acc, b) {
       return Object.keys(b).reduce((a, k) => {
-        return Object.entries(b[k]).reduce(
+        return Object.entries({ ...b[k] }).reduce(
           (a, [p, v]) =>
             v.reduce((a, v) => {
               //@ts-ignore
@@ -153,5 +153,5 @@ export const $entries = <D extends O, V, C = unknown>(
   func<Arr<Rec<'k', string> & Rec<'v', V>>, [Rec<string, Rec<'1' | '0', Arr<V>>>], D, C>(function (
     obj,
   ) {
-    return Object.entries(obj).flatMap(([k, v]) => v[0].map(v => ({ k, v })))
+    return Object.entries({ ...obj }).flatMap(([k, v]) => v[0].map(v => ({ k, v })))
   }, expr)

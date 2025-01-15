@@ -1,7 +1,9 @@
 import type { Timestamp } from 'mongodb'
-import type { Arr, N, O, StrKey, jsonItem, rawItem } from '../../types'
+import type { Arr, ConstHKT, N, O, RORec, StrKey, jsonItem, rawItem } from '../../types'
 import type { Expr } from '../types'
 import { asExpr, asExprRaw } from './expr-base'
+import type { ExprHKT, ExprsExact } from './concat'
+import { mapExactToObject } from '../utils/map-object'
 
 export const val = <T extends rawItem>(val: T): Expr<T, unknown> =>
   asExpr({
@@ -16,6 +18,19 @@ export const val = <T extends rawItem>(val: T): Expr<T, unknown> =>
 export const now: Expr<Timestamp, unknown> = asExpr({
   raw: () => asExprRaw<Timestamp, unknown, unknown>('$$CLUSTER_TIME'),
 })
+export const $let = <T, D, C, V extends RORec<string, jsonItem>>(
+  vars: ExprsExact<V, D, C>,
+  inExpr: Expr<T, D, C & V>,
+) =>
+  asExpr<T, D, C>({
+    raw: f =>
+      asExprRaw({
+        $let: {
+          vars: mapExactToObject<V, ExprHKT<D, C>, ConstHKT<rawItem>>(vars, v => v.raw(f).get()),
+          in: inExpr.raw(f).get(),
+        },
+      }),
+  })
 
 export const nil = val(null)
 
@@ -40,7 +55,7 @@ export type NoRaw<T> =
   T extends Arr<infer U>
     ? NoRaw<U>[]
     : T extends readonly unknown[]
-      ? { [K in keyof T]: NoRaw<T[K]>}
+      ? { [K in keyof T]: NoRaw<T[K]> }
       : T extends O
         ? { [K in StrKey<T>]: NoRaw<T[K]> }
         : T
@@ -48,7 +63,7 @@ export type RONoRaw<T> =
   T extends Arr<infer U>
     ? readonly RONoRaw<U>[]
     : T extends readonly unknown[]
-      ? { readonly [K in keyof T]: RONoRaw<T[K]>}
+      ? { readonly [K in keyof T]: RONoRaw<T[K]> }
       : T extends O
         ? { readonly [K in StrKey<T>]: RONoRaw<T[K]> }
         : T
