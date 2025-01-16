@@ -1,0 +1,21 @@
+{
+  "useTabs": false,
+  "tabWidth": 2,
+  "printWidth": 100,
+  "semi": false,
+  "arrowParens": "avoid",
+  "bracketSameLine": true,
+  "endOfLine": "auto",
+  "jsxSingleQuote": true,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "singleAttributePerLine": false,
+  "overrides": [
+    {
+      "files": "*.json",
+      "options": {
+        "tabWidth": 4
+      }
+    }
+  ]
+}
