@@ -14,7 +14,10 @@ export const monthPart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> =>
   asExpr<string, D, C>({
     raw: f => asExprRaw({ $dateToString: { date: date.raw(f).get(), format: '%Y-%m' } }),
   })
-
+export const weekPart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> =>
+  asExpr<string, D, C>({
+    raw: f => asExprRaw({ $dateToString: { date: date.raw(f).get(), format: '%Y-%U' } }),
+  })
 export const dateAdd = <D, C>(
   date: Expr<Date, D, C>,
   amount: Expr<number, D, C>,
