@@ -67,7 +67,7 @@ export const array = <T, D, C = unknown>(...exprs: Expr<T, D, C>[]) =>
     raw: f => asExprRaw(exprs.map(x => x.raw(f).get())),
   })
 
-export const concat = <T, D, C>(...exprs: Expr<Arr<T>, D, C>[]) =>
+export const concatArray = <T, D, C>(...exprs: Expr<Arr<T>, D, C>[]) =>
   asExpr<Arr<T>, D, C>({
     raw: f => asExprRaw({ $concatArrays: exprs.map(x => x.raw(f).get()) }),
   })
@@ -154,7 +154,7 @@ export const except = <T, D, C>(a: Expr<Arr<T>, D, C>, b: Expr<Arr<T>, D, C>) =>
                 out: ['out', out],
                 except: [
                   'except',
-                  concat<T, D, C2>(
+                  concatArray<T, D, C2>(
                     ite<Arr<T>, D, C2>(
                       eq(indexInExcept)(val(0)),
                       array<T, D>(),
@@ -165,7 +165,7 @@ export const except = <T, D, C>(a: Expr<Arr<T>, D, C>, b: Expr<Arr<T>, D, C>) =>
                 ],
               }),
               field({
-                out: ['out', concat<T, D, Reduce<T, DiffArr<T>>>(out, array(curr))],
+                out: ['out', concatArray<T, D, Reduce<T, DiffArr<T>>>(out, array(curr))],
                 except: ['except', except],
               }),
             ),
