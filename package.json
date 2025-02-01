@@ -1,5 +1,6 @@
 {
     "name": "@omegup/msync",
+    "type": "module",
     "module": "index.ts",
     "scripts": {
         "tsc": "tsc"

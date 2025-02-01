@@ -99,7 +99,9 @@ const executes = <
     type It = Iterator<readonly Result2[], W>
     type FrameD = Frame<readonly Result2[], W>
     type Next = Promise<FrameD>
-    const clear = async () => {}
+    const clear = async () => {
+      await snapshotCollection.drop()
+    }
     const withStop = (next: () => Next, tr?: () => void): It => {
       return addTeardown(() => ({ stop, next: next(), clear }), tr)
     }
