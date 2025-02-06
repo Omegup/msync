@@ -1,5 +1,5 @@
 import type { ConstHKT, HKT, I, IdHKT, N, O, RORec, Rec, jsonItem } from '../../../types'
-import { eqTyped, ite } from '../../expression/logic'
+import { $ifNull, eqTyped, ite } from '../../expression/logic'
 import { nil } from '../../expression/val'
 import { root } from '../../field'
 import type { BA, Delta, Expr, FRawStages, RawStages } from '../../types'
@@ -18,7 +18,7 @@ const deltaExpr =
   <K extends BA>(field: K): Expr<V | null, Delta<T> & E> => {
     type F = ParDeltaHKT<K, T, E>
     return ite<V | null, null, T, F>(
-      eqTyped<null, T, F, unknown>(root<Delta<T>>().of(field).expr(), nil),
+      eqTyped<null, T, F, unknown>($ifNull(root<Delta<T>>().of(field).expr()), nil),
       nil,
       expr(field),
     )

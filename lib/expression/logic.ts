@@ -31,15 +31,16 @@ export const ite = (<T, D1, D2, C>(
   ): Expr<T, App<F, R1 | R2>, C>
 }
 
-export const and = <D, C = unknown>(...expr: [Expr<boolean, D, C>, Expr<boolean, D, C>]) =>
+export const and = <D, C = unknown>(...expr: Expr<boolean, D, C>[]) =>
   asExpr<boolean, D, C>({
     raw: f => asExprRaw({ $and: expr.map(e => e.raw(f).get()) }),
   })
-export const or = <D, C = unknown>(...expr: [Expr<boolean, D, C>, Expr<boolean, D, C>]) =>
+
+export const or = <D, C = unknown>(...expr: Expr<boolean, D, C>[]) =>
   asExpr<boolean, D, C>({
     raw: f => asExprRaw({ $or: expr.map(e => e.raw(f).get()) }),
   })
-  
+
 export const eq =
   <T, D, C = unknown>(a: Expr<T, D, C>) =>
   (b: Expr<T, D, C>) =>
@@ -76,7 +77,7 @@ export const ne =
     })
 
 export const notNull =
-<T, K, D, C>(a: Expr<T, D, C>) => ne($ifNull(a, nil))(nil)
+<T, D, C>(a: Expr<T, D, C>) => ne($ifNull(a, nil))(nil)
 
 export const $ifNull = <R, D, C>(...expr: [...Expr<R | null | undefined, D, C>[], Expr<R, D, C>]) =>
   asExpr<R, D, C>({
