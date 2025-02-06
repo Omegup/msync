@@ -18,6 +18,10 @@ export const weekPart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> =>
   asExpr<string, D, C>({
     raw: f => asExprRaw({ $dateToString: { date: date.raw(f).get(), format: '%Y-%U' } }),
   })
+export const year = <D, C>(date: Expr<Date, D, C>): Expr<number, D, C> =>
+  asExpr<number, D, C>({
+    raw: f => asExprRaw({ $year: date.raw(f).get() }),
+  })
 export const dateAdd = <D, C>(
   date: Expr<Date, D, C>,
   amount: Expr<number, D, C>,

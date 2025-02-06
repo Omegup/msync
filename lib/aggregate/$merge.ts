@@ -2,9 +2,9 @@ import type { App, ConstHKT, HKT, I, IdHKT, OPick, RWCollection } from '../../ty
 import type { ID, N, O, RORec, Rec, Replace, StrKey, doc } from '../../types/json'
 import { field, type ExprHKT, type ExprsExact, type ExprsExactHKT } from '../expression/concat'
 import { eqTyped, ite } from '../expression/logic'
-import { nil, current } from '../expression/val'
+import { current, nil } from '../expression/val'
 import { root } from '../field'
-import type { Expr, Model, OutInput, RawStages, TS } from '../types'
+import type { Delta, Expr, Model, RawStages, TS } from '../types'
 import { omitPick, omitRORec, type Equal } from '../utils/guard'
 import {
   mapExact,
@@ -16,20 +16,24 @@ import {
 import { $replaceWith_ } from './mongo-stages'
 import { $merge_ } from './out'
 import { link } from './prefix'
-interface AfterHKT<T> extends HKT {
-  readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
-}
+
+type OutInputE<T, E, A = T | null> = ID & Rec<'after', A> & E
 type Allowed<K extends string> = Exclude<K, keyof (TS & ID)>
 
 type Patch<V, KK extends StrKey<V>> = ((OPick<V, Allowed<KK>> & ID) | (Rec<Allowed<KK>, N> & ID)) &
   TS
 
-export const $merge =
+const $mergeId =
   <V extends Model & ID>() =>
-  <KK extends StrKey<V>, Out extends doc>(
+  <KK extends StrKey<V>, Out extends doc, E = unknown>(
     out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
     keys: ExactKeys<Allowed<KK>>,
-  ): RawStages<unknown, OutInput<OPick<V, Allowed<KK>> & ID>, 'out'> => {
+    id: Expr<string, OutInputE<OPick<V, Allowed<KK>> & ID, E, null>>,
+  ): RawStages<unknown, OutInputE<OPick<V, Allowed<KK>> & ID, E>, 'out'> => {
+    type OutInput<T, A = T | null> = OutInputE<T, E, A>
+    interface AfterHKT<T> extends HKT {
+      readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
+    }
     type K = Allowed<KK>
     type T = OPick<V, K> & ID
     type Patch = (T | (Rec<K, N> & ID)) & TS
@@ -58,7 +62,7 @@ export const $merge =
           spread<RORec<K, N>, ID & TS, ExprHKT<OutInput<T, null>>>(
             mapExact<RORec<K, 1>, IdHKT, ConstHKT<Expr<null, unknown>>>(keys, () => nil),
             {
-              _id: ['_id', root<OutInput<T, null>>().of('_id').expr()],
+              _id: ['_id', id],
               touchedAt: ['touchedAt', current],
             },
           ),
@@ -85,3 +89,39 @@ export const $merge =
         }),
       ).stages
   }
+
+export const $simpleMerge =
+  <V extends Model & ID>() =>
+  <KK extends StrKey<V>, Out extends doc>(
+    out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
+    keys: ExactKeys<Allowed<KK>>,
+  ): RawStages<unknown, OutInputE<OPick<V, Allowed<KK>> & ID, unknown>, 'out'> =>
+    $mergeId<V>()(
+      out,
+      keys,
+      root<OutInputE<OPick<V, Allowed<KK>>, unknown, null>>().of('_id').expr(),
+    )
+
+export const $merge =
+  <V extends Model & ID>() =>
+  <KK extends StrKey<V>, Out extends doc>(
+    out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
+    keys: ExactKeys<Allowed<KK>>,
+  ): RawStages<unknown, Delta<OPick<V, Allowed<KK>> & ID>, 'out'> =>
+    $mergeId<V>()(
+      out,
+      keys,
+      assertNotNull(
+        root<
+          OutInputE<
+            OPick<V, Allowed<KK>> & ID,
+            RORec<'before', (OPick<V, Allowed<KK>> & ID) | null>
+          >
+        >()
+          .of('before')
+          .of('_id')
+          .expr(),
+      ),
+    )
+
+const assertNotNull = <T, D, C>(expr: Expr<T | N, D, C>) => expr as Expr<T, D, C>
