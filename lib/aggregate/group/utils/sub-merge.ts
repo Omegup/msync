@@ -51,7 +51,8 @@ export const subMerge = <
   gid: AsLiteral<GI<GG>>,
   // ExprsExact<Extra, V_Grp>
   extra: ExprsExact<Extra<EE, VV, GG>, V_Grp<VV, GG, Grp>>,
-  idPrefix: string
+  idPrefix: string,
+  first: boolean,
 ): RawStages<unknown, V_Grp<VV, GG, Grp>, 'out'> => {
   type GID = GI<GG>
   type V_Grp = Rec<GID, Grp> & V
@@ -130,12 +131,16 @@ export const subMerge = <
       .with<unknown, 'out'>(
         $merge_<ReadyForMerge, Out, New, Replace<Out, ReadyForMerge>>({
           ...out,
-          vars: { new: ['new', root<ReadyForMerge>().expr()] },
-          stages: 'ctx',
           on: root<Out | ReadyForMerge>().of(gid),
-          whenMatched: link<Out, New>()
-            .with<O, Replace<Out, V>>(mergeAggregates)
-            .with<O, Replace<Out, ReadyForMerge>>(doubleReplace($set_(updater))).stages,
+          ...(first
+            ? { whenMatched: 'merge' }
+            : {
+                vars: { new: ['new', root<ReadyForMerge>().expr()] },
+                stages: 'ctx',
+                whenMatched: link<Out, New>()
+                  .with<O, Replace<Out, V>>(mergeAggregates)
+                  .with<O, Replace<Out, ReadyForMerge>>(doubleReplace($set_(updater))).stages,
+              }),
         }),
       ).stages
   )

@@ -18,7 +18,7 @@ const deltaExpr =
   <K extends BA>(field: K): Expr<V | null, Delta<T> & E> => {
     type F = ParDeltaHKT<K, T, E>
     return ite<V | null, null, T, F>(
-      eqTyped<null, T, F, unknown>($ifNull(root<Delta<T>>().of(field).expr()), nil),
+      eqTyped<null, T, F, unknown>($ifNull(root<Delta<T>>().of(field).expr(), nil), nil),
       nil,
       expr(field),
     )
