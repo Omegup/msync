@@ -2,9 +2,10 @@ import type { RWCollection, WriteonlyCollection } from '../../../types'
 import type { AsLiteral, ID, O, RORec, Rec, Replace, doc, notArr } from '../../../types/json'
 import { mergeExpr, type ExprsExact, type ExprsExactHKT } from '../../expression/concat'
 import { root } from '../../field'
-import type { Delta, DeltaAccumulators, Expr, RawStages, TS } from '../../types'
+import type { Delta, DeltaAccumulators, Expr, StreamRunnerParam, TS } from '../../types'
 import { omitPick } from '../../utils/guard'
 import { map1 } from '../../utils/json'
+import { mapExactToObject } from '../../utils/map-object'
 import type { MergeInto } from '../out'
 import { link } from '../prefix'
 import { subGroup } from './utils/sub-group'
@@ -51,15 +52,37 @@ export const $groupMerge = <
   >,
   gid: AsLiteral<GI<GG>>,
   extra: ExprsExact<Extra<EE, V, GG>, V_Grp<V, GG, Grp>>,
-  idPrefix = ''
-): RawStages<unknown, Delta<T>, 'out'> => {
-  return link<Delta<T>>()
-    .with<unknown, WithGRP<Omit<V, Denied<GI<GG>>>, Grp, GI<GG>>>(
-      subGroup<T, Grp, O & Omit<V, Denied<GI<GG>>>, GI<GG>>(id, args, addGrp<V, Grp, GI<GG>>(gid)),
-    )
-    .with<unknown, 'out'>(subMerge<T, Grp, V, GG, EE, Out>(args, out, gid, extra, idPrefix)).stages
-}
-
+  idPrefix = '',
+): StreamRunnerParam<Delta<T>, 'out'> => ({
+  raw: (first: boolean) =>
+    link<Delta<T>>()
+      .with<unknown, WithGRP<Omit<V, Denied<GI<GG>>>, Grp, GI<GG>>>(
+        subGroup<T, Grp, O & Omit<V, Denied<GI<GG>>>, GI<GG>>(
+          id,
+          args,
+          addGrp<V, Grp, GI<GG>>(gid),
+        ),
+      )
+      .with<unknown, 'out'>(
+        subMerge<T, Grp, V, GG, EE, Out>(args, out, gid, extra, idPrefix, first),
+      ).stages,
+  teardown: c =>
+    c({
+      collection: out.into,
+      method: 'updateMany',
+      params: [
+        {},
+        [
+          {
+            $unset: Object.keys({
+              ...mapExactToObject(extra, () => 1),
+              ...mapExactToObject(args, () => 1),
+            }),
+          },
+        ],
+      ],
+    }),
+})
 export const $groupId = <
   T extends O,
   V extends O,
@@ -70,7 +93,7 @@ export const $groupId = <
   args: DeltaAccumulators<T, O & Omit<V, Denied>>,
   out: RWCollection<Replace<Out, Strict<string, V, '_id', EE>>, Out>,
   extra: ExprsExact<Omit<EE, IdAndTsKeys | keyof Omit<V, IdAndTsKeys>>, doc & Omit<V, IdAndTsKeys>>,
-): RawStages<unknown, Delta<T>, 'out'> =>
+): StreamRunnerParam<Delta<T>, 'out'> =>
   $groupMerge<T, string, V, '_id', EE, Out>(
     id,
     args,
@@ -93,6 +116,6 @@ export const $group = <
     Omit<EE, IdAndTsKeys | '_grp' | keyof Omit<V, IdAndTsKeys | '_grp'>>,
     Rec<'_grp', Grp> & Omit<V, IdAndTsKeys | '_grp'>
   >,
-  idPrefix = ''
-): RawStages<unknown, Delta<T>, 'out'> =>
+  idPrefix = '',
+): StreamRunnerParam<Delta<T>, 'out'> =>
   $groupMerge(id, args, { into: out, whenNotMatched: 'insert' }, '_grp', extra, idPrefix)
