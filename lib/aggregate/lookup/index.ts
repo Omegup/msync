@@ -8,10 +8,12 @@ import { fieldM } from '../../expression/concat'
 import { root, type Field } from '../../field'
 import type { Delta, DeltaStages, HasJob, IteratorResult, Runner, TStages } from '../../types'
 import type {
+  BA,
   Before,
   RawStages,
   SnapshotStream,
   SnapshotStreamExecutionResult,
+  StreamRunnerParam,
   UBefore,
 } from '../../types/stream'
 
@@ -72,7 +74,7 @@ const join = <
     stages: consume =>
       consume(concatTStages(resultingSnapshot, asBefore(stagesUntilNextLookup.raw))),
     out: <Final>(
-      finalInput: RawStages<unknown, Delta<Result>, Final>,
+      finalInput: StreamRunnerParam<Delta<Result>, Final>,
     ): Runner<readonly Final[], HasJob> => {
       const leftJoinField = { field1: rField, field2: lField }
       type LeftRight = Rec<'left', LE> & Rec<'right', RE> & ID
@@ -112,8 +114,12 @@ const join = <
 
       const lRunnerInput = concatStages(joinR_Delta, mergeForeignIntoDoc)
       const rRunnerInput = concatStages(joinL_Delta, mergeForeignIntoDoc)
-      const lRunner = left.out(concatStages(lRunnerInput, finalInput))
-      const rRunner = right.out(concatStages(rRunnerInput, finalInput))
+      const getRunner = <Q, V extends Q,  B, C>(f:SnapshotStreamExecutionResult<Q, V>,  stages: RawStages<unknown, Delta<V, BA, ID>, Delta<B>>, final: StreamRunnerParam<Delta<B>, C>)=>f.out({
+        raw: first => concatStages(stages, final.raw(first)),
+        teardown: final.teardown,
+      })
+      const lRunner = getRunner(left, lRunnerInput, finalInput)
+      const rRunner = getRunner(right, rRunnerInput, finalInput)
 
       return () => merge({ lsource: lRunner(), rsource: rRunner() })
     },
