@@ -37,6 +37,18 @@ import { makeWatchStream } from '../watch'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
+export type Teardown = { collection: string; method: string; params: unknown[] }
+export type TsData = {
+  input: readonly RawObj[]
+  finalInput: readonly RawObj[]
+  finalInputFirst: readonly RawObj[]
+  teardown: Teardown
+}
+export type Last = {
+  _id: string
+  ts: Timestamp
+  data: TsData
+}
 
 export const actions: {
   [K in keyof Actions<unknown>]: <W extends BSON.Document>(
@@ -85,18 +97,6 @@ const executes = <
       : {},
   ).catch(e => e.code == 86 || Promise.reject(e))
 
-  type Teardown = { collection: string; method: string; params: unknown[] }
-  type TsData = {
-    input: readonly RawObj[]
-    finalInput: readonly RawObj[]
-    finalInputFirst: readonly RawObj[]
-    teardown: Teardown
-  }
-  type Last = {
-    _id: string
-    ts: Timestamp
-    data: TsData
-  }
   const last = db.collection<Last>('__last')
   const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
 

@@ -1,11 +1,12 @@
-import type { App, ConstHKT, HKT, I, IdHKT, OPick, RWCollection } from '../../types'
+import type { ConstHKT, HKT, I, IdHKT, OPick, RWCollection } from '../../types'
 import type { ID, N, O, RORec, Rec, Replace, StrKey, doc } from '../../types/json'
 import { field, type ExprHKT, type ExprsExact, type ExprsExactHKT } from '../expression/concat'
 import { eqTyped, ite } from '../expression/logic'
 import { current, nil } from '../expression/val'
-import { root } from '../field'
+import { Field, root } from '../field'
 import type { Delta, Expr, Model, RawStages, StreamRunnerParam, TS } from '../types'
 import { omitPick, omitRORec, type Equal } from '../utils/guard'
+import { id } from '../utils/json'
 import {
   mapExact,
   mapExactToObject,
@@ -23,44 +24,105 @@ type Allowed<K extends string> = Exclude<K, keyof (TS & ID)>
 type Patch<V, KK extends StrKey<V>> = ((OPick<V, Allowed<KK>> & ID) | (Rec<Allowed<KK>, N> & ID)) &
   TS
 
+const $mergeX = <
+  V extends Model & ID,
+  KK extends StrKey<V>,
+  Out extends doc,
+  D extends O,
+  D2 extends O = D,
+>(
+  out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
+  keys: ExactKeys<Allowed<KK>>,
+  f: Field<D2, TakeDoc<V, KK>>,
+  map: (x: Expr<Patch<V, KK>, D2>) => Expr<Patch<V, KK>, D>,
+): StreamRunnerParam<D, 'out'> => ({
+  raw: (first: boolean): RawStages<unknown, D, 'out'> => {
+    type K = Allowed<KK>
+    type T = OPick<V, K> & ID
+    type Patch = (T | (Rec<K, N> & ID)) & TS
+
+    interface ExprHKT2<T, D, C = unknown> extends HKT<StrKey<T>> {
+      readonly out: Expr<T[I<StrKey<T>, this>], D, C>
+    }
+    const patch: ExprsExact<OPick<V, K>, D2> = mapExactToObject<
+      RORec<K, 1>,
+      IdHKT,
+      WithKey1<K, ExprHKT2<T, D2>>
+    >(keys, (_, k) => [k, f.of<T, typeof k, 1>(k).expr()])
+
+    const or: Expr<Patch, D2> = field<T & TS, D2>(
+      omitPick<KK, never, keyof (TS & ID), V>().backward<ExprsExactHKT<TS & doc, D2>>(
+        spread<Pick<V, K>, ID & TS, ExprHKT<D2>, O>(patch, {
+          _id: ['_id', f.of('_id').expr()],
+          touchedAt: ['touchedAt', current],
+        }),
+      ),
+    )
+
+    const replacer: Expr<Patch, D> = map(or)
+
+    return link<D>()
+      .with<unknown, Patch>($replaceWith_<D, Patch>(replacer))
+      .with<unknown, 'out'>(
+        $merge_<Patch, Out>({
+          into: out,
+          on: root<O<ID>>().of('_id'),
+          whenNotMatched: 'fail',
+          whenMatched: 'merge',
+        }),
+      ).stages
+  },
+  teardown: c =>
+    c({
+      collection: out,
+      method: 'updateMany',
+      params: [
+        {},
+        [
+          {
+            $unset: Object.keys(
+              mapExactToObject<RORec<Allowed<KK>, 1>, IdHKT, ConstHKT<1>>(keys, () => 1),
+            ),
+          },
+        ],
+      ],
+    }),
+})
+
+type TakeDoc<V, KK extends StrKey<V>> = OPick<V, Allowed<KK>> & ID
+
 const $mergeId =
   <V extends Model & ID>() =>
   <KK extends StrKey<V>, Out extends doc, E = unknown>(
     out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
     keys: ExactKeys<Allowed<KK>>,
-    id: Expr<string, OutInputE<OPick<V, Allowed<KK>> & ID, E, null>>,
-  ): StreamRunnerParam<OutInputE<OPick<V, Allowed<KK>> & ID, E>, 'out'> => ({
-    raw: (first: boolean): RawStages<unknown, OutInputE<OPick<V, Allowed<KK>> & ID, E>, 'out'> => {
-      type OutInput<T, A = T | null> = OutInputE<T, E, A>
-      interface AfterHKT<T> extends HKT {
-        readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
-      }
-      type K = Allowed<KK>
-      type T = OPick<V, K> & ID
-      type Patch = (T | (Rec<K, N> & ID)) & TS
-      type FromOut<N, E = TS & ID & O> = ExprsExactHKT<E, OutInput<T, N>>
+    id: Expr<string, OutInputE<TakeDoc<V, KK>, E, null>>,
+  ): StreamRunnerParam<OutInputE<OPick<V, Allowed<KK>> & ID, E>, 'out'> => {
+    type OutInput<T, A = T | null> = OutInputE<T, E, A>
+    interface AfterHKT<T> extends HKT {
+      readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
+    }
+    type K = Allowed<KK>
+    type T = TakeDoc<V, KK>
+    type Patch = (T | (Rec<K, N> & ID)) & TS
 
-      const omRORec: Equal<unknown, RORec<K, N>, Omit<RORec<K, N>, keyof (TS & ID)>> = omitRORec<
-        KK,
-        never,
-        keyof (TS & ID),
-        N
-      >()
+    type D = OutInputE<0, E, TakeDoc<V, KK> | null>
+    type D2 = OutInputE<0, E, TakeDoc<V, KK>>
 
-      interface ExprHKT2<T, D, C = unknown, F extends HKT = IdHKT> extends HKT<StrKey<T>> {
-        readonly out: Expr<App<F, T[I<StrKey<T>, this>]>, D, C>
-      }
-      type F = WithKey1<K, ExprHKT2<T, OutInput<T, T>>>
+    const omRORec: Equal<unknown, RORec<K, N>, Omit<RORec<K, N>, keyof (TS & ID)>> = omitRORec<
+      KK,
+      never,
+      keyof (TS & ID),
+      N
+    >()
 
-      const patch: ExprsExact<OPick<V, K>, OutInput<T, T>> = mapExactToObject<
-        RORec<K, 1>,
-        IdHKT,
-        F
-      >(keys, (_, k) => [k, root<OutInput<T, T>>().of('after').of<T, typeof k, 1>(k).expr()])
-      const replacer = ite<Patch, null, T, AfterHKT<T>>(
+    // Expr<Patch, ID & Obj & RORec<"after", T | null> & E & RORec<"after", Obj & Pick<V, Exclude<KK, "touchedAt" | "_id">> & ID>, unknown>
+
+    return $mergeX<V, KK, Out, D, D2>(out, keys, root<D2>().of('after'), or => {
+      return ite<Patch, null, T, AfterHKT<T>>(
         eqTyped<null, T, AfterHKT<T>>(root<OutInput<T>>().of('after').expr(), nil),
         field<RORec<K, N> & ID & TS, OutInput<T, null>>(
-          omRORec.backward<FromOut<null, ID & TS>>(
+          omRORec.backward<ExprsExactHKT<ID & TS, OutInput<T, null>>>(
             spread<RORec<K, N>, ID & TS, ExprHKT<OutInput<T, null>>>(
               mapExact<RORec<K, 1>, IdHKT, ConstHKT<Expr<null, unknown>>>(keys, () => nil),
               {
@@ -70,55 +132,18 @@ const $mergeId =
             ),
           ),
         ),
-        field<OPick<V, K> & ID & TS, OutInput<T, T>>(
-          omitPick<KK, never, keyof (TS & ID), V>().backward<FromOut<T>>(
-            spread<Pick<V, K>, ID & TS, ExprHKT<OutInput<T, T>>, O>(patch, {
-              _id: ['_id', root<OutInput<T, T>>().of('after').of('_id').expr()],
-              touchedAt: ['touchedAt', current],
-            }),
-          ),
-        ),
+        or,
       )
-
-      return link<OutInput<T>>()
-        .with<unknown, Patch>($replaceWith_(replacer))
-        .with<unknown, 'out'>(
-          $merge_<Patch, Out>({
-            into: out,
-            on: root<O<ID>>().of('_id'),
-            whenNotMatched: 'fail',
-            whenMatched: 'merge',
-          }),
-        ).stages
-    },
-    teardown: c =>
-      c({
-        collection: out,
-        method: 'updateMany',
-        params: [
-          {},
-          [
-            {
-              $unset: Object.keys(
-                mapExactToObject<RORec<Allowed<KK>, 1>, IdHKT, ConstHKT<1>>(keys, () => 1),
-              ),
-            },
-          ],
-        ],
-      }),
-  })
+    })
+  }
 
 export const $simpleMerge =
   <V extends Model & ID>() =>
-  <KK extends StrKey<V>, Out extends doc>(
+  <KK extends StrKey<V>, Out extends doc, E = unknown>(
     out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
     keys: ExactKeys<Allowed<KK>>,
-  ): StreamRunnerParam<OutInputE<OPick<V, Allowed<KK>> & ID, unknown>, 'out'> =>
-    $mergeId<V>()(
-      out,
-      keys,
-      root<OutInputE<OPick<V, Allowed<KK>>, unknown, null>>().of('_id').expr(),
-    )
+  ): StreamRunnerParam<OPick<V, Allowed<KK>> & ID & E, 'out'> =>
+    $mergeX<V, KK, Out, OPick<V, Allowed<KK>> & ID & E>(out, keys, root(), id)
 
 export const $merge =
   <V extends Model & ID>() =>
