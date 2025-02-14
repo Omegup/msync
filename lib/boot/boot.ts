@@ -47,7 +47,7 @@ export type TsData = {
 export type Last = {
   _id: string
   ts: Timestamp
-  data: TsData
+  data?: TsData
 }
 
 export const actions: {
@@ -181,6 +181,7 @@ const executes = <
         const handleTeardown = async <W extends Document, M extends keyof Actions<unknown>>(
           last: Last,
         ) => {
+          if(!last.data) return
           const { collection: c, method: m, params: p } = last.data.teardown
           const { collection, method, params } = {
             collection: db.collection<W>(c),

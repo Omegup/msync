@@ -4,7 +4,7 @@ import { field, type ExprHKT, type ExprsExact, type ExprsExactHKT } from '../exp
 import { eqTyped, ite } from '../expression/logic'
 import { current, nil } from '../expression/val'
 import { Field, root } from '../field'
-import type { Delta, Expr, Model, RawStages, StreamRunnerParam, TS } from '../types'
+import type { Delta, Expr, RawStages, StreamRunnerParam, TS } from '../types'
 import { omitPick, omitRORec, type Equal } from '../utils/guard'
 import { id } from '../utils/json'
 import {
@@ -25,7 +25,7 @@ type Patch<V, KK extends StrKey<V>> = ((OPick<V, Allowed<KK>> & ID) | (Rec<Allow
   TS
 
 const $mergeX = <
-  V extends Model & ID,
+  V extends O,
   KK extends StrKey<V>,
   Out extends doc,
   D extends O,
@@ -92,7 +92,7 @@ const $mergeX = <
 type TakeDoc<V, KK extends StrKey<V>> = OPick<V, Allowed<KK>> & ID
 
 const $mergeId =
-  <V extends Model & ID>() =>
+  <V extends O>() =>
   <KK extends StrKey<V>, Out extends doc, E = unknown>(
     out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
     keys: ExactKeys<Allowed<KK>>,
@@ -138,7 +138,7 @@ const $mergeId =
   }
 
 export const $simpleMerge =
-  <V extends Model & ID>() =>
+  <V extends O>() =>
   <KK extends StrKey<V>, Out extends doc, E = unknown>(
     out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
     keys: ExactKeys<Allowed<KK>>,
@@ -146,7 +146,7 @@ export const $simpleMerge =
     $mergeX<V, KK, Out, OPick<V, Allowed<KK>> & ID & E>(out, keys, root(), id)
 
 export const $merge =
-  <V extends Model & ID>() =>
+  <V extends O>() =>
   <KK extends StrKey<V>, Out extends doc>(
     out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
     keys: ExactKeys<Allowed<KK>>,
