@@ -132,8 +132,9 @@ const executes = <
     type It = Iterator<readonly Result2[], W>
     type FrameD = Frame<readonly Result2[], W>
     type Next = Promise<FrameD>
-    const clear = async () => Promise.all([snapshotCollection.drop(), last.deleteOne({_id: streamName })])
-    
+    const clear = async () =>
+      Promise.all([snapshotCollection.drop(), last.deleteOne({ _id: streamName })])
+
     const withStop = (next: () => Next, tr?: () => void): It => {
       return addTeardown(() => ({ stop, next: next(), clear }), tr)
     }
@@ -181,14 +182,14 @@ const executes = <
         const handleTeardown = async <W extends Document, M extends keyof Actions<unknown>>(
           last: Last,
         ) => {
-          if(!last.data) return
+          if (!last.data) return
           const { collection: c, method: m, params: p } = last.data.teardown
           const { collection, method, params } = {
             collection: db.collection<W>(c),
             method: m as M,
             params: p as TeardownRecord<W, M>['params'],
           }
-          await actions[method](collection, params)
+          await Promise.all([snapshotCollection.drop(), actions[method](collection, params)])
         }
         if (exists && !same) await handleTeardown(exists)
         return next(step3(same), 'clone into new collection')

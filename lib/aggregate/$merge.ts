@@ -15,24 +15,28 @@ import { link } from './prefix'
 type OutInputE<T, E, A = T | null> = ID & Rec<'after', A> & E
 type Allowed<K extends string> = Exclude<K, keyof (TS & ID)>
 
-type Patch<V, KK extends StrKey<V>> = ((OPick<V, Allowed<KK>> & ID) | (Rec<Allowed<KK>, N> & ID)) &
+type Patch<V, KK extends StrKey<V> = StrKey<V>> = (
+  | (OPick<V, Allowed<KK>> & ID)
+  | (Rec<Allowed<KK>, N> & ID)
+) &
   TS
+type TakeDoc<V, E = ID, KK extends StrKey<V> = StrKey<V>> = OPick<V, Allowed<KK>> & E
 
 const $mergeX = <
   V extends O,
-  KK extends StrKey<V>,
   Out extends doc,
   Source extends O,
   SourcePart extends doc,
   Intermediate extends O = Source,
 >(
-  out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
-  keys: ExprsExact<OPick<V, Allowed<KK>>, SourcePart>,
+  out: RWCollection<Out | Replace<Out, Patch<V>>, Out>,
+  keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
   f: Field<Intermediate, SourcePart>,
-  map: (x: Expr<Patch<V, KK>, Intermediate>) => Expr<Patch<V, KK>, Source>,
+  map: (x: Expr<Patch<V>, Intermediate>) => Expr<Patch<V>, Source>,
 ): StreamRunnerParam<Source, 'out'> => ({
   raw: (first: boolean): RawStages<unknown, Source, 'out'> => {
-    type K = Allowed<KK>
+    type KK = StrKey<V>
+    type K = Allowed<StrKey<V>>
     type T = OPick<V, K> & ID
     type Patch = (T | (Rec<K, N> & ID)) & TS
     const patch: ExprsExact<OPick<V, K>, Intermediate> = mapExact<
@@ -72,7 +76,7 @@ const $mergeX = <
         [
           {
             $unset: Object.keys(
-              mapExactToObject<OPick<V, Allowed<KK>>, IdHKT, ConstHKT<1>>(keys, () => 1),
+              mapExactToObject<TakeDoc<V, unknown>, IdHKT, ConstHKT<1>>(keys, () => 1),
             ),
           },
         ],
@@ -80,21 +84,20 @@ const $mergeX = <
     }),
 })
 
-type TakeDoc<V, KK extends StrKey<V>> = OPick<V, Allowed<KK>> & ID
-
 const $mergeId =
   <V extends O>() =>
-  <KK extends StrKey<V>, SourcePart extends doc, Out extends doc, E = unknown>(
-    out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
-    keys: ExprsExact<OPick<V, Allowed<KK>>, SourcePart>,
-    id: Expr<string, OutInputE<TakeDoc<V, KK>, E, null>>,
+  <SourcePart extends doc, Out extends doc, E = unknown>(
+    out: RWCollection<Out | Replace<Out, Patch<V>>, Out>,
+    keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
+    id: Expr<string, OutInputE<TakeDoc<V>, E, null>>,
   ): StreamRunnerParam<OutInputE<SourcePart, E>, 'out'> => {
     type OutInput<T, A = T | null> = OutInputE<T, E, A>
     interface AfterHKT<T> extends HKT {
       readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
     }
+    type KK = StrKey<V>
     type K = Allowed<KK>
-    type T = TakeDoc<V, KK>
+    type T = TakeDoc<V>
     type Patch = (T | (Rec<K, N> & ID)) & TS
 
     type Source = OutInputE<SourcePart, E>
@@ -109,7 +112,7 @@ const $mergeId =
 
     // Expr<Patch, ID & Obj & RORec<"after", T | null> & E & RORec<"after", Obj & Pick<V, Exclude<KK, "touchedAt" | "_id">> & ID>, unknown>
 
-    return $mergeX<V, KK, Out, Source, SourcePart, Intermediate>(
+    return $mergeX<V, Out, Source, SourcePart, Intermediate>(
       out,
       keys,
       root<Intermediate>().of('after'),
@@ -141,19 +144,19 @@ const $mergeId =
 
 export const $simpleMerge =
   <V extends O>() =>
-  <KK extends StrKey<V>, Source extends doc, Out extends doc>(
-    out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
-    keys: ExprsExact<OPick<V, Allowed<KK>>, Source>,
+  <Source extends doc, Out extends doc>(
+    out: RWCollection<Out | Replace<Out, Patch<V>>, Out>,
+    keys: ExprsExact<TakeDoc<V, unknown>, Source>,
   ): StreamRunnerParam<Source, 'out'> =>
-    $mergeX<V, KK, Out, Source, Source>(out, keys, root(), id)
+    $mergeX<V, Out, Source, Source>(out, keys, root(), id)
 
 export const $merge =
   <V extends O>() =>
-  <KK extends StrKey<V>, Out extends doc, SourcePart extends doc>(
-    out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
-    keys: ExprsExact<OPick<V, Allowed<KK>>, SourcePart>,
+  <Out extends doc, SourcePart extends doc>(
+    out: RWCollection<Out | Replace<Out, Patch<V>>, Out>,
+    keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
   ): StreamRunnerParam<Delta<SourcePart>, 'out'> =>
-    $mergeId<V>()<KK, SourcePart, Out, Before<SourcePart | null>>(
+    $mergeId<V>()<SourcePart, Out, Before<SourcePart | null>>(
       out,
       keys,
       assertNotNull(root<Rec<'before', (doc & SourcePart) | null>>().of('before').of('_id').expr()),
