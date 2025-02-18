@@ -1,5 +1,5 @@
 import type { Arr, ID, O, RORec, Rec, RecHKT } from '../../../../types'
-import { $array, $filterDefined } from '../../../expression/array'
+import { array, filterDefined } from '../../../expression/array'
 import { field, type ExprHKT, type ExprsExact } from '../../../expression/concat'
 import { eqTyped, ite, sub } from '../../../expression/logic'
 import { $getField, nil, val } from '../../../expression/val'
@@ -22,8 +22,8 @@ export const subGroup = <T extends O, Grp, V extends O, GID extends string>(
   type WithGrpId = GrpId & V
   type HasItem = WithGrpId
 
-  const part = $filterDefined<Part, Delta<T>>(
-    $array<Part | null, Delta<T>>(
+  const part = filterDefined<Part, Delta<T>>(
+    array<Part | null, Delta<T>>(
       ite<Part | null, null, T, RecHKT<'after', unknown, ID>>(
         eqTyped<null, T, RecHKT<'after', unknown, ID>>(root<After<T>>().of('after').expr(), nil),
         nil,

@@ -11,11 +11,11 @@ import type {
   notArr,
 } from '../../../../types'
 import { concat, type ExprHKT, type ExprsExact } from '../../../expression/concat'
-import { $rand, now, val } from '../../../expression/val'
+import { $rand, current, val } from '../../../expression/val'
 import { ctx, root } from '../../../field'
 import type { Expr, RawStages, TS } from '../../../types'
 import type { DeltaAccumulatorHKT, DeltaAccumulators } from '../../../types/accumulator'
-import { set, to, type Updater, type UpdaterHKT } from '../../../update'
+import { set, to, type Updater, type UpdaterHKT } from '../../../update/updater'
 import { map1 } from '../../../utils/json'
 import { mapExact0, type MapO, type MappedHKT } from '../../../utils/map-object'
 import { $set_ } from '../../mongo-stages'
@@ -89,7 +89,7 @@ export const subMerge = <
 
   const F1: MapO<ID & TS, Update<V_Grp, ID & TS>> = {
     _id: ['_id', to(idPrefix ? concat(val(idPrefix), $rand) : $rand)],
-    touchedAt: ['touchedAt', to(now)],
+    touchedAt: ['touchedAt', to(current)],
   }
   const F2: MapO<RORec<GID, Grp>, Update<V_Grp, RORec<GID, Grp>>> = mapId<
     GID,
@@ -105,7 +105,7 @@ export const subMerge = <
   } as MapO<Added, Update<V_Grp, Added>>
   const addTSAndExtra = {
     ...mapExact0<Extra, MappedHKT<Extra, ExprHKT<V_Grp>>, Update<V_Grp, Extra>>(extra, to),
-    touchedAt: ['touchedAt', to(now)],
+    touchedAt: ['touchedAt', to(current)],
   } as MapO<Extra & TS, Update<Replace<Out, V>, Extra & TS, New>>
 
   const updater: Updater<

@@ -8,7 +8,7 @@ import type { Accumulator, AccumulatorRaw, DeltaAccumulator, Expr, Part } from '
 
 const asAccumulator = <T, V, C = unknown>(x: RawObj) => x as AccumulatorRaw<T, V, C>
 
-export const $sum_ = <D extends O, C = unknown>(
+const $sum_ = <D extends O, C = unknown>(
   expr: Expr<number | N, D, C>,
 ): Accumulator<D, number, C> => ({ raw: f => asAccumulator({ $sum: expr.raw(f).get() }) })
 export const $sum = <D extends O, C = unknown>(
@@ -24,7 +24,7 @@ export const $sum = <D extends O, C = unknown>(
   merge: (x, y) => add($ifNull(x, val(0)), y),
 })
 
-export const $accumulator_ = <D, T, Ctx, A extends readonly unknown[]>(
+const $accumulator_ = <D, T, Ctx, A extends readonly unknown[]>(
   init: () => RONoRaw<T>,
   accumulateArgs: AppMap<ExprHKT<D, Ctx>, A>,
   accumulate: (a: NoRaw<T>, ...args: NoRaw<A>) => RONoRaw<T>,
@@ -56,12 +56,6 @@ export const $accumulator = <D, T, Ctx, A extends readonly unknown[]>(
   group: $accumulator_(init, accumulateArgs, accumulate, merge),
   merge: <D, C>(a: Expr<T | N, D, C>, b: Expr<T, D, C>): Expr<T, D, C> =>
     func<T, [T | N, T], D, C>(merge, a, b),
-})
-
-export const $push_ = <D extends O, T, C = unknown>(
-  expr: Expr<T, D, C>,
-): Accumulator<D, Arr<T>, C> => ({
-  raw: f => asAccumulator({ $push: expr.raw(f).get() }),
 })
 
 export const $countDict = <D extends O, C = unknown>(
@@ -149,7 +143,7 @@ export const $keys = <D extends O, C = unknown>(
 
 export const $entries = <D extends O, V, C = unknown>(
   expr: Expr<Rec<string, Rec<'1' | '0', Arr<V>>>, D, C>,
-) =>
+): Expr<Arr<Rec<'k', string> & Rec<'v', V>>, D, C> =>
   func<Arr<Rec<'k', string> & Rec<'v', V>>, [Rec<string, Rec<'1' | '0', Arr<V>>>], D, C>(function (
     obj,
   ) {

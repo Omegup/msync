@@ -8,7 +8,8 @@ import { omitRORec } from '../../utils/guard'
 import { map1 } from '../../utils/json'
 import { $simpleLookup_ } from '../mongo-stages'
 import { link } from '../prefix'
-import { $replaceWithDelta, $replaceWithEach } from '../set'
+import { $replaceWithDelta } from '../set/$set-delta'
+import { $replaceWithEach } from '../set/$replace-with-each'
 import { $unwindDelta } from '../unwind'
 
 type s = string

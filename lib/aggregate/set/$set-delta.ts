@@ -2,13 +2,15 @@ import type { App, O, RORec, jsonItem } from '../../../types'
 import { sub } from '../../expression/logic'
 import { nil } from '../../expression/val'
 import { root } from '../../field'
-import type { BA, Delta, Expr } from '../../types'
-import { subUpdater, to, weaken, type Updater } from '../../update'
+import type { BA, Delta, Expr, RawStages } from '../../types'
+import { subUpdater, to, weaken, type Updater } from '../../update/updater'
 import { link } from '../prefix'
 import { $replaceWithEach, $setEach, type ParDeltaHKT } from './$replace-with-each'
 
-export const $replaceWithDelta = <T extends O, V extends jsonItem>(expr: Expr<V, T>) =>
-  $replaceWithEach<T, V, unknown>(<K extends BA>(field: K) =>
+export const $replaceWithDelta = <T extends O, V extends jsonItem>(
+  expr: Expr<V, T>,
+): RawStages<unknown, Delta<T>, Delta<V>> =>
+  $replaceWithEach<T, V>(<K extends BA>(field: K) =>
     sub(expr, root<App<ParDeltaHKT<K, T, unknown>, T>>().of(field)),
   )
 

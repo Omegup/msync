@@ -22,7 +22,7 @@ import type {
   Query,
   RawStages,
 } from '../types'
-import type { Updater } from '../update'
+import type { Updater } from '../update/updater'
 import { id } from '../utils/json'
 import { mapExactToObject, type ExactKeys } from '../utils/map-object'
 import { asStages } from './prefix'

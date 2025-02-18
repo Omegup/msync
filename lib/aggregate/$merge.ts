@@ -1,16 +1,8 @@
-import type {
-  App,
-  ConstHKT,
-  HKT,
-  I,
-  IdHKT,
-  OPick,
-  RWCollection
-} from '../../types'
-import type { ID, N, O, RORec, Rec, Replace, StrKey } from '../../types/json'
+import type { App, ConstHKT, HKT, I, IdHKT, OPick, RWCollection } from '../../types'
+import type { ID, N, O, RORec, Rec, Replace, StrKey, doc } from '../../types/json'
 import { field, type ExprHKT, type ExprsExact, type ExprsExactHKT } from '../expression/concat'
 import { eqTyped, ite } from '../expression/logic'
-import { nil, now } from '../expression/val'
+import { nil, current } from '../expression/val'
 import { root } from '../field'
 import type { Expr, Model, OutInput, RawStages, TS } from '../types'
 import { omitPick, omitRORec, type Equal } from '../utils/guard'
@@ -28,17 +20,13 @@ interface AfterHKT<T> extends HKT {
   readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
 }
 type Allowed<K extends string> = Exclude<K, keyof (TS & ID)>
-export type WithKeys<V, MKeys extends StrKey<V>> = ID &
-  TS &
-  Omit<V, MKeys> &
-  (OPick<V, MKeys> | Rec<MKeys, N>)
 
 type Patch<V, KK extends StrKey<V>> = ((OPick<V, Allowed<KK>> & ID) | (Rec<Allowed<KK>, N> & ID)) &
   TS
 
 export const $merge =
   <V extends Model & ID>() =>
-  <KK extends StrKey<V>, Out extends O>(
+  <KK extends StrKey<V>, Out extends doc>(
     out: RWCollection<Out | Replace<Out, Patch<V, KK>>, Out>,
     keys: ExactKeys<Allowed<KK>>,
   ): RawStages<unknown, OutInput<OPick<V, Allowed<KK>> & ID>, 'out'> => {
@@ -71,7 +59,7 @@ export const $merge =
             mapExact<RORec<K, 1>, IdHKT, ConstHKT<Expr<null, unknown>>>(keys, () => nil),
             {
               _id: ['_id', root<OutInput<T, null>>().of('_id').expr()],
-              touchedAt: ['touchedAt', now],
+              touchedAt: ['touchedAt', current],
             },
           ),
         ),
@@ -80,7 +68,7 @@ export const $merge =
         omitPick<KK, never, keyof (TS & ID), V>().backward<FromOut<T>>(
           spread<Pick<V, K>, ID & TS, ExprHKT<OutInput<T, T>>, O>(patch, {
             _id: ['_id', root<OutInput<T, T>>().of('after').of('_id').expr()],
-            touchedAt: ['touchedAt', now],
+            touchedAt: ['touchedAt', current],
           }),
         ),
       ),

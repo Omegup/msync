@@ -3,7 +3,7 @@ import { eqTyped, ite } from '../../expression/logic'
 import { nil } from '../../expression/val'
 import { root } from '../../field'
 import type { BA, Delta, Expr, FRawStages, RawStages } from '../../types'
-import { set, to, type Updater, type UpdaterHKT } from '../../update'
+import { set, to, type Updater, type UpdaterHKT } from '../../update/updater'
 import { mapExact1, type MapK } from '../../utils/map-object'
 import { $set1 } from '../mongo-stages'
 
@@ -55,7 +55,7 @@ export const $setEach = <
 ): RawStages<unknown, Delta2<T, BA2> & E, Rec<BA2, V | null> & Omit<Delta<T> & E, BA2>, C, 1> =>
   $setEach1<T, V, BA2, E, C>(updater, dict)<IdHKT<O>>(root)
 
-export const $replaceWithEach = <T extends O, V extends jsonItem, E>(
+export const $replaceWithEach = <T extends O, V extends jsonItem, E = unknown>(
   expr: <K extends BA>(field: K) => Expr<V | null, Rec<K, T> & Delta<T> & E>,
 ): RawStages<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>> => {
   const t = deltaExpr<T, V, E>(expr)

@@ -1,5 +1,5 @@
 import type { App, HKT, O, U, Undef, jsonItem, rawItem } from '../../types'
-import type { Field, Path } from '../field'
+import type { Field } from '../field'
 import type { BoolExpr, Expr } from '../types'
 import { asBoolExpr, asExpr, asExprRaw } from './expr-base'
 import { nil, val } from './val'
@@ -47,7 +47,7 @@ export const eq =
       raw: f => asExprRaw({ $eq: [a.raw(f).get(), b.raw(f).get()] }),
     })
 
-export const sub = <T, D, Ctx, P extends O>(a: Expr<T, D, Ctx>, f: Path<P, D, Ctx>) =>
+export const sub = <T, D, Ctx, P extends O>(a: Expr<T, D, Ctx>, f: Field<P, D, Ctx>) =>
   asExpr<T, P, Ctx>({
     raw: <DeltaD extends O, I extends undefined, C = unknown>(g: Field<DeltaD, P | Undef<I>, C>) =>
       asExprRaw<T | I, DeltaD, Ctx & C>(a.raw(g.with<P, D, I, Ctx, 2>(f)).get()),

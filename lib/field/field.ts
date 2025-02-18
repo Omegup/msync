@@ -82,7 +82,4 @@ export class Field<in R, out V, in C = unknown> {
   }
 }
 
-export type Path<R extends O, V, Ctx = unknown> = Field<R, V, Ctx>
 export const { root, ctx } = Field
-
-export type JField<T extends O, S> = Field<T, S> | Field<T, Arr<S>>

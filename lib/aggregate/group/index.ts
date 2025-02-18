@@ -1,1 +1,2 @@
-export { $groupMerge } from './$group-merge'
+export { $groupMerge, $groupId, $group } from './$group-merge'
+export type { Loose, Strict } from './utils/sub-merge'

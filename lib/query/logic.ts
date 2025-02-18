@@ -19,7 +19,7 @@ type Alter = <T>(
 const make = (alter: Alter): Maker => {
   return (op, args) => alter(op, args.filter(defined))
 }
-export const combine =
+const combine =
   (op: string, make: Maker): Combiner =>
   <T extends O, C>(...args: Many<Query<T, C>>): Query<T, C> => {
     const q = make<Query<T, C>>(op, args)

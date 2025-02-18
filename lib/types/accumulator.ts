@@ -1,17 +1,5 @@
-import type { Expr } from '.'
-import type {
-  HKT,
-  I,
-  N,
-  O,
-  RORec,
-  RawObj,
-  Rec,
-  Type,
-  U,
-  Undef,
-  jsonItem
-} from '../../types'
+import type { Expr } from './expr'
+import type { HKT, I, N, O, RORec, RawObj, Rec, Type, U, Undef, jsonItem } from '../../types'
 import type { Field } from '../field'
 import type { Exact } from '../utils/map-object'
 

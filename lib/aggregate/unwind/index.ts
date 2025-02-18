@@ -1,11 +1,11 @@
 import type { Arr, AsLiteral, doc, O, Rec, RORec } from '../../../types'
-import { $mergeObjects } from '../../expression/array'
+import { mergeObjects } from '../../expression/array'
 import { field, fieldM } from '../../expression/concat'
 import { root } from '../../field'
 import type { Delta, DeltaStages } from '../../types'
 import { $unwind1 } from '../mongo-stages'
 import { link } from '../prefix'
-import { $replaceWithDelta } from '../set'
+import { $replaceWithDelta } from '../set/$set-delta'
 import { $unwindDelta } from './$unwind-delta'
 
 export { $unwindDelta } from './$unwind-delta'
@@ -31,7 +31,7 @@ export const $unwind = <T extends doc, K extends s, U extends doc>(
     )
     .with<unknown, Delta<T & Rec<K, U>>>(
       $replaceWithDelta<LR<T & Rec<K, Arr<U>>, U>, T & Rec<K, U>>(
-        $mergeObjects<T, Rec<K, U>, LR<T & Rec<K, Arr<U>>, U>>(
+        mergeObjects<T, Rec<K, U>, LR<T & Rec<K, Arr<U>>, U>>(
           root<LR<T & Rec<K, Arr<U>>, U>>().of('left').expr(),
           fieldM<RORec<K, 'key'>, RORec<'key', U>, LR<T & Rec<K, Arr<U>>, U>>(
             {

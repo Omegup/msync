@@ -1,1 +1,1 @@
-export * from './updater'
+export { set, to } from './updater'

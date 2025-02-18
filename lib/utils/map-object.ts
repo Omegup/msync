@@ -52,7 +52,7 @@ export const mapExactToObject0 = <T, F extends HKT<StrKey<T>>, G extends HKT<Str
 export const mapExactToObject1 = <K extends string, F extends HKT<K>, G extends HKT<K>>(
   x: MapK<K, F>,
   f: <P extends K>(v: App<F, P>, k: P) => App<G, P>,
-): MapKPart1<RORec<K>, G> => mapExactToObject0(x, f)
+): MapKPart1<RORec<K>, G> => mapExactToObject0<RORec<K>, F, G>(x, f)
 
 export interface WithKey1<K extends string, G extends HKT<K>> extends HKT<K> {
   readonly out: readonly [I<K, this>, App<G, I<K, this>>]

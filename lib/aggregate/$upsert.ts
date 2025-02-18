@@ -1,9 +1,9 @@
 import type { App, HKT, I, RWCollection } from '../../types'
 import type { ID, O, RORec, doc } from '../../types/json'
-import { $mergeObjects } from '../expression/array'
+import { mergeObjects } from '../expression/array'
 import { field } from '../expression/concat'
 import { eqTyped, ite } from '../expression/logic'
-import { nil, now } from '../expression/val'
+import { nil, current } from '../expression/val'
 import { root } from '../field'
 import type { Del, OutInput, RawStages, TS } from '../types'
 import { $replaceWith_ } from './mongo-stages'
@@ -14,7 +14,7 @@ interface AfterHKT<T> extends HKT {
   readonly out: OutInput<T> & RORec<'after', I<unknown, this>>
 }
 
-export type ND = { readonly deletedAt?: null }
+type ND = { readonly deletedAt?: null }
 export type Merge<T extends ID> = (T & ND & TS) | Del
 
 export const $upsert = <T extends doc>(
@@ -23,13 +23,13 @@ export const $upsert = <T extends doc>(
   const replacer = ite<Merge<T>, null, T, AfterHKT<T>>(
     eqTyped<null, T, AfterHKT<T>>(root<OutInput<T>>().of('after').expr(), nil),
     field<Del, OutInput<T, null>>({
-      deletedAt: ['deletedAt', now],
+      deletedAt: ['deletedAt', current],
       _id: ['_id', root<OutInput<T, null>>().of('_id').expr()],
-      touchedAt: ['touchedAt', now],
+      touchedAt: ['touchedAt', current],
     }),
-    $mergeObjects<T, ND & TS, App<AfterHKT<T>, T>>(
+    mergeObjects<T, ND & TS, App<AfterHKT<T>, T>>(
       root<App<AfterHKT<T>, T>>().of('after').expr(),
-      field({ deletedAt: ['deletedAt', nil], touchedAt: ['touchedAt', now] }),
+      field({ deletedAt: ['deletedAt', nil], touchedAt: ['touchedAt', current] }),
     ),
   )
   return link<OutInput<T>>()
