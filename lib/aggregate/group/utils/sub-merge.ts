@@ -75,7 +75,11 @@ export const subMerge = <
   >(
     set<V>()(
       mapExact0<V, MappedHKT<V, DeltaAccumulatorHKT<T>>, Update<Out, V, New>>(args, (v, k) =>
-        to(v.merge<Out, New>(root<O<PV>>().of(k).expr(), ctx<O<V>>()('new').of(k).expr())),
+        to(
+          first
+            ? ctx<O<V>>()('new').of(k).expr()
+            : v.merge<Out, New>(root<O<PV>>().of(k).expr(), ctx<O<V>>()('new').of(k).expr()),
+        ),
       ),
     ),
   )
@@ -132,15 +136,13 @@ export const subMerge = <
         $merge_<ReadyForMerge, Out, New, Replace<Out, ReadyForMerge>>({
           ...out,
           on: root<Out | ReadyForMerge>().of(gid),
-          ...(first
-            ? { whenMatched: 'merge' }
-            : {
-                vars: { new: ['new', root<ReadyForMerge>().expr()] },
-                stages: 'ctx',
-                whenMatched: link<Out, New>()
-                  .with<O, Replace<Out, V>>(mergeAggregates)
-                  .with<O, Replace<Out, ReadyForMerge>>(doubleReplace($set_(updater))).stages,
-              }),
+          ...{
+            vars: { new: ['new', root<ReadyForMerge>().expr()] },
+            stages: 'ctx',
+            whenMatched: link<Out, New>()
+              .with<O, Replace<Out, V>>(mergeAggregates)
+              .with<O, Replace<Out, ReadyForMerge>>(doubleReplace($set_(updater))).stages,
+          },
         }),
       ).stages
   )
