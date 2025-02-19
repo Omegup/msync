@@ -17,13 +17,9 @@ declare global {
     map<U>(callbackfn: (value: T, index: number, array: readonly T[]) => U, thisArg?: any): U[]
     map<K extends string, T extends RORec<K>, U extends RORec<K>, _ extends 2 = 2>(
       this: readonly Entry<T, K>[],
-      callbackfn: <P extends K>(
-        value: [P, T[P]],
-        index: number,
-        array: this,
-      ) => readonly [P, U[P]],
+      callbackfn: <P extends K>(value: [P, T[P]], index: number, array: this) => readonly [P, U[P]],
       thisArg?: any,
-    ): readonly Entry<U, K> []
+    ): readonly Entry<U, K>[]
     map<
       V extends ReadonlyArray<unknown>,
       F extends HKT<unknown>,
@@ -79,13 +75,9 @@ declare global {
     map<U>(callbackfn: (value: T, index: number, array: readonly T[]) => U, thisArg?: any): U[]
     map<K extends string, T extends RORec<K>, U extends RORec<K>, _ extends 2 = 2>(
       this: readonly Entry<T, K>[],
-      callbackfn: <P extends K>(
-        value: [P, T[P]],
-        index: number,
-        array: this,
-      ) => readonly [P, U[P]],
+      callbackfn: <P extends K>(value: [P, T[P]], index: number, array: this) => readonly [P, U[P]],
       thisArg?: any,
-    ): readonly Entry<U, K> []
+    ): readonly Entry<U, K>[]
     map<
       V extends ReadonlyArray<unknown>,
       F extends HKT<unknown>,
@@ -145,5 +137,13 @@ declare global {
       values: T,
     ): Promise<{ -readonly [P in keyof T]: Awaited<T[P]> }>
     race<T extends readonly unknown[] | []>(values: T): Promise<Awaited<T[number]>>
+  }
+}
+declare module 'synchronous-promise' {
+  interface SynchronousPromiseConstructor {
+    any<T extends readonly unknown[] | [], _ extends 0 = 0>(
+      values: AppMap<PromiseHKT, T>,
+    ): SynchronousPromise<T[number]>
+    any<T extends readonly unknown[] | []>(values: T): SynchronousPromise<Awaited<T[number]>>
   }
 }

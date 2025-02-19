@@ -17,6 +17,8 @@ import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 import { actions, type Last, streamNames, type Teardown, type TsData } from './boot'
 import { createIndex } from '../utils/db-indexes'
+import { log } from '../utils'
+import { SynchronousPromise } from 'synchronous-promise'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -75,7 +77,7 @@ const executes = <
     type FrameD = Frame<readonly Result2[], W>
     type Next = Promise<FrameD>
     const clear = async () => {}
-    const withStop = (next: () => Next, tr?: () => void): It => {
+    const withStop = (next: () => PromiseLike<FrameD>, tr?: () => void): It => {
       return addTeardown(() => ({ stop, next: next(), clear }), tr)
     }
     const next = (next: () => Next, debug: string, tr?: () => void): FrameD => ({
@@ -100,7 +102,7 @@ const executes = <
 
 
     // Step 0 : declare we are starting a job
-    const step0 = (): Next => Promise.resolve(next(step1, 'get last update'))
+    const step0 = () => SynchronousPromise.resolve(next(step1, 'get last update'))
     const stop: It = withStop(step0)
 
     // Step 1 : get last update
@@ -122,7 +124,10 @@ const executes = <
             method: m as M,
             params: p as TeardownRecord<W, M>['params'],
           }
-          await actions[method](collection, params)
+          const [action, out] = actions[method](collection, params)
+          log('teardown', ...out)
+          await action
+          log('teardown done', ...out)
         }
         if (exists && !same) await handleTeardown(exists)
         return next(step4(same), 'clone into new collection')

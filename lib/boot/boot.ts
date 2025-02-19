@@ -34,6 +34,7 @@ import { log } from '../utils/log'
 import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
+import { SynchronousPromise } from 'synchronous-promise'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -54,9 +55,9 @@ export const actions: {
   [K in keyof Actions<unknown>]: <W extends BSON.Document>(
     col: Collection<W>,
     x: Actions<W>[K],
-  ) => Promise<unknown>
+  ) => [Promise<unknown>, unknown[]]
 } = {
-  updateMany: (c, args) => c.updateMany(...args),
+  updateMany: (c, args) => [c.updateMany(...args), [`db['${c.collectionName}'].updateMany(...`, args, ')']],
 }
 
 export const streamNames: Record<string, string> = {}
@@ -135,13 +136,13 @@ const executes = <
     const clear = async () =>
       Promise.all([snapshotCollection.drop(), last.deleteOne({ _id: streamName })])
 
-    const withStop = (next: () => Next, tr?: () => void): It => {
+    const withStop = (next: () => PromiseLike<FrameD>, tr?: () => void): It => {
       return addTeardown(() => ({ stop, next: next(), clear }), tr)
     }
     const next = (next: () => Next, debug: string, tr?: () => void): FrameD => ({
       cont: withStop(next, tr),
       data: [],
-      info: { job, debug },
+      info: { job, debug: `${streamName} on ${collection.collectionName}: ${debug}` },
     })
 
     const data: TsData = {
@@ -158,7 +159,7 @@ const executes = <
     }
 
     // Step 0 : declare we are starting a job
-    const step0 = (): Next => Promise.resolve(next(step1, 'empty new collection'))
+    const step0 = () => SynchronousPromise.resolve(next(step1, 'empty new collection'))
     const stop: It = withStop(step0)
 
     // Step 1 : empty new collection
@@ -175,7 +176,7 @@ const executes = <
       Promise.all([
         last.findOne({ _id: streamName, data }),
         last.findOne({ _id: streamName }),
-      ]).then(ts => next(step2_5(ts), 'handle teardown'))
+      ]).then(ts => next(step2_5(ts), ts[0] ? `no teardown to handle, starting at ${ts[0].ts}` : ts[1] ? 'handle teardown' : 'start fresh'))
     const step2_5 =
       ([same, exists]: [Last | null, Last | null]) =>
       async (): Next => {
@@ -189,7 +190,10 @@ const executes = <
             method: m as M,
             params: p as TeardownRecord<W, M>['params'],
           }
-          await Promise.all([snapshotCollection.drop(), actions[method](collection, params)])
+          const [action, out] = actions[method](collection, params)
+          log('teardown', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
+          await Promise.all([snapshotCollection.drop(), action])
+          log('teardown done', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
         }
         if (exists && !same) await handleTeardown(exists)
         return next(step3(same), 'clone into new collection')

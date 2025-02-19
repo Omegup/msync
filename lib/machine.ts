@@ -26,7 +26,7 @@ export class Machine<Result = unknown> {
   }
 }
 
-export const wrap = <Result>(root: Machine<Result>): Machine<Result> => new Machine(root.runner())
+export const wrap = <Result>(root: Machine<Result>): Machine<Result> => root
 
 const runCont = async <T, Info>(
   { next }: IteratorResult<T, Info>,

@@ -1,3 +1,4 @@
+import { SynchronousPromise } from 'synchronous-promise'
 import { map } from '../map-object'
 import type { KEYS, RaceWinner, SourceIteratorResults } from './types'
 
@@ -9,7 +10,7 @@ export const restart = <K extends KEYS, Result, Info extends Record<K, unknown>>
   return map<Sources, K, Sources>(sources, x => x.stop())
 }
 
-export const race = async <W, K extends KEYS, Result, Info extends Record<K, W>>(
+export const race = <W, K extends KEYS, Result, Info extends Record<K, W>>(
   sources: SourceIteratorResults<K, Result, Info>,
 ) => {
   type Winner = RaceWinner<K, Result, Info>
@@ -19,5 +20,5 @@ export const race = async <W, K extends KEYS, Result, Info extends Record<K, W>>
       next.then(frame => ({ key, sources, frame })),
     ),
   )
-  return Promise.race<readonly Winner[], 0>(promises)
+  return SynchronousPromise.any<readonly Winner[], 0>(promises)
 }

@@ -136,13 +136,11 @@ export const subMerge = <
         $merge_<ReadyForMerge, Out, New, Replace<Out, ReadyForMerge>>({
           ...out,
           on: root<Out | ReadyForMerge>().of(gid),
-          ...{
-            vars: { new: ['new', root<ReadyForMerge>().expr()] },
-            stages: 'ctx',
-            whenMatched: link<Out, New>()
-              .with<O, Replace<Out, V>>(mergeAggregates)
-              .with<O, Replace<Out, ReadyForMerge>>(doubleReplace($set_(updater))).stages,
-          },
+          vars: { new: ['new', root<ReadyForMerge>().expr()] },
+          stages: 'ctx',
+          whenMatched: link<Out, New>()
+            .with<O, Replace<Out, V>>(mergeAggregates)
+            .with<O, Replace<Out, ReadyForMerge>>(doubleReplace($set_(updater))).stages,
         }),
       ).stages
   )
