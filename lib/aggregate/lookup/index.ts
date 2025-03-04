@@ -1,5 +1,5 @@
 import type { AsLiteral, ID, O, RORec, Rec, doc, notArr } from '../../../types'
-import { mergeObjects } from '../../expression/array'
+import { mergeObjects, type NullToOBJ } from '../../expression/array'
 import { fieldM } from '../../expression/concat'
 import { root, type Field } from '../../field'
 import type { Delta, DeltaStages, HasJob, IteratorResult, Runner, TStages } from '../../types'
@@ -34,9 +34,9 @@ const merge = <Result, LD extends HasJob, RD extends HasJob>({
 
 const join = <
   As extends string,
-  LQ extends doc,
-  Q2 extends O,
-  LE extends LQ,
+  LQ extends O,
+  Q2Q extends O,
+  LE extends LQ & ID,
   LS extends UBefore<LQ>,
   BLB extends Before<LQ>,
   RQ extends O,
@@ -44,15 +44,22 @@ const join = <
   S extends notArr,
   RS extends UBefore<RQ>,
   BRB extends Before<RQ>,
-  Result extends Q2,
-  Null extends null = never,
+  Result extends Q2Q,
+  LNull extends null = never,
+  RNull extends null = never,
 >(
   { lField, rField, left, right, as }: LookupParams<As, LQ, LE, RQ, RE, S>,
   leftSnapshot: TStages<LS, Before<LQ>, BLB, Before<LE>>,
   rightSnapshot: TStages<RS, Before<RQ>, BRB, Before<RE>>,
-  stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE | Null>, Result>,
-  includeNull?: Null,
-): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
+  stagesUntilNextLookup: DeltaStages<
+    LQ | (Q2Q | NullToOBJ<RNull>),
+    (LE | NullToOBJ<RNull>) & RORec<As, RE | LNull>,
+    Result
+  >,
+  outerLeft?: LNull,
+  outerRight?: RNull,
+): SnapshotStreamExecutionResult<LQ | (Q2Q | NullToOBJ<RNull>), Result> => {
+  type Q2 = Q2Q | NullToOBJ<RNull>
   createIndex(leftSnapshot.coll, { [`before.${lField.str()}`]: 1 }).catch(
     e => e.code == 86 || Promise.reject(e),
   )
@@ -81,39 +88,38 @@ const join = <
       const leftJoinField = { field1: rField, field2: lField }
       type L = 'left'
       type R = 'right'
-      type LeftRight<E extends Null = Null> = Rec<L, LE> & Rec<R, RE | E> & ID
+      type LeftRight = Rec<L, LE | RNull> & Rec<R, RE | LNull> & ID
       type JoinStages<RR> = RawStages<unknown, Delta<RR>, Delta<LeftRight>>
-      const joinL_Delta: JoinStages<RE> = $lookupDelta<RQ, RE, LQ, LE, BLB, LS, S, R, L>(
+      const joinL_Delta: JoinStages<RE> = $lookupDelta<RQ, RE, LQ, LE, BLB, LS, S, R, L, RNull>(
         leftJoinField,
         leftSnapshot,
         'right',
         'left',
         joinId,
+        outerRight,
       )
-      const joinR_Delta: JoinStages<LE> = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, L, R, Null>(
+      const joinR_Delta: JoinStages<LE> = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, L, R, LNull>(
         rightJoinField,
         rightSnapshot,
         'left',
         'right',
         joinId,
-        includeNull,
+        outerLeft,
       )
+
+      type OuterLE = LE | NullToOBJ<RNull>
 
       const mergeForeignIntoDoc = concatStages<
         unknown,
         Delta<LeftRight>,
-        Delta<LE & RORec<As, RE | Null>>,
+        Delta<OuterLE & RORec<As, RE | LNull>>,
         Delta<Result>,
         unknown
       >(
-        $replaceWithDelta<LeftRight, LE & RORec<As, RE | Null>>(
-          mergeObjects<LE, ID & RORec<As, RE | Null>, LeftRight>(
+        $replaceWithDelta<LeftRight, OuterLE & RORec<As, RE | LNull>>(
+          mergeObjects<LE, ID & RORec<As, RE | LNull>, LeftRight, unknown, RNull>(
             root<LeftRight>().of('left').expr(),
-            fieldM<
-              RORec<As, 'a'> & RORec<'_id', 'b'>,
-              { a: RE | Null; b: string },
-              LeftRight<Null>
-            >(
+            fieldM<RORec<As, 'a'> & RORec<'_id', 'b'>, { a: RE | LNull; b: string }, LeftRight>(
               { a: root<LeftRight>().of('right').expr(), b: root<LeftRight>().of('_id').expr() },
               dictId,
             ),
@@ -170,13 +176,18 @@ const $lookup1 =
     RQ extends O,
     RE extends RQ & doc,
     S extends notArr,
-    Null extends null = never,
+    LNull extends null = never,
+    RNull extends null = never,
   >(
     p: LookupParams<As, LQ, LE, RQ, RE, S>,
-    includeNull?: Null,
-  ): SnapshotStream<LQ, LE & RORec<As, RE | Null>> =>
+    outer?: { left?: LNull; right?: RNull },
+  ): SnapshotStream<LQ | NullToOBJ<RNull>, (LE | NullToOBJ<RNull>) & RORec<As, RE | LNull>> =>
   <Q2 extends O, Result extends Q2>(
-    input: DeltaStages<Q2 | (LE & RORec<As, RE | Null>), LE & RORec<As, RE | Null>, Result>,
+    input: DeltaStages<
+      Q2 | ((LE | NullToOBJ<RNull>) & RORec<As, RE | LNull>),
+      (LE | NullToOBJ<RNull>) & RORec<As, RE | LNull>,
+      Result
+    >,
   ) =>
     p.left.stages(
       <LS extends UBefore<LQ>, BLB extends Before<LQ>>(
@@ -186,12 +197,13 @@ const $lookup1 =
           <RS extends UBefore<RQ>, BRB extends Before<RQ>>(
             rStages: TStages<RS, Before<RQ>, BRB, Before<RE>>,
           ) =>
-            join<As, LQ, Q2, LE, LS, BLB, RQ, RE, S, RS, BRB, Result, Null>(
+            join<As, LQ, Q2, LE, LS, BLB, RQ, RE, S, RS, BRB, Result, LNull, RNull>(
               p,
               lStages,
               rStages,
               input,
-              includeNull,
+              outer?.left,
+              outer?.right,
             ),
         ),
     )
@@ -209,11 +221,22 @@ export const $lookup =
     })
 
 export const $outerLookup =
-  <As extends string, LQ extends doc, RQ extends O, RE extends RQ & doc, S extends notArr>(
+  <
+    As extends string,
+    LQ extends doc,
+    RQ extends O,
+    RE extends RQ & doc,
+    S extends notArr,
+    LNull extends null = never,
+    RNull extends null = never,
+  >(
     p: Params<As, LQ, RQ, RE, S>,
+    outer: { left?: LNull; right?: RNull },
   ) =>
-  <LE extends LQ>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE | null>> =>
-    $lookup1<As, LQ, LE, RQ, RE, S, null>(
+  <LE extends LQ>(
+    l: SnapshotStream<LQ, LE>,
+  ): SnapshotStream<LQ | NullToOBJ<RNull>, (LE | NullToOBJ<RNull>) & RORec<As, RE | LNull>> =>
+    $lookup1<As, LQ, LE, RQ, RE, S, LNull, RNull>(
       {
         right: p.from,
         as: p.as,
@@ -221,5 +244,5 @@ export const $outerLookup =
         rField: p.foreignField,
         left: l(emptyDelta()),
       },
-      null,
+      outer,
     )

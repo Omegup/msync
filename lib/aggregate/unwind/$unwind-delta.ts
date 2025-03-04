@@ -1,10 +1,10 @@
 import type { Arr, AsLiteral, ID, Rec, doc, rawItem } from '../../../types'
+import type { NullToOBJ } from '../../expression'
 import type { BA, Delta, RawStages } from '../../types'
 import { $unwind_ } from '../mongo-stages'
 import { asStages, link } from '../prefix'
 
 type s = string
-type NullToOBJ<T> = T extends null ? {} : T
 
 export const $unwindDelta = <
   K1 extends s,
@@ -75,7 +75,7 @@ export const $unwindDelta = <
     },
   }
 
-  const ifNull = (k: K1 | K2, part: BA, str = `$${[k1, k2].sort()[0]}.${part}._id`) =>
+  const ifNull = (k: K1 | K2, part: BA, str = `$${k}.${part}._id`) =>
     outer && k == k2 ? { $ifNull: [str, 'null'] } : str
   const interDot = ([a, b]: rawItem[]) => [a, '.', b]
 
@@ -85,7 +85,7 @@ export const $unwindDelta = <
       then: null,
       else: {
         _id: k
-          ? `$${k}.${part}._id`
+          ? ifNull(k, part)
           : {
               $concat: interDot([k1, k2].sort().map(k => ifNull(k, part))),
             },

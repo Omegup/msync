@@ -1,4 +1,4 @@
-import type { App, Arr, HKT, N, RORec, Rec, notArr } from '../../types'
+import type { App, Arr, HKT, N, O, RORec, Rec, notArr } from '../../types'
 import { ctx } from '../field'
 import type { Expr } from '../types'
 import { gte, add } from './arith'
@@ -81,10 +81,13 @@ export const last = <T, D, C>(expr: Expr<Arr<T>, D, C>) =>
   asExpr<T | null, D, C>({
     raw: f => asExprRaw({ $last: expr.raw(f).get() }),
   })
-export const mergeObjects = <T1, T2, D, C = unknown>(
-  ...exprs: readonly [Expr<T1, D, C>, Expr<T2, D, C>]
+
+export type NullToOBJ<N extends null> = N extends null ? O : N
+
+export const mergeObjects = <T1, T2, D, C = unknown, N extends null = never>(
+  ...exprs: readonly [Expr<T1 | N, D, C>, Expr<T2, D, C>]
 ) =>
-  asExpr<T1 & T2, D, C>({
+  asExpr<(T1 | NullToOBJ<N>) & T2, D, C>({
     raw: f => asExprRaw({ $mergeObjects: exprs.map(x => x.raw(f).get()) }),
   })
 
