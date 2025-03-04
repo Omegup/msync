@@ -70,9 +70,16 @@ export const $replaceWith1 =
   }
 
 export const $unwind1 =
-  <T extends O, K extends s, R>(k: K): FRawStages<T, T & Rec<K, Arr<R>>, T & Rec<K, R>> =>
-  f =>
-    asStages([{ $unwind: `$${f<Rec<K, Arr<R>>>().of(k).str()}` }])
+  <T extends O, K extends s, R, Null extends null = never>(
+    k: K,
+    includeNull?: Null,
+  ): FRawStages<T, T & Rec<K, Arr<R>>, T & Rec<K, R | Null>> =>
+  f => {
+    const path = `$${f<Rec<K, Arr<R>>>().of(k).str()}`
+    return asStages([
+      { $unwind: includeNull === null ? { path, preserveNullAndEmptyArrays: true } : path },
+    ])
+  }
 
 export const $group1 =
   <T extends O, ID, V extends O, C>(id: Expr<ID, T, C>, args: Accumulators<T, V, C>) =>

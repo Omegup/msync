@@ -1,4 +1,4 @@
-import type { Arr, AsLiteral, ID, N, O, RORec, Rec } from '../../../types'
+import type { Arr, AsLiteral, ID, N, O, RORec, Rec, doc } from '../../../types'
 import { field, mergeExpr, type ExprsExactHKT } from '../../expression/concat'
 import { eq, ite } from '../../expression/logic'
 import { nil } from '../../expression/val'
@@ -13,27 +13,29 @@ import { $replaceWithEach } from '../set/$replace-with-each'
 import { $unwindDelta } from '../unwind'
 
 type s = string
-type Both<K1 extends s, LE, KK2 extends s, RE> = Delta<
-  Rec<K1, LE> & Rec<Exclude<KK2, BA | K1>, RE> & ID
+type Both<K1 extends s, LE, KK2 extends s, RE, Null extends null = never> = Delta<
+  Rec<K1, LE> & Rec<Exclude<KK2, BA | K1>, RE | Null> & ID
 >
 
 export const $lookupDelta = <
   LQ extends O,
-  LE extends LQ & O,
+  LE extends LQ & doc,
   RQ extends O,
-  RE extends RQ,
+  RE extends RQ & doc,
   BRB extends UBefore<RQ>,
   RS extends UBefore<RQ>,
   S,
   K1 extends s,
   KK2 extends s,
+  Null extends null = never,
 >(
   { field1, field2 }: { field1: Field<LQ, S | N>; field2: Field<RQ, S | N> },
   { coll, exec, input }: TStages<RS, UBefore<RQ>, BRB, Before<RE>>,
   k1: AsLiteral<K1>,
   k2: AsLiteral<Exclude<KK2, BA | K1>>,
   k: K1 | Exclude<KK2, BA | K1> | false,
-): RawStages<unknown, Delta<LE>, Both<K1, LE, KK2, RE>> => {
+  includeNull?: Null,
+): RawStages<unknown, Delta<LE>, Both<K1, LE, KK2, RE, Null>> => {
   type K2 = Exclude<KK2, BA | K1>
   type BU = Before<RE>
 
@@ -102,6 +104,9 @@ export const $lookupDelta = <
           )
         },
       ),
-    )
-    .with<unknown, Delta<Rec<K1, LE> & Rec<K2, RE> & ID>>($unwindDelta(k1, k2, k)).stages
+    ).with<unknown, Delta<Rec<K1, LE> & Rec<K2, RE | Null> & ID>>(
+    $unwindDelta<K1, LE, K2, RE, Null>(
+      k1, k2, k, includeNull
+    ) 
+  ).stages
 }

@@ -1,8 +1,4 @@
 import type { AsLiteral, ID, O, RORec, Rec, doc, notArr } from '../../../types'
-import { $lookupRaw } from './$lookup-raw'
-import { $lookupDelta } from './$lookup-delta'
-import { concatStages, concatTStages, emptyDelta } from '../prefix'
-import { $replaceWithDelta } from '../set/$set-delta'
 import { mergeObjects } from '../../expression/array'
 import { fieldM } from '../../expression/concat'
 import { root, type Field } from '../../field'
@@ -16,6 +12,10 @@ import type {
   StreamRunnerParam,
   UBefore,
 } from '../../types/stream'
+import { concatStages, concatTStages, emptyDelta } from '../prefix'
+import { $replaceWithDelta } from '../set/$set-delta'
+import { $lookupDelta } from './$lookup-delta'
+import { $lookupRaw } from './$lookup-raw'
 
 import { asBefore } from '../../utils/before'
 import { createIndex } from '../../utils/db-indexes'
@@ -45,16 +45,18 @@ const join = <
   RS extends UBefore<RQ>,
   BRB extends Before<RQ>,
   Result extends Q2,
+  Null extends null = never,
 >(
   { lField, rField, left, right, as }: LookupParams<As, LQ, LE, RQ, RE, S>,
   leftSnapshot: TStages<LS, Before<LQ>, BLB, Before<LE>>,
   rightSnapshot: TStages<RS, Before<RQ>, BRB, Before<RE>>,
-  stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE>, Result>,
+  stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE | Null>, Result>,
+  includeNull?: Null,
 ): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
-  createIndex(leftSnapshot.coll, { [lField.str()]: 1 }).catch(
+  createIndex(leftSnapshot.coll, { [`before.${lField.str()}`]: 1 }).catch(
     e => e.code == 86 || Promise.reject(e),
   )
-  createIndex(rightSnapshot.coll, { [rField.str()]: 1 }).catch(
+  createIndex(rightSnapshot.coll, { [`before.${rField.str()}`]: 1 }).catch(
     e => e.code == 86 || Promise.reject(e),
   )
 
@@ -77,33 +79,41 @@ const join = <
       finalInput: StreamRunnerParam<Delta<Result>, Final>,
     ): Runner<readonly Final[], HasJob> => {
       const leftJoinField = { field1: rField, field2: lField }
-      type LeftRight = Rec<'left', LE> & Rec<'right', RE> & ID
+      type L = 'left'
+      type R = 'right'
+      type LeftRight<E extends Null = Null> = Rec<L, LE> & Rec<R, RE | E> & ID
       type JoinStages<RR> = RawStages<unknown, Delta<RR>, Delta<LeftRight>>
-      const joinL_Delta: JoinStages<RE> = $lookupDelta<RQ, RE, LQ, LE, BLB, LS, S, 'right', 'left'>(
+      const joinL_Delta: JoinStages<RE> = $lookupDelta<RQ, RE, LQ, LE, BLB, LS, S, R, L>(
         leftJoinField,
         leftSnapshot,
         'right',
         'left',
         joinId,
       )
-      const joinR_Delta: JoinStages<LE> = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, 'left', 'right'>(
+      const joinR_Delta: JoinStages<LE> = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, L, R, Null>(
         rightJoinField,
         rightSnapshot,
         'left',
         'right',
         joinId,
+        includeNull,
       )
+
       const mergeForeignIntoDoc = concatStages<
         unknown,
         Delta<LeftRight>,
-        Delta<LE & RORec<As, RE>>,
+        Delta<LE & RORec<As, RE | Null>>,
         Delta<Result>,
         unknown
       >(
-        $replaceWithDelta<LeftRight, LE & RORec<As, RE>>(
-          mergeObjects<LE, ID & RORec<As, RE>, LeftRight>(
+        $replaceWithDelta<LeftRight, LE & RORec<As, RE | Null>>(
+          mergeObjects<LE, ID & RORec<As, RE | Null>, LeftRight>(
             root<LeftRight>().of('left').expr(),
-            fieldM<RORec<As, 'a'> & RORec<'_id', 'b'>, { a: RE; b: string }, LeftRight>(
+            fieldM<
+              RORec<As, 'a'> & RORec<'_id', 'b'>,
+              { a: RE | Null; b: string },
+              LeftRight<Null>
+            >(
               { a: root<LeftRight>().of('right').expr(), b: root<LeftRight>().of('_id').expr() },
               dictId,
             ),
@@ -114,10 +124,15 @@ const join = <
 
       const lRunnerInput = concatStages(joinR_Delta, mergeForeignIntoDoc)
       const rRunnerInput = concatStages(joinL_Delta, mergeForeignIntoDoc)
-      const getRunner = <Q, V extends Q,  B, C>(f:SnapshotStreamExecutionResult<Q, V>,  stages: RawStages<unknown, Delta<V, BA, ID>, Delta<B>>, final: StreamRunnerParam<Delta<B>, C>)=>f.out({
-        raw: first => concatStages(stages, final.raw(first)),
-        teardown: final.teardown,
-      })
+      const getRunner = <Q, V extends Q, B, C>(
+        f: SnapshotStreamExecutionResult<Q, V>,
+        stages: RawStages<unknown, Delta<V, BA, ID>, Delta<B>>,
+        final: StreamRunnerParam<Delta<B>, C>,
+      ) =>
+        f.out({
+          raw: first => concatStages(stages, final.raw(first)),
+          teardown: final.teardown,
+        })
       const lRunner = getRunner(left, lRunnerInput, finalInput)
       const rRunner = getRunner(right, rRunnerInput, finalInput)
 

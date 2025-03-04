@@ -28,9 +28,11 @@ export const $replaceWith_ = <T extends O, V extends O, C = unknown>(
   expr: Expr<V, T, C>,
 ): RawStages<O, T, V, C, 1> => $replaceWith1(expr)<IdHKT<O>>(root)
 
-export const $unwind_ = <T extends O, K extends s, U>(
+export const $unwind_ = <T extends O, K extends s, U, Null extends null = never>(
   k: K,
-): RawStages<O<T>, T & Rec<K, Arr<U>>, T & Rec<K, U>> => $unwind1<T, K, U>(k)<IdHKT<O>>(root)
+  includeNull?: Null,
+): RawStages<O<T>, T & Rec<K, Arr<U>>, T & Rec<K, Null | U>> =>
+  $unwind1<T, K, U, Null>(k, includeNull)<IdHKT<O>>(root)
 
 export const $group_ =
   <V extends O>() =>
