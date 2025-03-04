@@ -170,11 +170,13 @@ const $lookup1 =
     RQ extends O,
     RE extends RQ & doc,
     S extends notArr,
+    Null extends null = never,
   >(
     p: LookupParams<As, LQ, LE, RQ, RE, S>,
-  ): SnapshotStream<LQ, LE & RORec<As, RE>> =>
+    includeNull?: Null,
+  ): SnapshotStream<LQ, LE & RORec<As, RE | Null>> =>
   <Q2 extends O, Result extends Q2>(
-    input: DeltaStages<Q2 | (LE & RORec<As, RE>), LE & RORec<As, RE>, Result>,
+    input: DeltaStages<Q2 | (LE & RORec<As, RE | Null>), LE & RORec<As, RE | Null>, Result>,
   ) =>
     p.left.stages(
       <LS extends UBefore<LQ>, BLB extends Before<LQ>>(
@@ -184,7 +186,13 @@ const $lookup1 =
           <RS extends UBefore<RQ>, BRB extends Before<RQ>>(
             rStages: TStages<RS, Before<RQ>, BRB, Before<RE>>,
           ) =>
-            join<As, LQ, Q2, LE, LS, BLB, RQ, RE, S, RS, BRB, Result>(p, lStages, rStages, input),
+            join<As, LQ, Q2, LE, LS, BLB, RQ, RE, S, RS, BRB, Result, Null>(
+              p,
+              lStages,
+              rStages,
+              input,
+              includeNull,
+            ),
         ),
     )
 export const $lookup =
@@ -199,3 +207,19 @@ export const $lookup =
       rField: p.foreignField,
       left: l(emptyDelta()),
     })
+
+export const $outerLookup =
+  <As extends string, LQ extends doc, RQ extends O, RE extends RQ & doc, S extends notArr>(
+    p: Params<As, LQ, RQ, RE, S>,
+  ) =>
+  <LE extends LQ>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE | null>> =>
+    $lookup1<As, LQ, LE, RQ, RE, S, null>(
+      {
+        right: p.from,
+        as: p.as,
+        lField: p.localField,
+        rField: p.foreignField,
+        left: l(emptyDelta()),
+      },
+      null,
+    )
