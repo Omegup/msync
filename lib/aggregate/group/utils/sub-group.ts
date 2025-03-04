@@ -56,7 +56,7 @@ export const subGroup = <T extends O, Grp, V extends O, GID extends string>(
         }),
       ),
     )
-    .with<unknown, Rec<'part', Part>>($unwind_('part'))
+    .with<unknown, Rec<'part', Part>>($unwind_<O, 'part', Part>('part'))
     .with<unknown, Part>($replaceWith_(root<Rec<'part', Part>>().of('part').expr()))
     .with<unknown, WithGrpId>(
       $group_<V>()(
