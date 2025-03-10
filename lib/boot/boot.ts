@@ -57,7 +57,10 @@ export const actions: {
     x: Actions<W>[K],
   ) => [Promise<unknown>, unknown[]]
 } = {
-  updateMany: (c, args) => [c.updateMany(...args), [`db['${c.collectionName}'].updateMany(...`, args, ')']],
+  updateMany: (c, args) => [
+    c.updateMany(...args),
+    [`db['${c.collectionName}'].updateMany(...`, args, ')'],
+  ],
 }
 
 export const streamNames: Record<string, string> = {}
@@ -176,7 +179,16 @@ const executes = <
       Promise.all([
         last.findOne({ _id: streamName, data }),
         last.findOne({ _id: streamName }),
-      ]).then(ts => next(step2_5(ts), ts[0] ? `no teardown to handle, starting at ${ts[0].ts}` : ts[1] ? 'handle teardown' : 'start fresh'))
+      ]).then(ts =>
+        next(
+          step2_5(ts),
+          ts[0]
+            ? `no teardown to handle, starting at ${ts[0].ts}`
+            : ts[1]
+              ? 'handle teardown'
+              : 'start fresh',
+        ),
+      )
     const step2_5 =
       ([same, exists]: [Last | null, Last | null]) =>
       async (): Next => {
@@ -202,7 +214,10 @@ const executes = <
     // Step 3 : clone into new collection
     const step3 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const hardQuery = $and(
-        lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
+        lastTS
+          ? root<Model>().of('touchedAt').has($gteTs(lastTS.ts))
+          : root<D>().of('deletedAt').has($eq<Timestamp | N>(null)),
+        lastTS ? null : match && $expr(match),
         hardMatch,
       )
       const notDeleted: Expr<boolean, T, unknown> = eq(
@@ -212,7 +227,7 @@ const executes = <
       const replaceRaw: RawStages<O, T & D, After<T> & { updated: true; _id: string }> =
         $replaceWith_(
           field<After<T> & { updated: true; _id: string }, T & D>({
-            after: ['after', ite(query, root<T>().expr(), nil)],
+            after: ['after', lastTS ? ite(query, root<T>().expr(), nil): root<T>().expr()],
             updated: ['updated', val(true)],
             _id: ['_id', root<T & D>().of('_id').expr()],
           }),

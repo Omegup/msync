@@ -34,9 +34,9 @@ const merge = <Result, LD extends HasJob, RD extends HasJob>({
 
 const join = <
   As extends string,
-  LQ extends O,
+  LQ extends doc,
   Q2Q extends O,
-  LE extends LQ & ID,
+  LE extends LQ,
   LS extends UBefore<LQ>,
   BLB extends Before<LQ>,
   RQ extends O,
