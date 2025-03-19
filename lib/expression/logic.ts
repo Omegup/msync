@@ -70,8 +70,8 @@ export const eqTyped = <
   })
 
 export const ne =
-  <T, K, D, C>(a: Expr<T, D, C>) =>
-  (b: Expr<K, D, C>) =>
+  <T, D, C>(a: Expr<T, D, C>) =>
+  <K>(b: Expr<K, D, C>) =>
     asExpr<boolean, D, C>({
       raw: f => asExprRaw({ $ne: [a.raw(f).get(), b.raw(f).get()] }),
     })

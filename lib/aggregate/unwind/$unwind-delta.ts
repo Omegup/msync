@@ -1,7 +1,9 @@
 import type { Arr, AsLiteral, ID, Rec, doc, rawItem } from '../../../types'
-import type { NullToOBJ } from '../../expression'
+import { ne, type NullToOBJ } from '../../expression'
+import { root } from '../../field'
+import { $expr } from '../../predicate'
 import type { BA, Delta, RawStages } from '../../types'
-import { $unwind_ } from '../mongo-stages'
+import { $match_, $unwind_ } from '../mongo-stages'
 import { asStages, link } from '../prefix'
 
 type s = string
@@ -46,32 +48,26 @@ export const $unwindDelta = <
   }
 
   const oldItems = {
-    $filter: {
-      input: {
-        $map: {
-          input: { $ifNull: [`$before.${k2}`, []] },
-          as: 'b',
-          in: {
-            before: '$$b',
-            after: {
-              $ifNull: [
-                {
-                  $first: {
-                    $filter: {
-                      input: `$after.${k2}`,
-                      as: 'a',
-                      cond: { $eq: ['$$a._id', '$$b._id'] },
-                    },
-                  },
+    $map: {
+      input: { $ifNull: [`$before.${k2}`, []] },
+      as: 'b',
+      in: {
+        before: '$$b',
+        after: {
+          $ifNull: [
+            {
+              $first: {
+                $filter: {
+                  input: `$after.${k2}`,
+                  as: 'a',
+                  cond: { $eq: ['$$a._id', '$$b._id'] },
                 },
-                null,
-              ],
+              },
             },
-          },
+            null,
+          ],
         },
       },
-      as: 'a',
-      cond: { $ne: ['$$a.before', '$$a.after'] },
     },
   }
 
@@ -102,6 +98,8 @@ export const $unwindDelta = <
       },
     },
   })
+
+  const part = (k: BA) => root<Delta<Rec<K1, T> & Rec<K2, U | Null> & ID>>().of(k).expr()
 
   const stages = link<Delta<Rec<K1, T> & Rec<K2, Arr<U>>>>()
     .with<unknown, Rec<K1, Delta<T>> & Rec<K2, Arr<Delta<U | NullToOBJ<Null>>>>>(
@@ -165,6 +163,9 @@ export const $unwindDelta = <
           },
         },
       ]),
+    )
+    .with<unknown, Delta<Rec<K1, T> & Rec<K2, U | Null> & ID>>(
+      $match_($expr(ne(part('before'))(part('after')))),
     ).stages
   return stages as RawStages<
     Delta<Rec<K1, T>>,
