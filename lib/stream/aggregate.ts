@@ -13,7 +13,7 @@ export const aggregate = <Result>(
   snapshot = true,
   start = Date.now()
 ) =>
-  input(({ coll, input }) => {
+  input<Promise<AggregateCommand<Result>>>(({ coll, input }) => {
     const req = {
       aggregate: coll.collectionName,
       pipeline: input,
@@ -27,7 +27,7 @@ export const aggregate = <Result>(
         return result as AggregateCommand<Result>
       },
       err => {
-        log('err', req)
+        log('err', req, err)
         throw new Error(err)
       },
     )

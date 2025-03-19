@@ -139,14 +139,17 @@ const executes = <
     const clear = async () =>
       Promise.all([snapshotCollection.drop(), last.deleteOne({ _id: streamName })])
 
-    const withStop = (next: () => PromiseLike<FrameD>, tr?: () => void): It => {
+    const withStop = (next: () => PromiseLike<FrameD>, tr?: () => Promise<void>): It => {
       return addTeardown(() => ({ stop, next: next(), clear }), tr)
     }
-    const next = (next: () => Next, debug: string, tr?: () => void): FrameD => ({
-      cont: withStop(next, tr),
-      data: [],
-      info: { job, debug: `${streamName} on ${collection.collectionName}: ${debug}` },
-    })
+    const nextData =
+      (data: readonly Result2[], job?: object) =>
+      (next: () => Next, debug: string, tr?: () => Promise<void>): FrameD => ({
+        cont: withStop(next, tr),
+        data,
+        info: { job, debug: `${streamName} on ${collection.collectionName}: ${debug}` },
+      })
+    const next = nextData([], job)
 
     const data: TsData = {
       input: input.delta,
@@ -227,7 +230,7 @@ const executes = <
       const replaceRaw: RawStages<O, T & D, After<T> & { updated: true; _id: string }> =
         $replaceWith_(
           field<After<T> & { updated: true; _id: string }, T & D>({
-            after: ['after', lastTS ? ite(query, root<T>().expr(), nil): root<T>().expr()],
+            after: ['after', lastTS ? ite(query, root<T>().expr(), nil) : root<T>().expr()],
             updated: ['updated', val(true)],
             _id: ['_id', root<T & D>().of('_id').expr()],
           }),
@@ -336,13 +339,10 @@ const executes = <
     }
     // Step 8 : wait for change
     const step8 = (l: L): FrameD => {
-      return {
-        data: l.aggResult.cursor.firstBatch,
-        info: { job: undefined, debug: 'wait for change' },
-        cont: withStop(() =>
-          l.stream.tryNext().then(doc => (doc ? next(step2, 'restart') : step8(l))),
-        ),
-      }
+      return nextData(l.aggResult.cursor.firstBatch)(
+        () => l.stream.tryNext().then(doc => (doc ? next(step2, 'restart') : step8(l))),
+        'wait for change',
+      )
     }
     return stop
   }

@@ -77,10 +77,10 @@ const executes = <
     type FrameD = Frame<readonly Result2[], W>
     type Next = Promise<FrameD>
     const clear = async () => {}
-    const withStop = (next: () => PromiseLike<FrameD>, tr?: () => void): It => {
+    const withStop = (next: () => PromiseLike<FrameD>, tr?: () => Promise<void>): It => {
       return addTeardown(() => ({ stop, next: next(), clear }), tr)
     }
-    const next = (next: () => Next, debug: string, tr?: () => void): FrameD => ({
+    const next = (next: () => Next, debug: string, tr?: () => Promise<void>): FrameD => ({
       cont: withStop(next, tr),
       data: [],
       info: { job, debug },

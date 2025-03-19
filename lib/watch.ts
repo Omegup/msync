@@ -28,7 +28,13 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
     const q = $or(...changeKeys.map((k): Query<Change<V>> => subQ(m, root<Change<V>>().of(k))))
     if (q)
       pipeline.push({
-        $match: { $or: [q.raw(root()), Object.fromEntries(changeKeys.map(k => [k, null]))] },
+        $match: {
+          $or: [
+            q.raw(root()),
+            // recheck whenever a document with lost value is deleted
+            Object.fromEntries(changeKeys.map(k => [k, null])),
+          ],
+        },
       })
   }
   pipeline.push({
