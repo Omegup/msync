@@ -1,7 +1,8 @@
 import crypto from 'crypto'
 import { Collection, UUID, type ChangeStream, type Timestamp } from 'mongodb'
+import { SynchronousPromise } from 'synchronous-promise'
 import type { BSON, N, O, O2, O3, OPickD, RawObj, RORec, StrKey, View } from '../../types'
-import type { HKT, I, IdHKT } from '../../types/hkt'
+import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_, $replaceWith_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
@@ -13,7 +14,13 @@ import { $eq, $gteTs, $ne } from '../predicate'
 import { $expr } from '../predicate/$expr'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
-import type { AggregateCommand, Before, Expr, SnapshotStreamExecutionResult } from '../types'
+import type {
+  AggregateCommand,
+  Before,
+  Expr,
+  Query,
+  SnapshotStreamExecutionResult
+} from '../types'
 import type { Frame, HasJob, Iterator, Runner } from '../types/machine'
 import type {
   Actions,
@@ -31,10 +38,9 @@ import type {
 import { asBefore } from '../utils/before'
 import { createIndex } from '../utils/db-indexes'
 import { log } from '../utils/log'
-import { spread } from '../utils/map-object'
+import { mapExactToObject, spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
-import { SynchronousPromise } from 'synchronous-promise'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -82,7 +88,13 @@ const executes = <
   else if (streamNames[streamName] != hash) throw new Error(`streamName ${streamName} already used`)
   type T = AllowedPick<V, KK>
   type K = Allowed<KK>
-  const { collection, projection, hardMatch, match } = view
+  const { collection, projection, hardMatch: pre, match } = view
+  const removeNotYetSynchronizedFields: readonly Query<V>[] = Object.values(
+    mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<Query<V> | null>>(projection, (_, k) =>
+      k.startsWith('_') ? root<V>().of(k).has($ne<unknown>(null)) : null,
+    ),
+  )
+  const hardMatch: typeof pre = $and<V>(pre, ...removeNotYetSynchronizedFields)
   const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
@@ -95,7 +107,7 @@ const executes = <
     { touchedAt: 1 },
     hardMatch
       ? {
-          partialFilterExpression: hardMatch,
+          partialFilterExpression: hardMatch.raw(root()),
           name: 'touchedAt_hard_' + new UUID().toString('base64'),
         }
       : {},
@@ -256,7 +268,7 @@ const executes = <
     type C = Pick<ChangeStream, 'close' | 'tryNext'>
 
     // Step 4 : run the aggregation // idempotent
-    const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt)
+    const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt, streamName)
     const step4 =
       ({ result, ts }: { result: AggregateCommand<'out'>; ts?: Timestamp }) =>
       async (): Next => {
@@ -340,7 +352,14 @@ const executes = <
     // Step 8 : wait for change
     const step8 = (l: L): FrameD => {
       return nextData(l.aggResult.cursor.firstBatch)(
-        () => l.stream.tryNext().then(doc => (doc ? next(step2, 'restart') : step8(l))),
+        () =>
+          l.stream
+            .tryNext()
+            .catch(err => {
+              log('restarting', err)
+              return 1
+            })
+            .then(doc => (doc ? next(step2, 'restart') : step8(l))),
         'wait for change',
       )
     }

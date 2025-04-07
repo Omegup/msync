@@ -18,6 +18,7 @@ export const createIndex = async (
         await new Promise(res => setTimeout(res, 300))
         continue
       }
+      console.error('Error creating index', e)
       throw e
     }
     break

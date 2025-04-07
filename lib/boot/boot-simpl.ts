@@ -136,7 +136,7 @@ const executes = <
 
     type C = Pick<ChangeStream, 'close' | 'tryNext'>
     // Step 4 : run the aggregation // idempotent
-    const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt)
+    const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt, streamName)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const hardQuery: Query<V> | undefined = $and(
         lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
