@@ -10,17 +10,11 @@ import { field } from '../expression/concat'
 import { $ifNull, and, eq, ite, ne } from '../expression/logic'
 import { nil, val } from '../expression/val'
 import { root } from '../field'
-import { $eq, $gteTs, $ne } from '../predicate'
+import { $eq, $exists, $gteTs, $ne } from '../predicate'
 import { $expr } from '../predicate/$expr'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
-import type {
-  AggregateCommand,
-  Before,
-  Expr,
-  Query,
-  SnapshotStreamExecutionResult
-} from '../types'
+import type { AggregateCommand, Before, Expr, Query, SnapshotStreamExecutionResult } from '../types'
 import type { Frame, HasJob, Iterator, Runner } from '../types/machine'
 import type {
   Actions,
@@ -91,10 +85,10 @@ const executes = <
   const { collection, projection, hardMatch: pre, match } = view
   const removeNotYetSynchronizedFields: readonly Query<V>[] = Object.values(
     mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<Query<V> | null>>(projection, (_, k) =>
-      k.startsWith('_') ? root<V>().of(k).has($ne<unknown>(null)) : null,
+      k.startsWith('_') ? root<V>().of(k).has($exists(true)) : null,
     ),
   )
-  const hardMatch: typeof pre = $and<V>(pre, ...removeNotYetSynchronizedFields)
+  const hardMatch = $and(pre, ...removeNotYetSynchronizedFields)
   const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
@@ -260,12 +254,15 @@ const executes = <
           }),
         ).stages
 
-      const r = await aggregate<'out'>(c => c({ coll: collection, input: cloneIntoNew }))
+      const r = await aggregate<'out'>(streamName, c =>
+        c({ coll: collection, input: cloneIntoNew }),
+      )
       await snapshotCollection.deleteMany({ updated: true, after: null, before: null })
       return next(step4({ result: r, ts: lastTS?.ts }), 'run the aggregation')
     }
 
-    type C = Pick<ChangeStream, 'close' | 'tryNext'>
+    type Res = { ts: Timestamp | null }
+    type C = Pick<ChangeStream<{}, Res>, 'close' | 'tryNext'>
 
     // Step 4 : run the aggregation // idempotent
     const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt, streamName)
@@ -275,6 +272,7 @@ const executes = <
         const start = Date.now()
         await snapshotCollection.updateMany({ before: null }, { $set: { before: null } })
         const aggResult = await aggregate<Result2>(
+          streamName,
           c =>
             c<UDelta<T>, UDelta<T> & Delta<T>>({
               coll: snapshotCollection as Collection<UDelta<T> & Delta<T>>,
@@ -296,8 +294,10 @@ const executes = <
           start,
         )
         const stream = makeStream(result.cursor.atClusterTime)
-        return next(step5({ result, aggResult, stream }), 'remove handled deleted updated', () =>
-          stream.close(),
+        return next(
+          step5({ ts: result.cursor.atClusterTime, aggResult, stream }),
+          'remove handled deleted updated',
+          () => stream.close(),
         )
       }
 
@@ -312,7 +312,7 @@ const executes = <
     }
     type L = {
       aggResult: AggregateCommand<Result2>
-      result: AggregateCommand<'out'>
+      ts: Timestamp
       stream: C
     }
 
@@ -341,7 +341,7 @@ const executes = <
         { _id: streamName },
         {
           $set: {
-            ts: l.result.cursor.atClusterTime,
+            ts: l.ts,
             data,
           },
         },
@@ -355,11 +355,17 @@ const executes = <
         () =>
           l.stream
             .tryNext()
-            .catch(err => {
+            .catch((err): Res => {
               log('restarting', err)
-              return 1
+              return { ts: null  }
             })
-            .then(doc => (doc ? next(step2, 'restart') : step8(l))),
+            .then(doc =>
+              doc
+                ? doc.ts
+                  ? next(step7({...l, ts: doc.ts }), 'nothing changed')
+                  : next(step2, 'restart')
+                : step8(l),
+            ),
         'wait for change',
       )
     }

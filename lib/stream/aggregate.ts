@@ -4,6 +4,7 @@ import type { RawStages } from '../types'
 import { log } from '../utils/log'
 
 export const aggregate = <Result>(
+  streamName: string,
   input: <E>(
     consume: <S, B>(value: {
       coll: ReadonlyCollection<S>
@@ -20,10 +21,10 @@ export const aggregate = <Result>(
       cursor: {},
       ...(snapshot && { readConcern: { level: 'snapshot' } }),
     }
-    log('exec', req)
+    log('exec', streamName, req)
     return coll.s.db.command(req).then(
       result => {
-        log('execed', req, result, 'took', Date.now() - start)
+        log('execed', streamName, req, result, 'took', Date.now() - start)
         return result as AggregateCommand<Result>
       },
       err => {

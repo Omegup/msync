@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
+import { SynchronousPromise } from 'synchronous-promise'
 import type { N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
 import type { HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
@@ -11,14 +12,21 @@ import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
 import type { Frame, HasJob, Iterator, Query, RawStages, Runner } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
-import type { Actions, D, Del, Model, SimpleStreamExecutionResult, StreamRunnerParam, TeardownRecord } from '../types/stream'
+import type {
+  Actions,
+  D,
+  Del,
+  Model,
+  SimpleStreamExecutionResult,
+  StreamRunnerParam,
+  TeardownRecord,
+} from '../types/stream'
+import { log } from '../utils'
+import { createIndex } from '../utils/db-indexes'
 import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
-import { actions, type Last, streamNames, type Teardown, type TsData } from './boot'
-import { createIndex } from '../utils/db-indexes'
-import { log } from '../utils'
-import { SynchronousPromise } from 'synchronous-promise'
+import { actions, streamNames, type Last, type Teardown, type TsData } from './boot'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -86,7 +94,6 @@ const executes = <
       info: { job, debug },
     })
 
-
     const data: TsData = {
       input: input,
       finalInputFirst: finalInput.raw(true),
@@ -99,7 +106,6 @@ const executes = <
         }),
       ),
     }
-
 
     // Step 0 : declare we are starting a job
     const step0 = () => SynchronousPromise.resolve(next(step1, 'get last update'))
@@ -117,7 +123,7 @@ const executes = <
         const handleTeardown = async <W extends Document, M extends keyof Actions<unknown>>(
           last: Last,
         ) => {
-          if(!last.data) return
+          if (!last.data) return
           const { collection: c, method: m, params: p } = last.data.teardown
           const { collection, method, params } = {
             collection: db.collection<W>(c),
@@ -133,8 +139,7 @@ const executes = <
         return next(step4(same), 'clone into new collection')
       }
 
-
-    type C = Pick<ChangeStream, 'close' | 'tryNext'>
+    type C = Pick<ChangeStream<{}, { ts: Timestamp | null }>, 'close' | 'tryNext'>
     // Step 4 : run the aggregation // idempotent
     const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt, streamName)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
@@ -144,7 +149,7 @@ const executes = <
         notDeleted,
         match && $expr(match),
       )
-      const aggResult = await aggregate<Result2>(c =>
+      const aggResult = await aggregate<Result2>(streamName, c =>
         c<V | Del, V | Del>({
           coll: collection,
           input: link<V | Del>()
@@ -156,24 +161,20 @@ const executes = <
       )
 
       const stream = makeStream(aggResult.cursor.atClusterTime)
-      return next(step7({ aggResult, result: aggResult, stream }), 'update __last', () =>
+      return next(step7({ aggResult, ts: aggResult.cursor.atClusterTime, stream }), 'update __last', () =>
         stream.close(),
       )
     }
 
     type L = {
       aggResult: AggregateCommand<Result2>
-      result: AggregateCommand<Result2>
+      ts: Timestamp
       stream: C
     }
 
     // Step 7 : update __last
     const step7 = (l: L) => async (): Next => {
-      await last.updateOne(
-        { _id: streamName },
-        { $set: { ts: l.result.cursor.atClusterTime , data } },
-        { upsert: true },
-      )
+      await last.updateOne({ _id: streamName }, { $set: { ts: l.ts, data } }, { upsert: true })
       return step8(l)
     }
     // Step 8 : wait for change
@@ -182,7 +183,15 @@ const executes = <
         data: l.aggResult.cursor.firstBatch,
         info: { job: undefined, debug: 'wait for change' },
         cont: withStop(() =>
-          l.stream.tryNext().then(doc => (doc ? next(step1, 'restart') : step8(l))),
+          l.stream
+            .tryNext()
+            .then(doc =>
+              doc
+                ? doc.ts
+                  ? next(step7({ ...l, ts: doc.ts }), 'nothing changed')
+                  : next(step1, 'restart')
+                : step8(l),
+            ),
         ),
       }
     }

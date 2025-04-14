@@ -4,7 +4,7 @@ import { root, type Field } from './field'
 import { $or } from './query/logic'
 import type { Model, Query } from './types'
 import { mapExactToObject } from './utils/map-object'
-import { log } from 'console'
+import { log } from './utils'
 
 export const changeKeys = ['fullDocument', 'fullDocumentBeforeChange'] as const
 export type ChangeKey = (typeof changeKeys)[number]
@@ -50,24 +50,32 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
   })
 
   pipeline.push({
-    $match: {
-      $or: [
-        { $expr: { $ne: ['$fullDocument', '$fullDocumentBeforeChange'] } },
-        Object.fromEntries(changeKeys.map(k => [k, null])),
-      ],
+    $replaceWith: {
+      ts: {
+        $cond: {
+          if: {
+            $or: [
+              { $ne: ['$fullDocument', '$fullDocumentBeforeChange'] },
+              { $and: changeKeys.map(k => ({ $eq: [k, null] })) },
+            ],
+          },
+          then: '$clusterTime',
+          else: null,
+        },
+      },
     },
   })
-
-  const stream = db.collection(collection.collectionName).watch(pipeline, {
+  const stream = db.collection(collection.collectionName).watch<BSON.Document, { ts: Timestamp | null }>(pipeline, {
     fullDocument: 'required',
     fullDocumentBeforeChange: 'required',
     startAtOperationTime: startAt,
   })
+
   const tryNext = async () => {
     const doc = await stream.tryNext()
     // wait a bit for bulk operations so we run the stream for once
     if (doc) await new Promise(resolve => setTimeout(resolve, 100))
-    if(doc) log('detected', streamName, collection.collectionName, doc)
+    if (doc) log('detected', streamName, collection.collectionName, doc)
     return doc
   }
   return { tryNext, close: () => stream.close() }
