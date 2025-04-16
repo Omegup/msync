@@ -1,16 +1,17 @@
 import crypto from 'crypto'
 import { Collection, UUID, type ChangeStream, type Timestamp } from 'mongodb'
 import { SynchronousPromise } from 'synchronous-promise'
-import type { BSON, N, O, O2, O3, OPickD, RawObj, RORec, StrKey, View } from '../../types'
+import type { BSON, N, O, O2, O3, OPickD, rawItem, RawObj, RORec, StrKey, View } from '../../types'
 import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_, $replaceWith_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
+import { mergeObjects } from '../expression'
 import { field } from '../expression/concat'
 import { $ifNull, and, eq, ite, ne } from '../expression/logic'
 import { nil, val } from '../expression/val'
-import { root } from '../field'
-import { $eq, $exists, $gteTs, $ne } from '../predicate'
+import { ctx, root } from '../field'
+import { $eq, $exists, $gtTs, $ne } from '../predicate'
 import { $expr } from '../predicate/$expr'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
@@ -43,6 +44,8 @@ export type TsData = {
   input: readonly RawObj[]
   finalInput: readonly RawObj[]
   finalInputFirst: readonly RawObj[]
+  project: rawItem
+  match: rawItem
   teardown: Teardown
 }
 export type Last = {
@@ -161,6 +164,8 @@ const executes = <
       input: input.delta,
       finalInputFirst: finalInput.raw(true),
       finalInput: finalInput.raw(false),
+      match: view.match?.raw(root()).get(),
+      project: projection,
       teardown: finalInput.teardown(
         (x): Teardown => ({
           collection: x.collection.collectionName,
@@ -216,15 +221,21 @@ const executes = <
           await Promise.all([snapshotCollection.drop(), action])
           log('teardown done', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
         }
-        if (exists && !same) await handleTeardown(exists)
-        return next(step3(same), 'clone into new collection')
+        if (exists && !same) {
+          await handleTeardown(exists)
+        }
+        return nextData([])(async () => {
+          // @TODO: use a proper way to execute teardowns before streams
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          return step3(same)()
+        }, 'clone into new collection')
       }
 
     // Step 3 : clone into new collection
     const step3 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const hardQuery = $and(
         lastTS
-          ? root<Model>().of('touchedAt').has($gteTs(lastTS.ts))
+          ? root<Model>().of('touchedAt').has($gtTs(lastTS.ts))
           : root<D>().of('deletedAt').has($eq<Timestamp | N>(null)),
         lastTS ? null : match && $expr(match),
         hardMatch,
@@ -233,23 +244,37 @@ const executes = <
         $ifNull(root<D>().of('deletedAt').expr(), nil),
       )(nil)
       const query = match ? and<T & D>(notDeleted, match) : notDeleted
-      const replaceRaw: RawStages<O, T & D, After<T> & { updated: true; _id: string }> =
-        $replaceWith_(
-          field<After<T> & { updated: true; _id: string }, T & D>({
-            after: ['after', lastTS ? ite(query, root<T>().expr(), nil) : root<T>().expr()],
-            updated: ['updated', val(true)],
-            _id: ['_id', root<T & D>().of('_id').expr()],
-          }),
-        )
+      type ToMerge = After<T> & { updated: true; _id: string }
+      const replaceRaw: RawStages<O, T & D, ToMerge> = $replaceWith_(
+        field<ToMerge, T & D>({
+          after: ['after', lastTS ? ite(query, root<T>().expr(), nil) : root<T>().expr()],
+          updated: ['updated', val(true)],
+          _id: ['_id', root<T & D>().of('_id').expr()],
+        }),
+      )
       const cloneIntoNew = link<V | Del>()
         .with($match_(hardQuery) as RawStages<O, V | Del, V>)
         .with(projectInput)
         .with(replaceRaw)
         .with(
-          $merge_({
+          $merge_<ToMerge, UDelta<T>, { new: ToMerge }>({
             into: snapshotCollection,
             on: root<UDelta<T>>().of('_id'),
-            whenMatched: 'merge',
+            stages: 'ctx',
+            vars: {
+              new: ['new', root<ToMerge>().expr()],
+            },
+            whenMatched: link<UDelta<T>, { new: ToMerge }>().with(
+              $replaceWith_(
+                ite(
+                  eq<T | N, UDelta<T>, { new: ToMerge }>(root<UDelta<T>>().of('before').expr())(
+                    ctx<ToMerge>()('new').of('after').expr(),
+                  ),
+                  root<UDelta<T>>().expr(),
+                  mergeObjects(root<UDelta<T>>().expr(), ctx<ToMerge>()('new').expr()),
+                ),
+              ),
+            ).stages,
             whenNotMatched: 'insert',
           }),
         ).stages
@@ -261,7 +286,7 @@ const executes = <
       return next(step4({ result: r, ts: lastTS?.ts }), 'run the aggregation')
     }
 
-    type Res = { ts: Timestamp | null }
+    type Res = {}
     type C = Pick<ChangeStream<{}, Res>, 'close' | 'tryNext'>
 
     // Step 4 : run the aggregation // idempotent
@@ -357,15 +382,9 @@ const executes = <
             .tryNext()
             .catch((err): Res => {
               log('restarting', err)
-              return { ts: null  }
+              return { ts: null }
             })
-            .then(doc =>
-              doc
-                ? doc.ts
-                  ? next(step7({...l, ts: doc.ts }), 'nothing changed')
-                  : next(step2, 'restart')
-                : step8(l),
-            ),
+            .then(doc => (doc ? next(step3({ _id: streamName, ts: l.ts }), 'restart') : step8(l))),
         'wait for change',
       )
     }

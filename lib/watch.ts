@@ -50,26 +50,26 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
   })
 
   pipeline.push({
-    $replaceWith: {
-      ts: {
-        $cond: {
-          if: {
-            $or: [
-              { $ne: ['$fullDocument', '$fullDocumentBeforeChange'] },
-              { $and: changeKeys.map(k => ({ $eq: [k, null] })) },
-            ],
-          },
-          then: '$clusterTime',
-          else: null,
-        },
-      },
+    $match: {
+      $or: [
+        { $expr: { $ne: ['$fullDocument', '$fullDocumentBeforeChange'] } },
+        Object.fromEntries(changeKeys.map(k => [k, null])),
+      ],
     },
   })
-  const stream = db.collection(collection.collectionName).watch<BSON.Document, { ts: Timestamp | null }>(pipeline, {
-    fullDocument: 'required',
-    fullDocumentBeforeChange: 'required',
-    startAtOperationTime: startAt,
+  pipeline.push({
+    $project: {
+      _id: 1,
+    },
   })
+
+  const stream = db
+    .collection(collection.collectionName)
+    .watch(pipeline, {
+      fullDocument: 'required',
+      fullDocumentBeforeChange: 'required',
+      startAtOperationTime: startAt,
+    })
 
   const tryNext = async () => {
     const doc = await stream.tryNext()

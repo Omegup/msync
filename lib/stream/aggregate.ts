@@ -12,7 +12,7 @@ export const aggregate = <Result>(
     }) => E,
   ) => E,
   snapshot = true,
-  start = Date.now()
+  start = Date.now(),
 ) =>
   input<Promise<AggregateCommand<Result>>>(({ coll, input }) => {
     const req = {
@@ -24,8 +24,22 @@ export const aggregate = <Result>(
     log('exec', streamName, req)
     return coll.s.db.command(req).then(
       result => {
-        log('execed', streamName, req, result, 'took', Date.now() - start)
-        return result as AggregateCommand<Result>
+        const r = result as AggregateCommand<Result>
+        log(
+          'execed',
+          streamName,
+          (replace: (s: string) => string) =>
+            replace(
+              JSON.stringify(req).replaceAll(
+                '$$CLUSTER_TIME',
+                JSON.stringify(r.cursor.atClusterTime),
+              ),
+            ),
+          result,
+          'took',
+          Date.now() - start,
+        )
+        return r
       },
       err => {
         log('err', req, err)

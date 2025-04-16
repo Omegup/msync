@@ -1,4 +1,5 @@
 import type { Iterator, HasJob } from './types'
+import { log } from './utils'
 import { firstWorksMerge } from './utils/merge/combiners'
 
 export class Machine<Result = unknown> {
@@ -38,6 +39,7 @@ const runCont = async <T, Info>(
     err => ({ ok: false, err }) as const,
   )
   if (!res.ok) {
+    log('error', res.err)
     return runCont(stop, cb)
   }
   const { cont, info } = res.next

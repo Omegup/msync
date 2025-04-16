@@ -2,11 +2,11 @@ import crypto from 'crypto'
 import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
 import { SynchronousPromise } from 'synchronous-promise'
 import type { N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
-import type { HKT, I, IdHKT } from '../../types/hkt'
+import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
 import { concatStages, link, pipe } from '../aggregate/prefix'
 import { root } from '../field'
-import { $eq, $gteTs } from '../predicate'
+import { $eq, $exists, $gteTs } from '../predicate'
 import { $expr } from '../predicate/$expr'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
@@ -23,7 +23,7 @@ import type {
 } from '../types/stream'
 import { log } from '../utils'
 import { createIndex } from '../utils/db-indexes'
-import { spread } from '../utils/map-object'
+import { mapExactToObject, spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 import { actions, streamNames, type Last, type Teardown, type TsData } from './boot'
@@ -48,7 +48,14 @@ const executes = <
   if (!streamNames[streamName]) streamNames[streamName] = hash
   else if (streamNames[streamName] != hash) throw new Error('streamName already used')
   type K = Allowed<KK>
-  const { collection, projection, hardMatch, match } = view
+  const { collection, projection, hardMatch: pre, match } = view
+  const removeNotYetSynchronizedFields: readonly Query<V>[] = Object.values(
+    mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<Query<V> | null>>(projection, (_, k) =>
+      k.startsWith('_') ? root<V>().of(k).has($exists(true)) : null,
+    ),
+  )
+  const hardMatch = $and(pre, ...removeNotYetSynchronizedFields)
+
   const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
@@ -98,6 +105,8 @@ const executes = <
       input: input,
       finalInputFirst: finalInput.raw(true),
       finalInput: finalInput.raw(false),
+      match: view.match?.raw(root()).get(),
+      project: projection,
       teardown: finalInput.teardown(
         (x): Teardown => ({
           collection: x.collection.collectionName,
@@ -136,10 +145,17 @@ const executes = <
           log('teardown done', ...out)
         }
         if (exists && !same) await handleTeardown(exists)
-        return next(step4(same), 'clone into new collection')
+        return {
+          cont: withStop(async () => {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            return step4(same)()
+          }),
+          data: [],
+          info: { debug: 'clone into new collection', job: undefined },
+        }
       }
 
-    type C = Pick<ChangeStream<{}, { ts: Timestamp | null }>, 'close' | 'tryNext'>
+    type C = Pick<ChangeStream<{}, {}>, 'close' | 'tryNext'>
     // Step 4 : run the aggregation // idempotent
     const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt, streamName)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
@@ -161,8 +177,10 @@ const executes = <
       )
 
       const stream = makeStream(aggResult.cursor.atClusterTime)
-      return next(step7({ aggResult, ts: aggResult.cursor.atClusterTime, stream }), 'update __last', () =>
-        stream.close(),
+      return next(
+        step7({ aggResult, ts: aggResult.cursor.atClusterTime, stream }),
+        'update __last',
+        () => stream.close(),
       )
     }
 
@@ -185,13 +203,7 @@ const executes = <
         cont: withStop(() =>
           l.stream
             .tryNext()
-            .then(doc =>
-              doc
-                ? doc.ts
-                  ? next(step7({ ...l, ts: doc.ts }), 'nothing changed')
-                  : next(step1, 'restart')
-                : step8(l),
-            ),
+            .then(doc => (doc ? next(step4({ _id: streamName, ts: l.ts }), 'restart') : step8(l))),
         ),
       }
     }

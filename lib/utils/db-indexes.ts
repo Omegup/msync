@@ -9,8 +9,9 @@ export const createIndex = async (
     try {
       await collection.createIndex(indexSpec, options)
     } catch (e: any) {
-      if (e.code == 85) {
-        // index exists with different name, just ignore creating
+      if ([85, 276].includes(e.code)) {
+        // 85 index exists with different name, just ignore creating
+        // 276 operation interrupted, it is ok
         break
       }
       if (e.code == 12587) {
