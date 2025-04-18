@@ -41,6 +41,11 @@ export const or = <D, C = unknown>(...expr: Expr<boolean, D, C>[]) =>
     raw: f => asExprRaw({ $or: expr.map(e => e.raw(f).get()) }),
   })
 
+export const not = <D, C = unknown>(expr: Expr<boolean, D, C>) =>
+  asExpr<boolean, D, C>({
+    raw: f => asExprRaw({ $not: expr.raw(f).get() }),
+  })
+
 export const eq =
   <T, D, C = unknown>(a: Expr<T, D, C>) =>
   (b: Expr<T, D, C>) =>

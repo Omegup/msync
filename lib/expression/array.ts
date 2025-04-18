@@ -91,9 +91,9 @@ export const mergeObjects = <T1, T2, D, C = unknown, N extends null = never>(
     raw: f => asExprRaw({ $mergeObjects: exprs.map(x => x.raw(f).get()) }),
   })
 
-export const inArray = <T, D, C = unknown>(...exprs: readonly [Expr<T, D, C>, Expr<Arr<T>, D, C>]) =>
+export const anyElementTrue = <T, D, C = unknown>(expr: Expr<Arr<boolean>, D, C>) =>
   asExpr<boolean, D, C>({
-    raw: f => asExprRaw({ $in: exprs.map(x => x.raw(f).get()) }),
+    raw: f => asExprRaw({ $anyElementTrue: expr.raw(f).get() }),
   })
 
 type Reduce<T, V> = RORec<'value', V> & RORec<'this', T>

@@ -17,7 +17,21 @@ export const concat = <D, C>(...expr: Expr<string, D, C>[]) =>
   asExpr<string, D, C>({
     raw: f => asExprRaw({ $concat: expr.map(e => e.raw(f).get()) }),
   })
-
+export const regex = <D, C>(
+  expr: Expr<string, D, C>,
+  regex: Expr<string, D, C>,
+  options?: Expr<string, D, C>,
+) =>
+  asExpr<boolean, D, C>({
+    raw: f =>
+      asExprRaw({
+        $regexMatch: {
+          input: expr.raw(f).get(),
+          regex: regex.raw(f).get(),
+          options: options?.raw(f).get(),
+        },
+      }),
+  })
 export const str = <D, C>(expr: Expr<unknown, D, C>) =>
   asExpr<string, D, C>({
     raw: f => asExprRaw({ $toString: expr.raw(f).get() }),

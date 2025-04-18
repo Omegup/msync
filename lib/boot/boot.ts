@@ -76,6 +76,7 @@ const executes = <
   view: View<V, Allowed<KK>>,
   input: DeltaStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result>,
   streamName: string,
+  skip = false,
 ): SnapshotStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
   const hash = crypto
     .createHash('md5')
@@ -388,7 +389,9 @@ const executes = <
         'wait for change',
       )
     }
-    return stop
+    return skip
+      ? withStop(() => SynchronousPromise.resolve(next(step3(null), 'clone into new collection')))
+      : stop
   }
   const hasBefore = root<UDelta<T>>().of('before').has($ne<T | N>(null))
   return {
@@ -412,9 +415,10 @@ export interface DeltaHKT extends HKT<O3> {
 export const staging = <V extends Model, KK extends StrKey<V>>(
   view: View<V, Allowed<KK>>,
   streamName: string,
+  skip = false,
 ): DeltaPipe<AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT, DeltaHKT> =>
   pipe<AllowedPick<V, KK>, AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT, DeltaHKT>(
-    input => executes(view, input, streamName),
+    input => executes(view, input, streamName, skip),
     emptyDelta(),
     concatDelta,
     emptyDelta,
