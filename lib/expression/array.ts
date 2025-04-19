@@ -62,6 +62,11 @@ export const isArray = <T extends notArr, D, C, F extends HKT<T | Arr<T>>>(
     raw: f => asExprRaw<never, unknown, C>({ $isArray: expr.raw(f).get() }),
   })
 
+export const inArray = <T, D, C>(item: Expr<T, D, C>, expr: Expr<Arr<T>, D, C>) =>
+  asExpr<boolean, D, C>({
+    raw: f => asExprRaw({ $in: [item.raw(f).get(), expr.raw(f).get()] }),
+  })
+
 export const array = <T, D, C = unknown>(...exprs: Expr<T, D, C>[]) =>
   asExpr<Arr<T>, D, C>({
     raw: f => asExprRaw(exprs.map(x => x.raw(f).get())),
@@ -91,7 +96,7 @@ export const mergeObjects = <T1, T2, D, C = unknown, N extends null = never>(
     raw: f => asExprRaw({ $mergeObjects: exprs.map(x => x.raw(f).get()) }),
   })
 
-export const anyElementTrue = <T, D, C = unknown>(expr: Expr<Arr<boolean>, D, C>) =>
+export const anyElementTrue = <D, C = unknown>(expr: Expr<Arr<boolean>, D, C>) =>
   asExpr<boolean, D, C>({
     raw: f => asExprRaw({ $anyElementTrue: expr.raw(f).get() }),
   })
