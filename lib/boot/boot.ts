@@ -1,9 +1,9 @@
 import crypto from 'crypto'
 import { Collection, UUID, type ChangeStream, type Timestamp } from 'mongodb'
 import { SynchronousPromise } from 'synchronous-promise'
-import type { BSON, N, O, O2, O3, OPickD, rawItem, RawObj, RORec, StrKey, View } from '../../types'
-import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
-import { $match_, $project_, $replaceWith_ } from '../aggregate/mongo-stages'
+import type { N, O, O2, O3, StrKey, View } from '../../types'
+import type { HKT, I } from '../../types/hkt'
+import { $match_, $replaceWith_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
 import { mergeObjects } from '../expression'
@@ -11,17 +11,15 @@ import { field } from '../expression/concat'
 import { $ifNull, and, eq, ite, ne } from '../expression/logic'
 import { nil, val } from '../expression/val'
 import { ctx, root } from '../field'
-import { $eq, $exists, $gtTs, $ne } from '../predicate'
+import { $eq, $ne } from '../predicate'
 import { $expr } from '../predicate/$expr'
-import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
-import type { AggregateCommand, Before, Expr, Query, SnapshotStreamExecutionResult } from '../types'
+import type { AggregateCommand, Before, Expr, SnapshotStreamExecutionResult } from '../types'
 import type { Frame, HasJob, Iterator, Runner } from '../types/machine'
 import type {
   Actions,
   After,
   D,
-  Del,
   Delta,
   DeltaStages,
   Model,
@@ -30,41 +28,15 @@ import type {
   TeardownRecord,
   UDelta,
 } from '../types/stream'
+import { noop } from '../utils'
 import { asBefore } from '../utils/before'
 import { createIndex } from '../utils/db-indexes'
 import { log } from '../utils/log'
-import { mapExactToObject, spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
-
-type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
-type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
-export type Teardown = { collection: string; method: string; params: unknown[] }
-export type TsData = {
-  input: readonly RawObj[]
-  finalInput: readonly RawObj[]
-  finalInputFirst: readonly RawObj[]
-  project: rawItem
-  match: rawItem
-  teardown: Teardown
-}
-export type Last = {
-  _id: string
-  ts: Timestamp
-  data?: TsData
-}
-
-export const actions: {
-  [K in keyof Actions<unknown>]: <W extends BSON.Document>(
-    col: Collection<W>,
-    x: Actions<W>[K],
-  ) => [Promise<unknown>, unknown[]]
-} = {
-  updateMany: (c, args) => [
-    c.updateMany(...args),
-    [`db['${c.collectionName}'].updateMany(...`, args, ')'],
-  ],
-}
+import type { Allowed, AllowedPick, Last, Teardown, TsData } from './boot-utils'
+import { actions } from './boot-utils'
+import { getFirstStages } from './first-stages'
 
 export const streamNames: Record<string, string> = {}
 const executes = <
@@ -77,25 +49,23 @@ const executes = <
   input: DeltaStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result>,
   streamName: string,
   skip = false,
+  after?: () => Promise<void>,
 ): SnapshotStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
+  type T = AllowedPick<V, KK>
+
+  const { collection, projection, match } = view
+
+  const { firstStages, hardMatch } = getFirstStages(view)
+
+  const db = collection.s.db,
+    coll = collection.collectionName
+
   const hash = crypto
     .createHash('md5')
     .update(new Error().stack + '')
     .digest('base64url')
   if (!streamNames[streamName]) streamNames[streamName] = hash
   else if (streamNames[streamName] != hash) throw new Error(`streamName ${streamName} already used`)
-  type T = AllowedPick<V, KK>
-  type K = Allowed<KK>
-  const { collection, projection, hardMatch: pre, match } = view
-  const removeNotYetSynchronizedFields: readonly Query<V>[] = Object.values(
-    mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<Query<V> | null>>(projection, (_, k) =>
-      k.startsWith('_') ? root<V>().of(k).has($exists(true)) : null,
-    ),
-  )
-  const hardMatch = $and(pre, ...removeNotYetSynchronizedFields)
-  const job = {}
-  const db = collection.s.db,
-    coll = collection.collectionName
   db.command({
     collMod: coll,
     changeStreamPreAndPostImages: { enabled: true },
@@ -131,14 +101,8 @@ const executes = <
       name: 'updated_nulls_' + new UUID().toString('base64'),
     },
   )
-  type WithDel = 'deletedAt' | '_id' | Exclude<K, 'deletedAt' | '_id'>
-  const projectInput = $project_<V, WithDel>(
-    spread<RORec<K, 1>, RORec<'deletedAt' | '_id', 1>, IdHKT>(projection, {
-      deletedAt: ['deletedAt', 1],
-      _id: ['_id', 1],
-    }),
-  )
 
+  const job = {}
   const run = <Result2>(
     finalInput: StreamRunnerParam<Delta<Result>, Result2>,
   ): Runner<readonly Result2[], HasJob> => {
@@ -147,7 +111,10 @@ const executes = <
     type FrameD = Frame<readonly Result2[], W>
     type Next = Promise<FrameD>
     const clear = async () =>
-      Promise.all([snapshotCollection.drop(), last.deleteOne({ _id: streamName })])
+      Promise.all([
+        snapshotCollection.drop().catch(noop).catch(noop),
+        last.deleteOne({ _id: streamName }),
+      ])
 
     const withStop = (next: () => PromiseLike<FrameD>, tr?: () => Promise<void>): It => {
       return addTeardown(() => ({ stop, next: next(), clear }), tr)
@@ -208,7 +175,7 @@ const executes = <
       ([same, exists]: [Last | null, Last | null]) =>
       async (): Next => {
         const handleTeardown = async <W extends Document, M extends keyof Actions<unknown>>(
-          last: Last,
+          last: Pick<Last, 'data'>,
         ) => {
           if (!last.data) return
           const { collection: c, method: m, params: p } = last.data.teardown
@@ -219,12 +186,13 @@ const executes = <
           }
           const [action, out] = actions[method](collection, params)
           log('teardown', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
-          await Promise.all([snapshotCollection.drop(), action])
+          await Promise.all([snapshotCollection.drop().catch(noop), action])
           log('teardown done', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
         }
-        if (exists && !same) {
-          await handleTeardown(exists)
+        if (!exists || !same) {
+          await handleTeardown(exists ?? { data })
         }
+        await after?.()
         return nextData([])(async () => {
           // @TODO: use a proper way to execute teardowns before streams
           await new Promise(resolve => setTimeout(resolve, 1000))
@@ -234,13 +202,6 @@ const executes = <
 
     // Step 3 : clone into new collection
     const step3 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
-      const hardQuery = $and(
-        lastTS
-          ? root<Model>().of('touchedAt').has($gtTs(lastTS.ts))
-          : root<D>().of('deletedAt').has($eq<Timestamp | N>(null)),
-        lastTS ? null : match && $expr(match),
-        hardMatch,
-      )
       const notDeleted: Expr<boolean, T, unknown> = eq(
         $ifNull(root<D>().of('deletedAt').expr(), nil),
       )(nil)
@@ -253,9 +214,8 @@ const executes = <
           _id: ['_id', root<T & D>().of('_id').expr()],
         }),
       )
-      const cloneIntoNew = link<V | Del>()
-        .with($match_(hardQuery) as RawStages<O, V | Del, V>)
-        .with(projectInput)
+
+      const cloneIntoNew = firstStages(lastTS)
         .with(replaceRaw)
         .with(
           $merge_<ToMerge, UDelta<T>, { new: ToMerge }>({
@@ -416,10 +376,12 @@ export const staging = <V extends Model, KK extends StrKey<V>>(
   view: View<V, Allowed<KK>>,
   streamName: string,
   skip = false,
+  after?: () => Promise<void>,
 ): DeltaPipe<AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT, DeltaHKT> =>
   pipe<AllowedPick<V, KK>, AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT, DeltaHKT>(
-    input => executes(view, input, streamName, skip),
+    input => executes(view, input, streamName, skip, after),
     emptyDelta(),
     concatDelta,
     emptyDelta,
   )
+

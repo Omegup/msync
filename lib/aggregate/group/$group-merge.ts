@@ -67,21 +67,29 @@ export const $groupMerge = <
         subMerge<T, Grp, V, GG, EE, Out>(args, out, gid, extra, idPrefix, first),
       ).stages,
   teardown: c =>
-    c({
-      collection: out.into,
-      method: 'updateMany',
-      params: [
-        {},
-        [
-          {
-            $unset: Object.keys({
-              ...mapExactToObject(extra, () => 1),
-              ...mapExactToObject(args, () => 1),
-            }),
+    c(
+      out.whenNotMatched === 'insert'
+        ? {
+            collection: out.into,
+            method: 'deleteMany',
+            params: [{}],
+          }
+        : {
+            collection: out.into,
+            method: 'updateMany',
+            params: [
+              {},
+              [
+                {
+                  $unset: Object.keys({
+                    ...mapExactToObject(extra, () => 1),
+                    ...mapExactToObject(args, () => 1),
+                  }),
+                },
+              ],
+            ],
           },
-        ],
-      ],
-    }),
+    ),
 })
 export const $groupId = <
   T extends O,

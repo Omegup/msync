@@ -55,6 +55,7 @@ export type Stages<out Q, out R extends Q, out SDom> = <E>(
 
 export type Actions<W> = {
   updateMany: [Filter<W>, UpdateFilter<W> | BSON.Document[]]
+  deleteMany: [Filter<W>]
 }
 
 export type TeardownRecord<W, M extends keyof Actions<W>> = {

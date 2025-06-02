@@ -213,13 +213,11 @@ export const $outerLookup =
     RQ extends O,
     RE extends RQ & doc,
     S extends notArr,
-    Null extends null = never,
   >(
     p: Params<As, LQ, RQ, RE, S>,
-    outer?: { left?: Null },
   ) =>
-  <LE extends LQ>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE | Null>> =>
-    $lookup1<As, LQ, LE, RQ, RE, S, Null>(
+  <LE extends LQ>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE | null>> =>
+    $lookup1<As, LQ, LE, RQ, RE, S, null>(
       {
         right: p.from,
         as: p.as,
@@ -227,5 +225,5 @@ export const $outerLookup =
         rField: p.foreignField,
         left: l(emptyDelta()),
       },
-      outer?.left,
+      null,
     )

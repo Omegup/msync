@@ -26,7 +26,8 @@ import { createIndex } from '../utils/db-indexes'
 import { mapExactToObject, spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
-import { actions, streamNames, type Last, type Teardown, type TsData } from './boot'
+import { streamNames } from './boot'
+import { actions, type Last, type Teardown, type TsData } from './boot-utils'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -83,6 +84,19 @@ const executes = <
     }),
   )
   const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
+
+  const stages = (lastTS: { _id: string; ts: Timestamp } | null) => {
+    const hardQuery: Query<V> | undefined = $and(
+      lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
+      hardMatch,
+      notDeleted,
+      match && $expr(match),
+    )
+    return link<V | Del>()
+      .with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
+      .with(projectInput)
+      .with<unknown, Result>(input)
+  }
 
   const run = <Result2>(
     finalInput: StreamRunnerParam<Result, Result2>,
@@ -159,20 +173,10 @@ const executes = <
     // Step 4 : run the aggregation // idempotent
     const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt, streamName)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
-      const hardQuery: Query<V> | undefined = $and(
-        lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
-        hardMatch,
-        notDeleted,
-        match && $expr(match),
-      )
       const aggResult = await aggregate<Result2>(streamName, c =>
         c<V | Del, V | Del>({
           coll: collection,
-          input: link<V | Del>()
-            .with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
-            .with(projectInput)
-            .with<unknown, Result>(input)
-            .with(finalInput.raw(lastTS === null)).stages,
+          input: stages(lastTS).with(finalInput.raw(lastTS === null)).stages,
         }),
       )
 
