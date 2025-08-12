@@ -119,7 +119,7 @@ export const $unwindDelta = <
                         then: {
                           $cond: {
                             if: { $eq: [`$after.${k2}`, []] },
-                            then: [],
+                            then: [{ before: {}, after: {} }],
                             else: [{ before: {}, after: null }],
                           },
                         },

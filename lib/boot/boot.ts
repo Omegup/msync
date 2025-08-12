@@ -189,7 +189,7 @@ const executes = <
           await Promise.all([snapshotCollection.drop().catch(noop), action])
           log('teardown done', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
         }
-        if (!exists || !same) {
+        if (!same) {
           await handleTeardown(exists ?? { data })
         }
         await after?.()
