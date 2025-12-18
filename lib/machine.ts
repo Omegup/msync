@@ -1,5 +1,4 @@
 import type { Iterator, HasJob } from './types'
-import { log } from './utils'
 import { firstWorksMerge } from './utils/merge/combiners'
 
 export class Machine<Result = unknown> {
@@ -33,19 +32,21 @@ const runCont = async <T, Info>(
   it: Iterator<T, Info>,
   cb?: (info: Info) => void | boolean,
 ): Promise<never> => {
-  const { next, stop, clear } = it()
-  const res = await next.then(
-    next => ({ ok: true, next }) as const,
-    err => ({ ok: false, err }) as const,
-  )
-  if (!res.ok) {
-    log('error', res.err)
-    return runCont(stop, cb)
+  while (true) {
+    const { next, stop, clear } = it()
+    const res = await next.then(
+      next => ({ ok: true, next }) as const,
+      err => ({ ok: false, err }) as const,
+    )
+    if (!res.ok) {
+      console.error(res.err)
+      process.exit(1)
+    }
+    const { cont, info } = res.next
+    if (cb?.(info)) {
+      await clear()
+      throw new Error('Machine stopped')
+    }
+    it = cont
   }
-  const { cont, info } = res.next
-  if (cb?.(info)) {
-    await clear()
-    throw new Error('Machine stopped')
-  }
-  return runCont(cont, cb)
 }

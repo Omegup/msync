@@ -1,4 +1,4 @@
-import { Timestamp } from 'mongodb'
+import type { Timestamp } from 'mongodb'
 import type { ArrHKT, ConstHKT, HKT, I, IdHKT, N, rawItem, RawObj, RConstHKT } from '../../types'
 import { operator } from './utils'
 
