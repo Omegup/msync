@@ -19,20 +19,19 @@ export const getFirstStages = <V extends Model, KK extends StrKey<V>>(
   type WithDel = 'deletedAt' | '_id' | Exclude<K, 'deletedAt' | '_id'>
 
   const { projection, hardMatch: pre, match } = view
-  const projectInput = $project_<V, WithDel>(
+  const projectInput = projection && $project_<V, WithDel>(
     spread<RORec<K, 1>, RORec<'deletedAt' | '_id', 1>, IdHKT>(projection, {
       deletedAt: ['deletedAt', 1],
       _id: ['_id', 1],
     }),
   )
 
-  const removeNotYetSynchronizedFields: readonly Query<V>[] = Object.values(
+  const removeNotYetSynchronizedFields: null | readonly Query<V>[] = projection && Object.values(
     mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<Query<V> | null>>(projection, (_, k) =>
       k.startsWith('_') ? root<V>().of(k).has($exists(true)) : null,
     ),
   )
-  const hardMatch = $and(pre, ...removeNotYetSynchronizedFields)
-
+  const hardMatch = removeNotYetSynchronizedFields ? $and(pre, ...removeNotYetSynchronizedFields) : pre
   const firstStages = (
     lastTS: { ts: Timestamp } | null,
     keepNulls = false,
@@ -44,9 +43,9 @@ export const getFirstStages = <V extends Model, KK extends StrKey<V>>(
       lastTS ? null : match && $expr(match),
       keepNulls ? pre : hardMatch,
     )
-    return link<V | Del>()
+    const ln = link<V | Del>()
       .with($match_(hardQuery) as RawStages<O, V | Del, V>)
-      .with(projectInput)
+    return (projectInput ? ln.with(projectInput) : ln)
   }
   return { firstStages, hardMatch }
 }

@@ -24,7 +24,7 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
   startAt: Timestamp,
   streamName: string,
 ) => {
-  const projection = { ...mapExactToObject(p, v => v), deletedAt: 1 }
+  const projection = p ? { ...mapExactToObject(p, v => v), deletedAt: 1 } : 1
   const pipeline: BSON.Document[] = []
   if (m) {
     const q = $or(...changeKeys.map((k): Query<Change<V>> => subQ(m, root<Change<V>>().of(k))))

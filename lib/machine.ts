@@ -33,7 +33,7 @@ const runCont = async <T, Info>(
   cb?: (info: Info) => void | boolean,
 ): Promise<never> => {
   while (true) {
-    const { next, stop, clear } = it()
+    const { next, stop: _, clear } = it()
     const res = await next.then(
       next => ({ ok: true, next }) as const,
       err => ({ ok: false, err }) as const,

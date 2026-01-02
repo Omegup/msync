@@ -31,7 +31,7 @@ export type OPickD<V extends Model, K extends StrKey<V>> = OPick<V, K, 'deletedA
 
 export type View<V extends Model, K extends StrKey<V>> = {
   collection: ReadonlyCollection<V | Del>
-  projection: ExactKeys<K>
+  projection: ExactKeys<K> | null
   match?: Expr<boolean, OPickD<V, K>>
   hardMatch?: Query<V>
 }

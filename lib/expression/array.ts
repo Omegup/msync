@@ -50,7 +50,7 @@ export const sortArray = <T, D, C, K extends keyof T>({
   sortBy: K
   order?: 1 | -1
 }) =>
-  asExpr<Arr<T>, D, C>({
+  asExpr<Arr<T>, D, C>({  
     raw: f =>
       asExprRaw({ $sortArray: { input: expr.raw(f).get(), sortBy: { [sortBy]: order ?? -1 } } }),
   })

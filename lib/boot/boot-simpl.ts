@@ -50,12 +50,12 @@ const executes = <
   else if (streamNames[streamName] != hash) throw new Error('streamName already used')
   type K = Allowed<KK>
   const { collection, projection, hardMatch: pre, match } = view
-  const removeNotYetSynchronizedFields: readonly Query<V>[] = Object.values(
+  const removeNotYetSynchronizedFields: null | readonly Query<V>[] = projection && Object.values(
     mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<Query<V> | null>>(projection, (_, k) =>
       k.startsWith('_') ? root<V>().of(k).has($exists(true)) : null,
     ),
   )
-  const hardMatch = $and(pre, ...removeNotYetSynchronizedFields)
+  const hardMatch = removeNotYetSynchronizedFields ? $and(pre, ...removeNotYetSynchronizedFields) : pre
 
   const job = {}
   const db = collection.s.db,
@@ -77,7 +77,7 @@ const executes = <
   type D_ID = 'deletedAt' | '_id'
   // TODO create indexes (if snapshot is in sources)
   type WithDel = D_ID | Exclude<K, D_ID>
-  const projectInput = $project_<V, WithDel>(
+  const projectInput = projection && $project_<V, WithDel>(
     spread<RORec<K, 1>, RORec<D_ID, 1>, IdHKT>(projection, {
       deletedAt: ['deletedAt', 1],
       _id: ['_id', 1],
@@ -92,10 +92,9 @@ const executes = <
       notDeleted,
       match && $expr(match),
     )
-    return link<V | Del>()
+    const ln = link<V | Del>()
       .with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
-      .with(projectInput)
-      .with<unknown, Result>(input)
+    return (projectInput ? ln.with(projectInput) : ln).with<unknown, Result>(input)
   }
 
   const run = <Result2>(
