@@ -102,7 +102,7 @@ export const anyElementTrue = <D, C = unknown>(expr: Expr<Arr<boolean>, D, C>) =
   })
 
 type Reduce<T, V> = RORec<'value', V> & RORec<'this', T>
-const reduce = <T, V, D, C>(
+export const $reduce = <T, V, D, C>(
   input: Expr<Arr<T>, D, C>,
   initialValue: Expr<V, D, C>,
   inExpr: Expr<V, D, C & Reduce<T, V>>,
@@ -149,7 +149,7 @@ export const except = <T, D, C>(a: Expr<Arr<T>, D, C>, b: Expr<Arr<T>, D, C>) =>
     {
       res: [
         'res',
-        reduce<T, DiffArr<T>, D, C>(
+        $reduce<T, DiffArr<T>, D, C>(
           a,
           field({ out: ['out', array<T, D>()], except: ['except', b] }),
           $let<DiffArr<T>, D, C1, RORec<'indexInExcept', number>>(
