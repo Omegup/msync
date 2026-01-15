@@ -1,4 +1,4 @@
-import type { Filter, HKT, I, IdHKT, RWCollection, Timestamp } from '../../types'
+import type { Filter, HKT, I, IdHKT, RWCollection } from '../../types'
 import type { ID, N, O, StrKey, doc } from '../../types/json'
 import { mergeObjects } from '../expression/array'
 import { field, mergeExpr, type ExprsExact, type ExprsExactHKT } from '../expression/concat'
