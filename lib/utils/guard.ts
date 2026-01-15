@@ -51,6 +51,13 @@ export const doubleExclude = <
   R extends s,
 >() => assertEqual<K, K, Exclude<K, E & Exclude<Literal<R>, K>>>()
 
+export const translateOmit = <
+  T,
+  K extends string,
+  Q extends string,
+  P extends string,
+>() => assertEqual<unknown, Omit<Omit<T, K | Q>, P>, Omit<Omit<T, K | Q>, P | Q>>()
+
 export const excludeIdem = <
   K extends s,
   E extends s,
