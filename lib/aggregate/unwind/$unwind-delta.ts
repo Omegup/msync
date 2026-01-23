@@ -19,6 +19,7 @@ export const $unwindDelta = <
   k2: AsLiteral<K2>,
   k: K1 | K2 | false,
   includeNull?: Null,
+  middle?: string,
 ): RawStages<
   Delta<Rec<K1, T>>,
   Delta<Rec<K1, T> & Rec<K2, Arr<U>>>,
@@ -73,7 +74,7 @@ export const $unwindDelta = <
 
   const ifNull = (k: K1 | K2, part: BA, str = `$${k}.${part}._id`) =>
     outer && k == k2 ? { $ifNull: [str, 'null'] } : str
-  const interDot = ([a, b]: rawItem[]) => [a, '.', b]
+  const interDot = ([a, b]: rawItem[]) => [a, middle ?? '.', b]
 
   const partReplace = (part: BA) => ({
     $cond: {
@@ -162,6 +163,13 @@ export const $unwindDelta = <
             after: partReplace('after'),
           },
         },
+        ...(!k && middle
+          ? [
+              {
+                $set: { _id: { $ifNull: ['$before._id', '$after._id'] } },
+              },
+            ]
+          : []),
       ]),
     )
     .with<unknown, Delta<Rec<K1, T> & Rec<K2, U | Null> & ID>>(
