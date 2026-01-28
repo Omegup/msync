@@ -11,12 +11,12 @@ import { $unwindDelta } from './$unwind-delta'
 export { $unwindDelta } from './$unwind-delta'
 type s = string
 
-type LR<T, U> = O<{ readonly left: T; readonly right: U }>
+type LR<T, U> = doc & { readonly left: T; readonly right: U }
 type TOf<TT, K extends string> = doc & Omit<TT, K>
 
 export const $unwind = <TT extends O, K extends s, U extends doc>(
   k: AsLiteral<K>,
-  dict: RORec<K, 'key'>,
+  dict: RORec<K, 'key'> & RORec<'_id', 'id'>,
   middle?: string,
 ): DeltaStages<O, TOf<TT, K> & Rec<K, Arr<U>>, TOf<TT, K> & Rec<K, U>> => {
   type T = TOf<TT, K>
@@ -25,6 +25,7 @@ export const $unwind = <TT extends O, K extends s, U extends doc>(
       .with<unknown, Delta<LR<T & Rec<K, Arr<U>>, Arr<U>>>>(
         $replaceWithDelta(
           field({
+            _id: ['_id', root<T & Rec<K, Arr<U>>>().of('_id').expr()],
             left: ['left', root<T & Rec<K, Arr<U>>>().expr()],
             right: ['right', root<Rec<K, Arr<U>>>().of(k).expr()],
           }),
@@ -35,7 +36,6 @@ export const $unwind = <TT extends O, K extends s, U extends doc>(
           'left',
           'right',
           false,
-          undefined,
           middle,
         ),
       )
@@ -43,9 +43,10 @@ export const $unwind = <TT extends O, K extends s, U extends doc>(
         $replaceWithDelta<LR<T & Rec<K, Arr<U>>, U>, T & Rec<K, U>>(
           mergeObjects<T, Rec<K, U>, LR<T & Rec<K, Arr<U>>, U>>(
             root<LR<T & Rec<K, Arr<U>>, U>>().of('left').expr(),
-            fieldM<RORec<K, 'key'>, RORec<'key', U>, LR<T & Rec<K, Arr<U>>, U>>(
+            fieldM<RORec<K, 'key'> & RORec<'_id', 'id'>, RORec<'key', U> & RORec<'id', string>, LR<T & Rec<K, Arr<U>>, U>>(
               {
                 key: root<LR<T & Rec<K, Arr<U>>, U>>().of('right').expr(),
+                id: root<LR<T & Rec<K & Arr<U>>, U>>().of('_id').expr(),
               },
               dict,
             ),

@@ -1,4 +1,4 @@
-import { mergeIterators } from '.'
+import { mergeIterators } from './merge'
 import type { RORec } from '../../../types'
 import type { Iterator, IteratorResult, HasJob } from '../../types'
 

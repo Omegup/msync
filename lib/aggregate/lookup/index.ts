@@ -83,19 +83,21 @@ const join = <
       type R = 'right'
       type LeftRight = Rec<L, LE> & Rec<R, RE | Null> & ID
       type JoinStages<RR> = RawStages<unknown, Delta<RR>, Delta<LeftRight>>
-      const joinL_Delta: JoinStages<RE> = $lookupDelta<RQ, RE, LQ, LE, BLB, LS, S, R, L>(
+      const joinL_Delta: JoinStages<RE> = $lookupDelta<RQ, RE, LQ, LE, BLB, LS, S, R, L, Null>(
         leftJoinField,
         leftSnapshot,
         'right',
         'left',
         joinId,
+        outerLeft
       )
-      const joinR_Delta: JoinStages<LE> = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, L, R, Null>(
+      const joinR_Delta: JoinStages<LE> = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, L, R, never, Null>(
         rightJoinField,
         rightSnapshot,
         'left',
         'right',
         joinId,
+        undefined,
         outerLeft,
       )
 

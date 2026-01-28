@@ -121,7 +121,7 @@ export const $group = <
   args: DeltaAccumulators<T, O & Omit<V, Denied<'_grp'>>>,
   out: RWCollection<Strict<Grp, V, '_grp', EE>, Out>,
   extra: ExprsExact<
-    Omit<EE, IdAndTsKeys | '_grp' | keyof Omit<V, IdAndTsKeys | '_grp'>>,
+    Omit<EE, IdAndTsKeys | '_grp' | Exclude<keyof V, IdAndTsKeys | '_grp'>>,
     Rec<'_grp', Grp> & Omit<V, IdAndTsKeys | '_grp'>
   >,
   idPrefix = '',

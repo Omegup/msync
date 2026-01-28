@@ -2,7 +2,10 @@ import { SynchronousPromise } from 'synchronous-promise'
 import { map } from '../map-object'
 import type { KEYS, RaceWinner, SourceIteratorResults } from './types'
 
-export const patch = <T, K extends keyof T>(x: T, k: K, v: T[K]): T => ({ ...x, [k]: v })
+export const patch = <T, K extends keyof T>({ ...x }: T, k: K, v: T[K]): T => {
+  delete x[k]
+  return { ...x, [k]: v }
+}
 export const restart = <K extends KEYS, Result, Info extends Record<K, unknown>>(
   sources: SourceIteratorResults<K, Result, Info>,
 ) => {

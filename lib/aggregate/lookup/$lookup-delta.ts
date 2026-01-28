@@ -1,6 +1,6 @@
 import type { Arr, AsLiteral, ID, N, O, RORec, Rec, doc } from '../../../types'
 import { field, mergeExpr, type ExprsExactHKT } from '../../expression/concat'
-import { eq, ite } from '../../expression/logic'
+import { $ifNull, eq, ite } from '../../expression/logic'
 import { nil } from '../../expression/val'
 import { Field, root } from '../../field'
 import type { BA, Before, Delta, Expr, RawStages, TStages, UBefore } from '../../types'
@@ -13,9 +13,14 @@ import { $replaceWithEach } from '../set/$replace-with-each'
 import { $unwindDelta } from '../unwind'
 
 type s = string
-type Both<K1 extends s, LE, KK2 extends s, RE, Null extends null = never> = Delta<
-  Rec<K1, LE> & Rec<Exclude<KK2, BA | K1>, RE | Null> & ID
->
+type Both<
+  K1 extends s,
+  LE,
+  KK2 extends s,
+  RE,
+  N1 extends null = never,
+  N2 extends null = never,
+> = Delta<Rec<K1, LE | N1> & Rec<Exclude<KK2, BA | K1>, RE | N2> & ID>
 
 export const $lookupDelta = <
   LQ extends O,
@@ -27,17 +32,23 @@ export const $lookupDelta = <
   S,
   K1 extends s,
   KK2 extends s,
-  Null extends null = never,
+  N1 extends null = never,
+  N2 extends null = never,
 >(
   { field1, field2 }: { field1: Field<LQ, S | N>; field2: Field<RQ, S | N> },
   { coll, exec, input }: TStages<RS, UBefore<RQ>, BRB, Before<RE>>,
   k1: AsLiteral<K1>,
   k2: AsLiteral<Exclude<KK2, BA | K1>>,
-  k: K1 | Exclude<KK2, BA | K1> | false,
-  includeNull?: Null,
-): RawStages<unknown, Delta<LE>, Both<K1, LE, KK2, RE, Null>> => {
+  k:
+    | ([N1] extends [never] ? K1 : never)
+    | ([N2] extends [never] ? Exclude<KK2, BA | K1> : never)
+    | false,
+  includeNull1?: N1,
+  includeNull2?: N2,
+): RawStages<unknown, Delta<LE>, Both<K1, LE, KK2, RE, N1, N2>> => {
   type K2 = Exclude<KK2, BA | K1>
   type BU = Before<RE>
+  const omit = omitRORec<KK2, BA, K1, Arr<RE>>()
 
   return link<Delta<LE>>()
     .with<unknown, Delta<Rec<K1, LE>>>(
@@ -85,7 +96,6 @@ export const $lookupDelta = <
         > => {
           const f1 = f === 'after' ? 'a' : 'b'
           type R = Delta<Rec<K1, LE>> & Rec<'a' | 'b', Arr<BU>>
-          const omit = omitRORec<KK2, BA, K1, Arr<RE>>()
           const a = root<R>().of(f1).of('before').expr()
 
           const part: Field<Delta<Rec<K1, LE>>, Rec<K1, LE> | N> = root<Delta<Rec<K1, LE>>>().of(f)
@@ -104,9 +114,42 @@ export const $lookupDelta = <
           )
         },
       ),
-    ).with<unknown, Delta<Rec<K1, LE> & Rec<K2, RE | Null> & ID>>(
-    $unwindDelta<K1, LE, K2, RE, Null>(
-      k1, k2, k, includeNull
-    ) 
-  ).stages
+    )
+    .with<unknown, Delta<Rec<K1, LE | N1> & Rec<K2, Arr<RE>>>>(
+      includeNull1 === null
+        ? $replaceWithEach<Rec<K1, LE> & Rec<K2, Arr<RE>>, Rec<K1, LE | N1> & Rec<K2, Arr<RE>>>(
+            <K extends BA>(
+              f: K,
+            ): Expr<
+              (Rec<K1, LE | N1> & Rec<K2, Arr<RE>>) | null,
+              Rec<K, Rec<K1, LE> & Rec<K2, Arr<RE>>> & Delta<Rec<K1, LE> & Rec<K2, Arr<RE>>>
+            > => {
+              type R = Rec<K, Rec<K1, LE> & Rec<K2, Arr<RE>>> &
+                Delta<Rec<K1, LE> & Rec<K2, Arr<RE>>>
+              return $ifNull(
+                root<R>().of(f).expr(),
+                field<RORec<K1, LE | N1> & RORec<K2, Arr<RE>>, R>(
+                  omit.backward<ExprsExactHKT<RORec<K1, LE>, R>>(
+                    mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, LE | N>, R>(
+                      omit.forward<ExprsExactHKT<{}, R>>(
+                        map1(
+                          k2,
+                          root<R>()
+                            .of(f === 'after' ? 'before' : 'after')
+                            .of(k2)
+                            .expr(),
+                        ),
+                      ),
+                      map1(k1, nil),
+                    ),
+                  ),
+                ),
+              )
+            },
+          )
+        : link<Delta<Rec<K1, LE> & Rec<K2, Arr<RE>>>>().stages,
+    )
+    .with<unknown, Delta<Rec<K1, LE | N1> & Rec<K2, RE | N2> & ID>>(
+      $unwindDelta<K1, LE, K2, RE, N1, N2>(k1, k2, k, undefined, includeNull1, includeNull2),
+    ).stages
 }

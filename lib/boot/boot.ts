@@ -196,8 +196,8 @@ const executes = <
         return nextData([])(async () => {
           // @TODO: use a proper way to execute teardowns before streams
           await new Promise(resolve => setTimeout(resolve, 1000))
-          return step3(same)()
-        }, 'clone into new collection')
+          return next(step3(same), 'clone into new collection')
+        }, 'wait for clone into new collection')
       }
 
     // Step 3 : clone into new collection

@@ -56,10 +56,10 @@ export const fieldM = <
     raw: <DeltaD extends O, I extends U, Ctx>(f: Field<DeltaD, D | Undef<I>, Ctx>) =>
       asExprRaw<O<{ readonly [K in Dom]: T[M[K]] }>, DeltaD, C>(
         Object.fromEntries(
-          Object.entries(m).map(<K extends Dom>([dom, ref]: readonly [K, M[K]]) => [
+          Object.entries(m).flatMap(<K extends Dom>([dom, ref]: readonly [K, M[K]]) => expr[ref] ? [[
             dom,
             expr[ref].raw(f).get(),
-          ]),
+          ]] : []),
         ),
       ),
   })
