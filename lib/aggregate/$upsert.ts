@@ -1,14 +1,20 @@
 import type { Filter, HKT, I, IdHKT, RWCollection } from '../../types'
-import type { ID, N, O, StrKey, doc } from '../../types/json'
+import type { ID, N, O, RORec, StrKey, doc, rawItem } from '../../types/json'
 import { mergeObjects } from '../expression/array'
-import { field, mergeExpr, type ExprsExact, type ExprsExactHKT } from '../expression/concat'
+import {
+  field,
+  mergeExpr,
+  type ExprHKT,
+  type ExprsExact,
+  type ExprsExactHKT,
+} from '../expression/concat'
 import { eq, ite } from '../expression/logic'
-import { current, nil } from '../expression/val'
+import { current, nil, val } from '../expression/val'
 import { root } from '../field'
 import type { DDel, Del, Delta, Expr, RawStages, StreamRunnerParam, TS } from '../types'
 import { translateOmit } from '../utils/guard'
 import { id } from '../utils/json'
-import { mapExactToObject, type MappedHKT } from '../utils/map-object'
+import { mapExact, mapExactToObject, type Exact, type MappedHKT } from '../utils/map-object'
 import { $replaceWith_ } from './mongo-stages'
 import { $merge_ } from './out'
 import { link } from './prefix'
@@ -18,11 +24,12 @@ type ND = { readonly deletedAt?: null }
 type SafeE<E> = Omit<E, `$${string}` | keyof ID>
 export type Merge<T extends doc, E> = Omit<SafeE<E>, keyof (ND & TS)> & ((T & ND & TS) | Del)
 
-export const $insertX = <T extends doc, D extends O, EEE>(
+export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, rawItem>>(
   out: RWCollection<Merge<T, EEE>>,
   expr: Expr<T, D>,
   map: (x: Expr<T & ND & TS & Omit<SafeE<EEE>, keyof (ND & TS)>, D>) => Expr<Merge<T, EEE>, D>,
-  ext: ExprsExact<Omit<SafeE<EEE>, keyof (ND & TS)>, unknown>,
+  ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
+  extExpr: ExprsExact<Omit<SafeE<EEE>, keyof (ND & TS)>, unknown>,
 ): StreamRunnerParam<D, 'out'> => {
   type EE = SafeE<EEE>
   type E = Omit<EE, keyof (ND & TS)>
@@ -49,7 +56,7 @@ export const $insertX = <T extends doc, D extends O, EEE>(
         mergeObjects<T, ND & TS & E, D>(
           expr,
           field(
-            mergeExpr<EE, ND & TS, D>(ext, {
+            mergeExpr<EE, ND & TS, D>(extExpr, {
               deletedAt: ['deletedAt', nil],
               touchedAt: ['touchedAt', current],
             }),
@@ -73,13 +80,19 @@ export const $insertX = <T extends doc, D extends O, EEE>(
 
 export const $simpleInsert = <T extends doc>(
   out: RWCollection<Merge<T, {}>>,
-): StreamRunnerParam<T, 'out'> => $insertX(out, root<T>().expr(), id, {})
+): StreamRunnerParam<T, 'out'> => $insertX(out, root<T>().expr(), id, {}, {})
 
-export const $insertPart = <T extends doc, EEE>(
+export const $insertPart = <T extends doc, EEE extends RORec<string, rawItem>>(
   out: RWCollection<Merge<T, EEE>>,
-  ext: ExprsExact<Omit<SafeE<EEE>, keyof (ND & TS)>, unknown>,
-): StreamRunnerParam<Delta<T>, 'out'> =>
-  $insertX<T, Delta<T>, EEE>(
+  ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
+): StreamRunnerParam<Delta<T>, 'out'> => {
+  type EE = SafeE<EEE>
+  type E = Omit<EE, keyof (ND & TS)>
+  const extExpr = mapExact<E, IdHKT, ExprHKT<unknown>>(
+    ext,
+    <P extends StrKey<E>>(v: E[P]): Expr<E[P], unknown> => val<E[P]>(v),
+  )
+  return $insertX<T, Delta<T>, EEE>(
     out,
     assertNotNull(root<Delta<T>>().of('after').expr()),
     x =>
@@ -89,7 +102,7 @@ export const $insertPart = <T extends doc, EEE>(
           mergeExpr<SafeE<EEE>, DDel, Delta<T>>(
             translateOmit<EEE, `$${string}`, keyof ID, keyof (ND & TS)>().forward<
               ExprsExactHKT<unknown, unknown>
-            >(ext),
+            >(extExpr),
             {
               deletedAt: ['deletedAt', current],
               _id: ['_id', assertNotNull(root<Delta<doc>>().of('before').of('_id').expr())],
@@ -100,7 +113,9 @@ export const $insertPart = <T extends doc, EEE>(
         x,
       ),
     ext,
+    extExpr,
   )
+}
 
 export const $insert = <T extends doc>(
   out: RWCollection<Merge<T, {}>>,

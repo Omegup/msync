@@ -95,7 +95,8 @@ export const $pushDict = <D extends O, V, C = unknown>(
       let a = { ...ra }
       //@ts-ignore
       const equal = (a, b) => {
-        if ([a, b].some(a => !a || typeof a != 'object')) return a === b
+        if (!a || !b) return a === b
+        if ([a, b].some(a => Object.getPrototypeOf(a) != Object.prototype)) return a.valueOf() === b.valueOf()
         const keys = Object.keys(a)
         //@ts-ignore
         return keys.length === Object.keys(b).length && keys.every(k => equal(a[k], b[k]))
