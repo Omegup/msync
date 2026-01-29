@@ -206,6 +206,10 @@ const executes = <
         cont: withStop(() =>
           l.stream
             .tryNext()
+            .catch((err): {} => {
+              log('restarting', err)
+              return { ts: null }
+            })
             .then(doc => (doc ? next(step4({ _id: streamName, ts: l.ts }), 'restart') : step8(l))),
         ),
       }
