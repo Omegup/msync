@@ -31,7 +31,7 @@ export type MergeArgs<T extends O, Out extends O, Ctx, In extends O> = {
     | {
         stages: true
         into: RWCollection<In, Out>
-        whenMatched: RawStages<unknown, Out, In>
+        whenMatched: RawStages<unknown, Out, In, { new: In }>
       }
     | {
         stages: 'ctx'

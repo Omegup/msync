@@ -10,7 +10,7 @@ import { id } from '../utils/json'
 import { mapExact, mapExactToObject, spread } from '../utils/map-object'
 import { $replaceWith_ } from './mongo-stages'
 import { $merge_ } from './out'
-import { link } from './prefix'
+import { asStages, link } from './prefix'
 
 type OutInputE<T, E, A = T | null> = ID & Rec<'after', A> & E
 type Allowed<K extends string> = Exclude<K, keyof (TS & ID)>
@@ -63,7 +63,21 @@ const $mergeX = <
           into: out,
           on: root<O<ID>>().of('_id'),
           whenNotMatched: 'fail',
-          whenMatched: 'merge',
+          stages: true,
+          whenMatched: asStages<O, Out, Out, { new: Out }>([
+            { $replaceWith: { old: '$$ROOT', merged: { $mergeObjects: ['$$ROOT', '$$new'] } } },
+            {
+              $replaceWith: {
+                $cond: {
+                  if: {
+                    $eq: ['$old', { $mergeObjects: ['$merged', { touchedAt: '$old.touchedAt' }] }],
+                  },
+                  then: '$old',
+                  else: '$merged',
+                },
+              },
+            },
+          ]),
         }),
       ).stages
   },

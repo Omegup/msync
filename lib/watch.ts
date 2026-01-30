@@ -51,8 +51,16 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
 
   pipeline.push({
     $match: {
+      clusterTime: { $gt: startAt },
       $or: [
-        { $expr: { $ne: ['$fullDocument', '$fullDocumentBeforeChange'] } },
+        {
+          $expr: {
+            $ne: [
+              { $mergeObjects: ['$fullDocument', { touchedAt: null }] },
+              { $mergeObjects: ['$fullDocumentBeforeChange', { touchedAt: null }] },
+            ],
+          },
+        },
         Object.fromEntries(changeKeys.map(k => [k, null])),
       ],
     },
@@ -63,13 +71,11 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
     },
   })
 
-  const stream = db
-    .collection(collection.collectionName)
-    .watch(pipeline, {
-      fullDocument: 'required',
-      fullDocumentBeforeChange: 'required',
-      startAtOperationTime: startAt,
-    })
+  const stream = db.collection(collection.collectionName).watch(pipeline, {
+    fullDocument: 'required',
+    fullDocumentBeforeChange: 'required',
+    startAtOperationTime: startAt,
+  })
 
   const tryNext = async () => {
     const doc = await stream.tryNext()

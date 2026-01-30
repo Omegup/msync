@@ -52,7 +52,7 @@ export const $lookupDelta = <
   type K2 = Exclude<KK2, BA | K1>
   type BU = Before<RE>
   const omit = omitRORec<KK2, BA, K1, Arr<RE>>()
-  const hash = crypto.createHash('md5').update(str(input)).digest('base64url')
+  const hash = crypto.createHash('md5').update(coll.collectionName+str(input)+str(exec)).digest('base64url')
 
   type ABIds = Rec<'aId' | 'bId', S>
   const ss = (f: BA) =>

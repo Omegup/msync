@@ -17,7 +17,7 @@ import { id } from '../utils/json'
 import { mapExact, mapExactToObject, type Exact, type MappedHKT } from '../utils/map-object'
 import { $replaceWith_ } from './mongo-stages'
 import { $merge_ } from './out'
-import { link } from './prefix'
+import { asStages, link } from './prefix'
 
 type ND = { readonly deletedAt?: null }
 
@@ -70,7 +70,24 @@ export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, r
           $merge_<Out, Out>({
             into: out,
             on: root<O<ID>>().of('_id'),
-            whenMatched: 'merge',
+            stages: true,
+            whenMatched: asStages<O, Out, Out, { new: Out }>([
+              { $replaceWith: { old: '$$ROOT', merged: { $mergeObjects: ['$$ROOT', '$$new'] } } },
+              {
+                $replaceWith: {
+                  $cond: {
+                    if: {
+                      $eq: [
+                        '$old',
+                        { $mergeObjects: ['$merged', { touchedAt: '$old.touchedAt' }] },
+                      ],
+                    },
+                    then: '$old',
+                    else: '$merged',
+                  },
+                },
+              },
+            ]),
             whenNotMatched: 'insert',
           }),
         ).stages
