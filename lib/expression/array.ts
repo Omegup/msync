@@ -37,7 +37,7 @@ export const filter = <T, D, K extends string, C = unknown>({
           input: expr.raw(f).get(),
           as,
           cond: cond.raw(f).get(),
-          limit: limit?.raw(f).get(),
+          limit: limit?.raw(f).get() ?? null,
         },
       }),
   })

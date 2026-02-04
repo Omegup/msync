@@ -17,7 +17,7 @@ export type MergeArgs<T extends O, Out extends O, Ctx, In extends O> = {
   on: Field<T, jsonItem> & Field<Out, jsonItem>
 } & MergeInto<T, Out> &
   (
-    | ({ stages?: undefined } & (
+    | ({ stages?: never } & (
         | { whenMatched: 'keepExisting' | 'fail' }
         | {
             whenMatched: 'replace'
@@ -60,3 +60,6 @@ export const $merge_ = <T extends O, Out extends O = T, Ctx = unknown, In extend
       },
     },
   ])
+export const $merge2 = <T extends O, Out extends O = T, Ctx = unknown, In extends O = Out>(
+  args: MergeArgs<T, Out, Ctx, In>,
+) => $merge_<T, Out, Ctx, In>(args)

@@ -190,6 +190,7 @@ const executes = <
           log('teardown done', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
         }
         if (!same) {
+          log('not same, new data', data)
           await handleTeardown(exists ?? { data })
         }
         await after?.()
