@@ -99,7 +99,12 @@ const $mergeX = <
                   $cond: {
                     if: {
                       $eq: [
-                        { $mergeObjects: ['$old', { deletedAt: { $ifNull: ['$old.deletedAt', null] } }] },
+                        {
+                          $mergeObjects: [
+                            '$old',
+                            { deletedAt: { $ifNull: ['$old.deletedAt', null] } },
+                          ],
+                        },
                         { $mergeObjects: ['$merged', { touchedAt: '$old.touchedAt' }] },
                       ],
                     },
@@ -129,7 +134,7 @@ const $mergeX = <
   }
 }
 
-const $mergeId =
+export const $mergeId =
   <V extends O>() =>
   <SourcePart extends doc, Out extends doc, E = unknown, EEE extends RORec<string, rawItem> = {}>(
     out: RWCollection<Out | Replace<Out, Patch<V>>, Out>,
@@ -210,6 +215,22 @@ export const $simpleMerge =
   ): StreamRunnerParam<Source, 'out'> =>
     $mergeX<V, Out, Source, Source, {}>(out, keys, root(), id, whenNotMatched, {})
 
+export const $mergePart =
+  <V extends O>() =>
+  <Out extends doc, SourcePart extends doc, EEE extends RORec<string, rawItem>>(
+    out: RWCollection<Out | Replace<Out, Patch<V>>, Out>,
+    keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
+    ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
+    whenNotMatched: 'fail' | 'discard' = 'fail',
+  ): StreamRunnerParam<Delta<SourcePart>, 'out'> =>
+    $mergeId<V>()<SourcePart, Out, Before<SourcePart | null>, EEE>(
+      out,
+      keys,
+      assertNotNull(root<Rec<'before', (doc & SourcePart) | null>>().of('before').of('_id').expr()),
+      ext,
+      whenNotMatched,
+    )
+
 export const $merge =
   <V extends O>() =>
   <Out extends doc, SourcePart extends doc>(
@@ -217,12 +238,6 @@ export const $merge =
     keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
     whenNotMatched: 'fail' | 'discard' = 'fail',
   ): StreamRunnerParam<Delta<SourcePart>, 'out'> =>
-    $mergeId<V>()<SourcePart, Out, Before<SourcePart | null>>(
-      out,
-      keys,
-      assertNotNull(root<Rec<'before', (doc & SourcePart) | null>>().of('before').of('_id').expr()),
-      {},
-      whenNotMatched,
-    )
+    $mergePart<V>()<Out, SourcePart, {}>(out, keys, {}, whenNotMatched)
 
 const assertNotNull = <T, D, C>(expr: Expr<T | N, D, C>) => expr as Expr<T, D, C>

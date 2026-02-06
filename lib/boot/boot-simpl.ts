@@ -41,7 +41,7 @@ const executes = <
   view: View<V, Allowed<KK>>,
   input: RawStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result, unknown, 1>,
   streamName: string,
-  allowEmtpies?: readonly KK[]
+  needs: Partial<Record<KK, 0 | 1>>,
 ): SimpleStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
   const hash = crypto
     .createHash('md5')
@@ -53,7 +53,7 @@ const executes = <
   const { collection, projection, hardMatch: pre, match } = view
   const removeNotYetSynchronizedFields: null | readonly Query<V>[] = projection && Object.values(
     mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<Query<V> | null>>(projection, (_, k) =>
-      k.startsWith('_') && !allowEmtpies?.includes(k) ? root<V>().of(k).has($exists(true)) : null,
+      (needs[k] ?? k.startsWith('_')) ? root<V>().of(k).has($exists(true)) : null,
     ),
   )
   const hardMatch = removeNotYetSynchronizedFields ? $and(pre, ...removeNotYetSynchronizedFields) : pre
@@ -232,10 +232,10 @@ const emptyLin = <V>() => ({ lin: link<V, unknown, 1>().stages })
 export const from = <V extends Model, KK extends StrKey<V>>(
   view: View<V, Allowed<KK>>,
   streamName: string,
-  allowEmtpies?: readonly KK[],
+  needs: Partial<Record<KK, 0 | 1>> = {},
 ) =>
   pipe<AllowedPick<V, KK>, AllowedPick<V, KK>, AllowedPick<V, KK>, StreamRunnerHKT, StagesHKT>(
-    input => executes(view, input.lin, streamName, allowEmtpies),
+    input => executes(view, input.lin, streamName, needs),
     { lin: link<AllowedPick<V, KK>, unknown, 1>().stages },
     ({ lin: a }, { lin: b }) => ({ lin: concatStages(a, b) }),
     emptyLin,

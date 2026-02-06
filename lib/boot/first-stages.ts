@@ -14,6 +14,7 @@ import type { Allowed } from './boot-utils'
 
 export const getFirstStages = <V extends Model, KK extends StrKey<V>>(
   view: View<V, Allowed<KK>>,
+  needs: Partial<Record<KK, 0 | 1>>,
 ) => {
   type K = Allowed<KK>
   type WithDel = 'deletedAt' | '_id' | Exclude<K, 'deletedAt' | '_id'>
@@ -28,7 +29,7 @@ export const getFirstStages = <V extends Model, KK extends StrKey<V>>(
 
   const removeNotYetSynchronizedFields: null | readonly Query<V>[] = projection && Object.values(
     mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<Query<V> | null>>(projection, (_, k) =>
-      k.startsWith('_') ? root<V>().of(k).has($exists(true)) : null,
+      (needs[k] ?? k.startsWith('_')) ? root<V>().of(k).has($exists(true)) : null,
     ),
   )
   const hardMatch = removeNotYetSynchronizedFields ? $and(pre, ...removeNotYetSynchronizedFields) : pre

@@ -23,9 +23,10 @@ const executes = <
 >(
   view: View<V, Allowed<KK>>,
   input: DeltaStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result>,
+  needs: Partial<Record<KK, 0 | 1>>,
 ): SingleResult<Result> => {
   type T = AllowedPick<V, KK>
-  const { firstStages } = getFirstStages(view)
+  const { firstStages } = getFirstStages(view, needs)
   const { collection } = view
   return <Result2>(
     finalInput: RawStages<unknown, Result, Result2>,
@@ -43,9 +44,10 @@ const executes = <
 
 export const single = <V extends Model, KK extends StrKey<V>>(
   view: View<V, Allowed<KK>>,
+  needs: Partial<Record<KK, 0 | 1>> = {},
 ): DeltaPipe<AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT2, DeltaHKT> =>
   pipe<AllowedPick<V, KK>, AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT2, DeltaHKT>(
-    input => executes(view, input),
+    input => executes(view, input, needs),
     emptyDelta(),
     concatDelta,
     emptyDelta,

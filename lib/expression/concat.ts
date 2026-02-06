@@ -1,4 +1,4 @@
-import type { App, ConstHKT, HKT, I, IdHKT, O, RORec, StrKey, U, Undef, rawItem } from '../../types'
+import type { App, ConstHKT, HKT, I, IdHKT, N, O, RORec, StrKey, U, Undef, rawItem } from '../../types'
 import type { Field } from '../field'
 import type { Expr } from '../types'
 import {
@@ -13,7 +13,10 @@ import {
 import { asExpr, asExprRaw } from './expr-base'
 import { val } from './val'
 
-export const concat = <D, C>(...expr: Expr<string, D, C>[]) =>
+export const concat: {
+  <D, C>(...expr: Expr<string, D, C>[]): Expr<string, D, C>
+  <D, C>(...expr: Expr<string | N, D, C>[]): Expr<string | N, D, C>
+} = <D, C>(...expr: Expr<string | N, D, C>[]) =>
   asExpr<string, D, C>({
     raw: f => asExprRaw({ $concat: expr.map(e => e.raw(f).get()) }),
   })

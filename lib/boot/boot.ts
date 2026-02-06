@@ -50,12 +50,13 @@ const executes = <
   streamName: string,
   skip = false,
   after?: () => Promise<void>,
+  needs: Partial<Record<KK, 0 | 1>> = {},
 ): SnapshotStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
   type T = AllowedPick<V, KK>
 
   const { collection, projection, match } = view
 
-  const { firstStages, hardMatch } = getFirstStages(view)
+  const { firstStages, hardMatch } = getFirstStages(view, needs)
 
   const db = collection.s.db,
     coll = collection.collectionName
