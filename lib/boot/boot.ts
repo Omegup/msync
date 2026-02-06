@@ -375,15 +375,16 @@ export interface DeltaHKT extends HKT<O3> {
 }
 
 export const staging = <V extends Model, KK extends StrKey<V>>(
-  view: View<V, Allowed<KK>>,
+  view: View<V, Allowed<KK>> & {
+    needs?: Partial<Record<KK, 0 | 1>>
+  },
   streamName: string,
   skip = false,
   after?: () => Promise<void>,
 ): DeltaPipe<AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT, DeltaHKT> =>
   pipe<AllowedPick<V, KK>, AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT, DeltaHKT>(
-    input => executes(view, input, streamName, skip, after),
+    input => executes(view, input, streamName, skip, after, view.needs),
     emptyDelta(),
     concatDelta,
     emptyDelta,
   )
-
