@@ -93,9 +93,11 @@ export type Stream<
 ) => App<F, [Q | Q2, Result]>
 
 export type TS = { readonly touchedAt: Timestamp }
-export type DDel = { readonly deletedAt: Timestamp } & ID & TS
+export type IsDeleted = { readonly deletedAt: Timestamp }
+export type DDel = IsDeleted & ID & TS
 export type Del = O<DDel>
-export type D = O<{ readonly deletedAt?: Timestamp | null | undefined } & ID>
+export type DeletedAt = { readonly deletedAt?: Timestamp | null | undefined }
+export type D = O<DeletedAt & ID>
 export type Model = D & TS
 
 export type OutInput<T, A = T | null> = ID & Rec<'after', A>

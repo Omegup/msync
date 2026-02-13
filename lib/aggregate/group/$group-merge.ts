@@ -1,5 +1,5 @@
 import type { RWCollection, WriteonlyCollection } from '../../../types'
-import type { AsLiteral, ID, O, RORec, Rec, Replace, doc, notArr } from '../../../types/json'
+import type { AsLiteral, ID, O, RORec, Rec, doc, notArr } from '../../../types/json'
 import { mergeExpr, type ExprsExact, type ExprsExactHKT } from '../../expression/concat'
 import { root } from '../../field'
 import type { Delta, DeltaAccumulators, Expr, StreamRunnerParam, TS } from '../../types'
@@ -14,6 +14,7 @@ import {
   type Extra,
   type IdAndTsKeys,
   type Loose,
+  type MergedInput,
   type Strict,
   type V_Grp,
 } from './utils/sub-merge'
@@ -48,7 +49,7 @@ export const $groupMerge = <
   out: MergeInto<
     Strict<Grp, V, GG, EE>,
     Out,
-    WriteonlyCollection<Replace<Out, Strict<Grp, V, GG, EE>>>
+    WriteonlyCollection<MergedInput<Out, V, Grp, GG, EE>>
   >,
   gid: AsLiteral<GI<GG>>,
   extra: ExprsExact<Extra<EE, V, GG>, V_Grp<V, GG, Grp>>,
@@ -99,7 +100,7 @@ export const $groupId = <
 >(
   id: Expr<string, T>,
   args: DeltaAccumulators<T, O & Omit<V, Denied>>,
-  out: RWCollection<Replace<Out, Strict<string, V, '_id', EE>>, Out>,
+  out: RWCollection<MergedInput<Out, V, string, '_id', EE>, Out>,
   extra: ExprsExact<Omit<EE, IdAndTsKeys | keyof Omit<V, IdAndTsKeys>>, doc & Omit<V, IdAndTsKeys>>,
 ): StreamRunnerParam<Delta<T>, 'out'> =>
   $groupMerge<T, string, V, '_id', EE, Out>(
@@ -119,11 +120,18 @@ export const $group = <
 >(
   id: Expr<Grp, T>,
   args: DeltaAccumulators<T, O & Omit<V, Denied<'_grp'>>>,
-  out: RWCollection<Strict<Grp, V, '_grp', EE>, Out>,
+  out: RWCollection<MergedInput<Out, V, Grp, '_grp', EE> | Strict<Grp, V, '_grp', EE>, Out>,
   extra: ExprsExact<
     Omit<EE, IdAndTsKeys | '_grp' | Exclude<keyof V, IdAndTsKeys | '_grp'>>,
     Rec<'_grp', Grp> & Omit<V, IdAndTsKeys | '_grp'>
   >,
   idPrefix = '',
 ): StreamRunnerParam<Delta<T>, 'out'> =>
-  $groupMerge(id, args, { into: out, whenNotMatched: 'insert' }, '_grp', extra, idPrefix)
+  $groupMerge<T, Grp, V, '_grp', EE, Out>(
+    id,
+    args,
+    { into: out, whenNotMatched: 'insert' },
+    '_grp',
+    extra,
+    idPrefix,
+  )

@@ -6,11 +6,17 @@ export const max = <D, C>(...expr: Expr<number, D, C>[]) =>
     raw: f => asExprRaw({ $max: expr.map(e => e.raw(f).get()) }),
   })
 
-export const lt = <D, C>(...expr: [Expr<number, D, C>, Expr<number, D, C>]) =>
+export const lt: {
+  <D, C>(...expr: [Expr<Date, D, C>, Expr<Date, D, C>]): Expr<boolean, D, C>
+  <D, C>(...expr: [Expr<number, D, C>, Expr<number, D, C>]): Expr<boolean, D, C>
+} = <D, C>(...expr: [Expr<number | Date, D, C>, Expr<number | Date, D, C>]) =>
   asExpr<boolean, D, C>({
     raw: f => asExprRaw({ $lt: expr.map(e => e.raw(f).get()) }),
   })
-export const gt = <D, C>(...expr: [Expr<number, D, C>, Expr<number, D, C>]) =>
+export const gt: {
+  <D, C>(...expr: [Expr<Date, D, C>, Expr<Date, D, C>]): Expr<boolean, D, C>
+  <D, C>(...expr: [Expr<number, D, C>, Expr<number, D, C>]): Expr<boolean, D, C>
+} = <D, C>(...expr: [Expr<number | Date, D, C>, Expr<number | Date, D, C>]) =>
   asExpr<boolean, D, C>({
     raw: f => asExprRaw({ $gt: expr.map(e => e.raw(f).get()) }),
   })

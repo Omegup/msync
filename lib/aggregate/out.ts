@@ -7,7 +7,7 @@ import { asStages } from './prefix'
 import { rawVars } from './raws'
 
 export type MergeInto<T extends O, Out extends O, E = unknown> =
-  | { whenNotMatched: 'insert'; into: RWCollection<T, Out> }
+  | { whenNotMatched: 'insert'; into: RWCollection<T, Out> & E }
   | { whenNotMatched: 'discard' | 'fail'; into: ReadonlyCollection<Out> & E }
 
 // whenNotMatched == 'insert' || whenMatched == 'replace'  => Out extends T
@@ -31,7 +31,7 @@ export type MergeArgs<T extends O, Out extends O, Ctx, In extends O> = {
     | {
         stages: true
         into: RWCollection<In, Out>
-        whenMatched: RawStages<unknown, Out, In, { new: In }>
+        whenMatched: RawStages<unknown, Out, In, { new: T }>
       }
     | {
         stages: 'ctx'

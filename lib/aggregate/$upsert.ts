@@ -15,9 +15,10 @@ import type { DDel, Del, Delta, Expr, RawStages, StreamRunnerParam, TS } from '.
 import { translateOmit } from '../utils/guard'
 import { id } from '../utils/json'
 import { mapExact, mapExactToObject, type Exact, type MappedHKT } from '../utils/map-object'
+import { getWhenMatchedForMerge } from './$merge'
 import { $replaceWith_ } from './mongo-stages'
 import { $merge_ } from './out'
-import { asStages, link } from './prefix'
+import { link } from './prefix'
 
 type ND = { readonly deletedAt?: null }
 
@@ -71,23 +72,7 @@ export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, r
             into: out,
             on: root<O<ID>>().of('_id'),
             stages: true,
-            whenMatched: asStages<O, Out, Out, { new: Out }>([
-              { $replaceWith: { old: '$$ROOT', merged: { $mergeObjects: ['$$ROOT', '$$new'] } } },
-              {
-                $replaceWith: {
-                  $cond: {
-                    if: {
-                      $eq: [
-                        '$old',
-                        { $mergeObjects: ['$merged', { touchedAt: '$old.touchedAt' }] },
-                      ],
-                    },
-                    then: '$old',
-                    else: '$merged',
-                  },
-                },
-              },
-            ]),
+            whenMatched: getWhenMatchedForMerge<Out, Out, never>('insert'),
             whenNotMatched: 'insert',
           }),
         ).stages
