@@ -266,15 +266,6 @@ const executes = <
               coll: snapshotCollection as Collection<UDelta<T> & Delta<T>>,
               input: link<UDelta<T> & Delta<T>>()
                 .with($match_(root<UDelta<T> & Delta<T>>().of('updated').has($eq<boolean>(true))))
-                .with(
-                  $match_(
-                    $expr(
-                      ne(root<UDelta<T> & Delta<T>>().of('after').expr())(
-                        root<UDelta<T> & Delta<T>>().of('before').expr(),
-                      ),
-                    ),
-                  ),
-                )
                 .with(input.delta)
                 .with(finalInput.raw(ts === undefined)).stages,
             }),
