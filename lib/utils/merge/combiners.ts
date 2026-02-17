@@ -1,6 +1,7 @@
 import { mergeIterators } from './merge'
 import type { RORec } from '../../../types'
 import type { Iterator, IteratorResult, HasJob } from '../../types'
+import { state } from '../../stream/aggregate'
 
 export { mergeIterators } from './merge'
 
@@ -13,7 +14,7 @@ export const firstWorksMerge = <Result, Info extends HasJob>(
     return mergeIterators<string, Result, RORec<string, Info>>({
       sources,
       // interrupt: key => key !== '0',
-      interrupt: key => false,
+      interrupt: key => state.steady
     })
   }
   return iterator

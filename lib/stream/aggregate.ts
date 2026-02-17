@@ -3,6 +3,9 @@ import type { ReadonlyCollection } from '../../types'
 import type { RawStages } from '../types'
 import { log } from '../utils/log'
 
+export const state = { steady: false }
+let timeout: NodeJS.Timeout | null = null
+
 export const aggregate = <Result>(
   streamName: string,
   input: <E>(
@@ -20,6 +23,10 @@ export const aggregate = <Result>(
       pipeline: input,
       cursor: {},
       ...(snapshot && { readConcern: { level: 'snapshot' } }),
+    }
+    if (timeout !== null) {
+      clearTimeout(timeout)
+      timeout = null
     }
     log('exec', streamName, req)
     return coll.s.db.command(req).then(
@@ -39,6 +46,13 @@ export const aggregate = <Result>(
           'took',
           Date.now() - start,
         )
+        if (!state.steady) {
+          if (timeout !== null) throw new Error('timeout should be null')
+          timeout = setTimeout(() => {
+            state.steady = true
+            console.log('steady')
+          }, 1000)
+        }
         return r
       },
       err => {
