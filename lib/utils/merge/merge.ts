@@ -20,7 +20,7 @@ export const mergeIterators = <K extends KEYS, Result, Info extends Record<K, Ha
   const reiterate = (winner: Winner): CurFrame => {
     const { frame, key } = winner
     return {
-      cont: () =>{
+      cont: () => {
         const result = frame.cont()
         return mergeIterators<K, Result, Info>({
           sources: patch<Sources, K>(sources, key, result),
@@ -29,7 +29,7 @@ export const mergeIterators = <K extends KEYS, Result, Info extends Record<K, Ha
         })
       },
       data: frame.data,
-      info: { key, value: frame.info,  job: frame.info.job },
+      info: { key, value: frame.info, job: frame.info.job },
     }
   }
   // The main `IteratorResult` returned by `mergeItResults`.

@@ -8,11 +8,10 @@ import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
 import { mergeObjects } from '../expression'
 import { field } from '../expression/concat'
-import { $ifNull, and, eq, ite, ne } from '../expression/logic'
+import { $ifNull, and, eq, ite } from '../expression/logic'
 import { nil, val } from '../expression/val'
 import { ctx, root } from '../field'
 import { $eq, $ne } from '../predicate'
-import { $expr } from '../predicate/$expr'
 import { aggregate } from '../stream/aggregate'
 import type { AggregateCommand, Before, Expr, SnapshotStreamExecutionResult } from '../types'
 import type { Frame, HasJob, Iterator, Runner } from '../types/machine'
@@ -259,6 +258,7 @@ const executes = <
       async (): Next => {
         const start = Date.now()
         await snapshotCollection.updateMany({ before: null }, { $set: { before: null } })
+        const stages = finalInput.raw(ts === undefined)
         const aggResult = await aggregate<Result2>(
           streamName,
           c =>
@@ -267,14 +267,21 @@ const executes = <
               input: link<UDelta<T> & Delta<T>>()
                 .with($match_(root<UDelta<T> & Delta<T>>().of('updated').has($eq<boolean>(true))))
                 .with(input.delta)
-                .with(finalInput.raw(ts === undefined)).stages,
+                .with(stages).stages,
             }),
           false,
           start,
         )
         const stream = makeStream(result.cursor.atClusterTime)
+        const nextRes = stream.tryNext()
+        const intoColl = (stages.at(-1) as any).$merge.into.coll
+        const startx = Date.now()
+        await db
+          .collection(intoColl)
+          .countDocuments({ touchedAt: { $gte: result.cursor.atClusterTime } })
+          .then(count => log(`documents updated ${intoColl}`, count, 'took', Date.now() - startx))
         return next(
-          step5({ ts: result.cursor.atClusterTime, aggResult, stream }),
+          step5({ ts: result.cursor.atClusterTime, aggResult, stream, nextRes }),
           'remove handled deleted updated',
           () => stream.close(),
         )
@@ -293,6 +300,7 @@ const executes = <
       aggResult: AggregateCommand<Result2>
       ts: Timestamp
       stream: C
+      nextRes: Promise<Res | null>
     }
 
     // Step 6 : commit changes on snapshot
@@ -332,13 +340,16 @@ const executes = <
     const step8 = (l: L): FrameD => {
       return nextData(l.aggResult.cursor.firstBatch)(
         () =>
-          l.stream
-            .tryNext()
+          l.nextRes
             .catch((err): Res => {
               log('restarting', err)
               return { ts: null }
             })
-            .then(doc => (doc ? next(step3({ _id: streamName, ts: l.ts }), 'restart') : step8(l))),
+            .then(doc =>
+              doc
+                ? next(step3({ _id: streamName, ts: l.ts }), 'restart')
+                : step8({ ...l, nextRes: l.stream.tryNext() }),
+            ),
         'wait for change',
       )
     }

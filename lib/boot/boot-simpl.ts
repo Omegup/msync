@@ -51,12 +51,16 @@ const executes = <
   else if (streamNames[streamName] != hash) throw new Error('streamName already used')
   type K = Allowed<KK>
   const { collection, projection, hardMatch: pre, match } = view
-  const removeNotYetSynchronizedFields: null | readonly Query<V>[] = projection && Object.values(
-    mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<Query<V> | null>>(projection, (_, k) =>
-      (needs[k] ?? k.startsWith('_')) ? root<V>().of(k).has($exists(true)) : null,
-    ),
-  )
-  const hardMatch = removeNotYetSynchronizedFields ? $and(pre, ...removeNotYetSynchronizedFields) : pre
+  const removeNotYetSynchronizedFields: null | readonly Query<V>[] =
+    projection &&
+    Object.values(
+      mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<Query<V> | null>>(projection, (_, k) =>
+        (needs[k] ?? k.startsWith('_')) ? root<V>().of(k).has($exists(true)) : null,
+      ),
+    )
+  const hardMatch = removeNotYetSynchronizedFields
+    ? $and(pre, ...removeNotYetSynchronizedFields)
+    : pre
 
   const job = {}
   const db = collection.s.db,
@@ -78,12 +82,14 @@ const executes = <
   type D_ID = 'deletedAt' | '_id'
   // TODO create indexes (if snapshot is in sources)
   type WithDel = D_ID | Exclude<K, D_ID>
-  const projectInput = projection && $project_<V, WithDel>(
-    spread<RORec<K, 1>, RORec<D_ID, 1>, IdHKT>(projection, {
-      deletedAt: ['deletedAt', 1],
-      _id: ['_id', 1],
-    }),
-  )
+  const projectInput =
+    projection &&
+    $project_<V, WithDel>(
+      spread<RORec<K, 1>, RORec<D_ID, 1>, IdHKT>(projection, {
+        deletedAt: ['deletedAt', 1],
+        _id: ['_id', 1],
+      }),
+    )
   const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
 
   const stages = (lastTS: { _id: string; ts: Timestamp } | null) => {
@@ -93,8 +99,7 @@ const executes = <
       notDeleted,
       match && $expr(match),
     )
-    const ln = link<V | Del>()
-      .with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
+    const ln = link<V | Del>().with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
     return (projectInput ? ln.with(projectInput) : ln).with<unknown, Result>(input)
   }
 
@@ -162,10 +167,10 @@ const executes = <
         return {
           cont: withStop(async () => {
             await new Promise(resolve => setTimeout(resolve, 1000))
-            return step4(same)()
+            return next(step4(same), 'clone into new collection')
           }),
           data: [],
-          info: { debug: 'clone into new collection', job: undefined },
+          info: { debug: 'wait for clone into new collection', job: undefined },
         }
       }
 
@@ -173,16 +178,18 @@ const executes = <
     // Step 4 : run the aggregation // idempotent
     const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt, streamName)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
+      const raw = stages(lastTS).with(finalInput.raw(lastTS === null)).stages
       const aggResult = await aggregate<Result2>(streamName, c =>
         c<V | Del, V | Del>({
           coll: collection,
-          input: stages(lastTS).with(finalInput.raw(lastTS === null)).stages,
+          input: raw,
         }),
       )
 
       const stream = makeStream(aggResult.cursor.atClusterTime)
+      const nextRes = stream.tryNext()
       return next(
-        step7({ aggResult, ts: aggResult.cursor.atClusterTime, stream }),
+        step7({ aggResult, ts: aggResult.cursor.atClusterTime, stream, nextRes }),
         'update __last',
         () => stream.close(),
       )
@@ -192,6 +199,7 @@ const executes = <
       aggResult: AggregateCommand<Result2>
       ts: Timestamp
       stream: C
+      nextRes: Promise<{} | null>
     }
 
     // Step 7 : update __last
@@ -205,13 +213,16 @@ const executes = <
         data: l.aggResult.cursor.firstBatch,
         info: { job: undefined, debug: 'wait for change' },
         cont: withStop(() =>
-          l.stream
-            .tryNext()
+          l.nextRes
             .catch((err): {} => {
               log('restarting', err)
               return { ts: null }
             })
-            .then(doc => (doc ? next(step4({ _id: streamName, ts: l.ts }), 'restart') : step8(l))),
+            .then(doc =>
+              doc
+                ? next(step4({ _id: streamName, ts: l.ts }), 'restart')
+                : step8({ ...l, nextRes: l.stream.tryNext() }),
+            ),
         ),
       }
     }
