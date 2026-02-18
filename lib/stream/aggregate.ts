@@ -51,7 +51,7 @@ export const aggregate = <Result>(
           timeout = setTimeout(() => {
             state.steady = true
             console.log('steady')
-          }, 1000)
+          }, 10000)
         }
         return r
       },
