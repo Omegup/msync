@@ -37,6 +37,9 @@ import type { Allowed, AllowedPick, Last, Teardown, TsData } from './boot-utils'
 import { actions } from './boot-utils'
 import { getFirstStages } from './first-stages'
 
+const tryNext = (stream: Pick<ChangeStream<{}, {}>, 'tryNext'>) =>
+  stream.tryNext().catch(() => ({}))
+
 export const streamNames: Record<string, string> = {}
 const executes = <
   q extends O,
@@ -273,7 +276,7 @@ const executes = <
           start,
         )
         const stream = makeStream(result.cursor.atClusterTime)
-        const nextRes = stream.tryNext()
+        const nextRes = tryNext(stream)
         const intoColl = (stages.at(-1) as any).$merge.into.coll
         const startx = Date.now()
         await db
@@ -341,14 +344,10 @@ const executes = <
       return nextData(l.aggResult.cursor.firstBatch)(
         () =>
           l.nextRes
-            .catch((err): Res => {
-              log('restarting', err)
-              return { ts: null }
-            })
             .then(doc =>
               doc
                 ? next(step3({ _id: streamName, ts: l.ts }), 'restart')
-                : step8({ ...l, nextRes: l.stream.tryNext() }),
+                : step8({ ...l, nextRes: tryNext(l.stream) }),
             ),
         'wait for change',
       )

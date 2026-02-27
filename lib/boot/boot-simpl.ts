@@ -32,6 +32,9 @@ import { actions, type Last, type Teardown, type TsData } from './boot-utils'
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
 
+const tryNext = (stream: Pick<ChangeStream<{}, {}>, 'tryNext'>) =>
+  stream.tryNext().catch(() => ({}))
+
 const executes = <
   q extends O,
   V extends Model,
@@ -187,7 +190,7 @@ const executes = <
       )
 
       const stream = makeStream(aggResult.cursor.atClusterTime)
-      const nextRes = stream.tryNext()
+      const nextRes = tryNext(stream)
       return next(
         step7({ aggResult, ts: aggResult.cursor.atClusterTime, stream, nextRes }),
         'update __last',
@@ -214,14 +217,10 @@ const executes = <
         info: { job: undefined, debug: 'wait for change' },
         cont: withStop(() =>
           l.nextRes
-            .catch((err): {} => {
-              log('restarting', err)
-              return { ts: null }
-            })
             .then(doc =>
               doc
                 ? next(step4({ _id: streamName, ts: l.ts }), 'restart')
-                : step8({ ...l, nextRes: l.stream.tryNext() }),
+                : step8({ ...l, nextRes: tryNext(l.stream) }),
             ),
         ),
       }
