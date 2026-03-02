@@ -10,5 +10,6 @@ export * from './lib/query'
 export * from './lib/utils'
 export * from './lib/types/extern'
 export * from './types/extern'
+export { setF } from './lib/stream/aggregate'
 
 export { enablePreAndPostImages, prepare, makeCol } from './test/mongodb'

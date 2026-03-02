@@ -28,12 +28,10 @@ import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 import { streamNames } from './boot'
 import { actions, type Last, type Teardown, type TsData } from './boot-utils'
+import { prepare } from '../../test/mongodb'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
-
-const tryNext = (stream: Pick<ChangeStream<{}, {}>, 'tryNext'>) =>
-  stream.tryNext().catch(() => ({}))
 
 const executes = <
   q extends O,
@@ -54,6 +52,9 @@ const executes = <
   else if (streamNames[streamName] != hash) throw new Error('streamName already used')
   type K = Allowed<KK>
   const { collection, projection, hardMatch: pre, match } = view
+  const client = prepare()
+  const pdb = client.then(cl => cl.db(collection.dbName))
+
   const removeNotYetSynchronizedFields: null | readonly Query<V>[] =
     projection &&
     Object.values(
@@ -182,7 +183,7 @@ const executes = <
     const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt, streamName)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const raw = stages(lastTS).with(finalInput.raw(lastTS === null)).stages
-      const aggResult = await aggregate<Result2>(streamName, c =>
+      const aggResult = await aggregate<Result2>(pdb, streamName, c =>
         c<V | Del, V | Del>({
           coll: collection,
           input: raw,
@@ -190,7 +191,7 @@ const executes = <
       )
 
       const stream = makeStream(aggResult.cursor.atClusterTime)
-      const nextRes = tryNext(stream)
+      const nextRes = stream.tryNext()
       return next(
         step7({ aggResult, ts: aggResult.cursor.atClusterTime, stream, nextRes }),
         'update __last',
@@ -216,12 +217,11 @@ const executes = <
         data: l.aggResult.cursor.firstBatch,
         info: { job: undefined, debug: 'wait for change' },
         cont: withStop(() =>
-          l.nextRes
-            .then(doc =>
-              doc
-                ? next(step4({ _id: streamName, ts: l.ts }), 'restart')
-                : step8({ ...l, nextRes: tryNext(l.stream) }),
-            ),
+          l.nextRes.then(doc =>
+            doc
+              ? next(step4({ _id: streamName, ts: l.ts }), 'restart')
+              : step8({ ...l, nextRes: l.stream.tryNext() }),
+          ),
         ),
       }
     }

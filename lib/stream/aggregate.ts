@@ -1,12 +1,17 @@
 import type { AggregateCommand } from '../types/aggregate'
-import type { ReadonlyCollection } from '../../types'
+import type { Db, ReadonlyCollection } from '../../types'
 import type { RawStages } from '../types'
 import { log } from '../utils/log'
 
-export const state = { steady: false }
+export const state = { steady: false, f: (_: { input: any }) => Promise.resolve() }
 let timeout: NodeJS.Timeout | null = null
 
+export const setF = (f: ({ input }: { input: any }) => Promise<void>) => {
+  state.f = f
+}
+
 export const aggregate = <Result>(
+  db: Promise<Db>,
   streamName: string,
   input: <E>(
     consume: <S, B>(value: {
@@ -29,8 +34,14 @@ export const aggregate = <Result>(
       timeout = null
     }
     log('exec', streamName, req)
-    return coll.s.db.command(req).then(
+    // if (state.steady) {
+    //   return state.f({ input: req }).then(() => new Promise(res => {}))
+    // }
+    const start2 = Date.now()
+    return db.then(d => d.command(req)).then(
       result => {
+        log('prepare', streamName, Date.now() - start)
+        log('prepare2', streamName, start2 - start)
         const r = result as AggregateCommand<Result>
         log(
           'execed',
@@ -38,7 +49,7 @@ export const aggregate = <Result>(
           (replace: (s: string) => string) =>
             replace(
               JSON.stringify(req).replaceAll(
-                '$$CLUSTER_TIME',
+                '"$$CLUSTER_TIME"',
                 JSON.stringify(r.cursor.atClusterTime),
               ),
             ),

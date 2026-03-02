@@ -76,12 +76,18 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
     fullDocumentBeforeChange: 'required',
     startAtOperationTime: startAt,
   })
-
+  log('watch stream created', streamName, collection.collectionName, 'startAt', startAt, pipeline)
   const tryNext = async () => {
-    const doc = await stream.tryNext()
-    // wait a bit for bulk operations so we run the stream for once
-    if (doc) await new Promise(resolve => setTimeout(resolve, 100))
-    if (doc) log('detected', streamName, collection.collectionName, doc)
+    const doc = await stream.tryNext().then(
+      doc => doc,
+      err => ({ err }),
+    )
+    if (doc) {
+      // await stream.close().catch(() => {})
+      // wait a bit for bulk operations so we run the stream for once
+      await new Promise(resolve => setTimeout(resolve, 100))
+      log('detected', streamName, collection.collectionName, doc)
+    }
     return doc
   }
   return { tryNext, close: () => stream.close() }

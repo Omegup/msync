@@ -1,9 +1,9 @@
 import crypto from 'crypto'
 import { Collection, UUID, type ChangeStream, type Timestamp } from 'mongodb'
 import { SynchronousPromise } from 'synchronous-promise'
-import type { N, O, O2, O3, StrKey, View } from '../../types'
+import type { N, O, O2, O3, RORec, StrKey, View } from '../../types'
 import type { HKT, I } from '../../types/hkt'
-import { $match_, $replaceWith_ } from '../aggregate/mongo-stages'
+import { $match_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
 import { mergeObjects } from '../expression'
@@ -36,9 +36,8 @@ import { makeWatchStream } from '../watch'
 import type { Allowed, AllowedPick, Last, Teardown, TsData } from './boot-utils'
 import { actions } from './boot-utils'
 import { getFirstStages } from './first-stages'
-
-const tryNext = (stream: Pick<ChangeStream<{}, {}>, 'tryNext'>) =>
-  stream.tryNext().catch(() => ({}))
+import { prepare } from '../../test/mongodb'
+import { set, to } from '../update'
 
 export const streamNames: Record<string, string> = {}
 const executes = <
@@ -57,6 +56,9 @@ const executes = <
   type T = AllowedPick<V, KK>
 
   const { collection, projection, match } = view
+
+  const client = prepare()
+  const pdb = client.then(cl => cl.db(collection.dbName))
 
   const { firstStages, hardMatch } = getFirstStages(view, needs)
 
@@ -86,6 +88,15 @@ const executes = <
 
   const last = db.collection<Last>('__last')
   const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
+
+  createIndex(
+    snapshotCollection,
+    { before: 1 },
+    {
+      partialFilterExpression: { before: null },
+      name: 'before_' + new UUID().toString('base64'),
+    },
+  )
 
   createIndex(
     snapshotCollection,
@@ -244,7 +255,7 @@ const executes = <
           }),
         ).stages
 
-      const r = await aggregate<'out'>(streamName, c =>
+      const r = await aggregate<'out'>(pdb, streamName, c =>
         c({ coll: collection, input: cloneIntoNew }),
       )
       await snapshotCollection.deleteMany({ updated: true, after: null, before: null })
@@ -260,15 +271,24 @@ const executes = <
       ({ result, ts }: { result: AggregateCommand<'out'>; ts?: Timestamp }) =>
       async (): Next => {
         const start = Date.now()
-        await snapshotCollection.updateMany({ before: null }, { $set: { before: null } })
+        // await snapshotCollection.updateMany({ before: null }, { $set: { before: null } })
+        log('snapshot', streamName, 'ensure before null', Date.now() - start)
         const stages = finalInput.raw(ts === undefined)
         const aggResult = await aggregate<Result2>(
+          pdb,
           streamName,
           c =>
             c<UDelta<T>, UDelta<T> & Delta<T>>({
               coll: snapshotCollection as Collection<UDelta<T> & Delta<T>>,
               input: link<UDelta<T> & Delta<T>>()
                 .with($match_(root<UDelta<T> & Delta<T>>().of('updated').has($eq<boolean>(true))))
+                .with(
+                  $set_(
+                    set<RORec<'before', T | null>>()({
+                      before: ['before', to($ifNull(root<UDelta<T> & Delta<T>>().of('before').expr(), nil))],
+                    }),
+                  ),
+                )
                 .with(input.delta)
                 .with(stages).stages,
             }),
@@ -276,13 +296,15 @@ const executes = <
           start,
         )
         const stream = makeStream(result.cursor.atClusterTime)
-        const nextRes = tryNext(stream)
+        const nextRes = stream.tryNext()
         const intoColl = (stages.at(-1) as any).$merge.into.coll
         const startx = Date.now()
-        await db
-          .collection(intoColl)
-          .countDocuments({ touchedAt: { $gte: result.cursor.atClusterTime } })
-          .then(count => log(`documents updated ${intoColl}`, count, 'took', Date.now() - startx))
+        if (false) {
+          await db
+            .collection(intoColl)
+            .countDocuments({ touchedAt: { $gte: result.cursor.atClusterTime } })
+            .then(count => log(`documents updated ${intoColl}`, count, 'took', Date.now() - startx))
+        }
         return next(
           step5({ ts: result.cursor.atClusterTime, aggResult, stream, nextRes }),
           'remove handled deleted updated',
@@ -293,6 +315,7 @@ const executes = <
     // Step 5 : remove handled deleted updated
     const step5 = (l: L) => async (): Next => {
       log(
+        streamName,
         `remove handled deleted updated db['${snapshotCollection.collectionName}'].deleteMany({ updated: true, after: null })`,
       )
       await snapshotCollection.deleteMany({ updated: true, after: null })
@@ -343,12 +366,11 @@ const executes = <
     const step8 = (l: L): FrameD => {
       return nextData(l.aggResult.cursor.firstBatch)(
         () =>
-          l.nextRes
-            .then(doc =>
-              doc
-                ? next(step3({ _id: streamName, ts: l.ts }), 'restart')
-                : step8({ ...l, nextRes: tryNext(l.stream) }),
-            ),
+          l.nextRes.then(doc =>
+            doc
+              ? next(step3({ _id: streamName, ts: l.ts }), 'restart')
+              : step8({ ...l, nextRes: l.stream.tryNext() }),
+          ),
         'wait for change',
       )
     }
