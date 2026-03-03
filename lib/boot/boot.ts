@@ -222,7 +222,7 @@ const executes = <
           log('teardown done', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
         }
         if (!same) {
-          log('not same, new data', data)
+          log('not same, new data', streamName, data)
           await handleTeardown(exists ?? { data })
         }
         await after?.()
@@ -389,7 +389,7 @@ const executes = <
           job: null,
         },
       }
-      if (l.ts) patch.$set = data
+      if (l.first) patch.$set = { ...patch.$set, data }
       await last.updateOne({ _id: streamName }, patch, { upsert: true })
       log(
         'updated __last',
