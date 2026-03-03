@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import { Collection, UUID, type ChangeStream, type Timestamp } from 'mongodb'
 import { SynchronousPromise } from 'synchronous-promise'
-import type { N, O, O2, O3, RORec, StrKey, View } from '../../types'
+import type { N, O, O2, O3, RORec, StrKey, UpdateFilter, View } from '../../types'
 import type { HKT, I } from '../../types/hkt'
 import { $match_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
@@ -109,6 +109,24 @@ const executes = <
 
   createIndex(
     snapshotCollection,
+    { updated: 1, after: 1, before: 1 },
+    {
+      partialFilterExpression: { updated: true, after: null, before: null },
+      name: 'updated_nulls_' + new UUID().toString('base64'),
+    },
+  )
+
+  createIndex(
+    snapshotCollection,
+    { updated: 1, after: 1 },
+    {
+      partialFilterExpression: { updated: true, after: null },
+      name: 'updated_no_after_' + new UUID().toString('base64'),
+    },
+  )
+
+  createIndex(
+    snapshotCollection,
     { updated: 1 },
     {
       partialFilterExpression: { updated: true, after: null, before: null },
@@ -173,7 +191,7 @@ const executes = <
     // Step 2 : get last update
     const step2 = (): Next =>
       Promise.all([
-        last.findOne({ _id: streamName, data }),
+        last.findOne({ _id: streamName, data, job: null }),
         last.findOne({ _id: streamName }),
       ]).then(ts =>
         next(
@@ -258,7 +276,14 @@ const executes = <
       const r = await aggregate<'out'>(pdb, streamName, c =>
         c({ coll: collection, input: cloneIntoNew }),
       )
-      await snapshotCollection.deleteMany({ updated: true, after: null, before: null })
+      const start = Date.now()
+      const res = await snapshotCollection.deleteMany({ updated: true, after: null, before: null })
+      log(
+        'deleting from cloned into new collection',
+        Date.now() - start,
+        res,
+        `db['${snapshotCollection.collectionName}'].deleteMany({ updated: true, after: null, before: null })`,
+      )
       return next(step4({ result: r, ts: lastTS?.ts }), 'run the aggregation')
     }
 
@@ -266,14 +291,17 @@ const executes = <
     type C = Pick<ChangeStream<{}, Res>, 'close' | 'tryNext'>
 
     // Step 4 : run the aggregation // idempotent
-    const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt, streamName)
+    const makeStream = (): C => makeWatchStream(view, streamName)
     const step4 =
       ({ result, ts }: { result: AggregateCommand<'out'>; ts?: Timestamp }) =>
       async (): Next => {
         const start = Date.now()
         // await snapshotCollection.updateMany({ before: null }, { $set: { before: null } })
         log('snapshot', streamName, 'ensure before null', Date.now() - start)
-        const stages = finalInput.raw(ts === undefined)
+        const first = ts === undefined
+        const stages = finalInput.raw(first)
+        await last.updateOne({ _id: streamName }, { $set: { job: 1 } }, { upsert: true })
+        const stream = makeStream()
         const aggResult = await aggregate<Result2>(
           pdb,
           streamName,
@@ -285,7 +313,10 @@ const executes = <
                 .with(
                   $set_(
                     set<RORec<'before', T | null>>()({
-                      before: ['before', to($ifNull(root<UDelta<T> & Delta<T>>().of('before').expr(), nil))],
+                      before: [
+                        'before',
+                        to($ifNull(root<UDelta<T> & Delta<T>>().of('before').expr(), nil)),
+                      ],
                     }),
                   ),
                 )
@@ -295,7 +326,6 @@ const executes = <
           false,
           start,
         )
-        const stream = makeStream(result.cursor.atClusterTime)
         const nextRes = stream.tryNext()
         const intoColl = (stages.at(-1) as any).$merge.into.coll
         const startx = Date.now()
@@ -306,7 +336,7 @@ const executes = <
             .then(count => log(`documents updated ${intoColl}`, count, 'took', Date.now() - startx))
         }
         return next(
-          step5({ ts: result.cursor.atClusterTime, aggResult, stream, nextRes }),
+          step5({ ts: result.cursor.atClusterTime, aggResult, stream, nextRes, first }),
           'remove handled deleted updated',
           () => stream.close(),
         )
@@ -327,6 +357,7 @@ const executes = <
       ts: Timestamp
       stream: C
       nextRes: Promise<Res | null>
+      first: boolean
     }
 
     // Step 6 : commit changes on snapshot
@@ -335,6 +366,7 @@ const executes = <
         'update snapshot aggregation',
         `db['${snapshotCollection.collectionName}'].updateMany({ updated: true }, [ { $set: { updated: false, after: null, before: '$after' } } ])`,
       )
+      const start = Date.now()
       await snapshotCollection.updateMany({ updated: true }, [
         {
           $set: {
@@ -344,21 +376,27 @@ const executes = <
           },
         },
       ])
-      log('updated snapshot aggregation')
+      log('updated snapshot aggregation', Date.now() - start)
       return next(step7(l), 'update __last')
     }
 
     // Step 7 : update __last
     const step7 = (l: L) => async (): Next => {
-      await last.updateOne(
-        { _id: streamName },
-        {
-          $set: {
-            ts: l.ts,
-            data,
-          },
+      const start = Date.now()
+      const patch: UpdateFilter<Last> = {
+        $set: {
+          ts: l.ts,
+          job: null,
         },
-        { upsert: true },
+      }
+      if (l.ts) patch.$set = data
+      await last.updateOne({ _id: streamName }, patch, { upsert: true })
+      log(
+        'updated __last',
+        Date.now() - start,
+        `db['${last.collectionName}'].updateOne({ _id: '${streamName}' }, `,
+        patch,
+        `, { upsert: true })`,
       )
       return step8(l)
     }

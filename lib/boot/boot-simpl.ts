@@ -180,9 +180,10 @@ const executes = <
 
     type C = Pick<ChangeStream<{}, {}>, 'close' | 'tryNext'>
     // Step 4 : run the aggregation // idempotent
-    const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt, streamName)
+    const makeStream = (): C => makeWatchStream( view, streamName)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const raw = stages(lastTS).with(finalInput.raw(lastTS === null)).stages
+      const stream = makeStream()
       const aggResult = await aggregate<Result2>(pdb, streamName, c =>
         c<V | Del, V | Del>({
           coll: collection,
@@ -190,7 +191,6 @@ const executes = <
         }),
       )
 
-      const stream = makeStream(aggResult.cursor.atClusterTime)
       const nextRes = stream.tryNext()
       return next(
         step7({ aggResult, ts: aggResult.cursor.atClusterTime, stream, nextRes }),

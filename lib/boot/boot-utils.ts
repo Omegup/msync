@@ -17,6 +17,7 @@ export type Last = {
   _id: string
   ts: Timestamp
   data?: TsData
+  job?: 1 | null
 }
 
 export const actions: {
