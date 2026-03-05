@@ -28,35 +28,32 @@ const getCurrentTimestamp = async (db: Db): Promise<Timestamp> => {
 }
 
 async function getLastCommittedTs(adminDb: Db): Promise<Timestamp | null> {
-  const st: any = await adminDb.command({ replSetGetStatus: 1 });
-  return (st?.optimes?.lastCommittedOpTime?.ts as Timestamp) ?? null;
+  const st: any = await adminDb.command({ replSetGetStatus: 1 })
+  return (st?.optimes?.lastCommittedOpTime?.ts as Timestamp) ?? null
 }
 
 export async function waitUntilStablePast(
   db: Db,
   oplogTs: Timestamp,
-  {
-    pollMs = 0,
-    timeoutMs = 10_000,
-  }: { pollMs?: number; timeoutMs?: number } = {},
+  { pollMs = 0, timeoutMs = 10_000 }: { pollMs?: number; timeoutMs?: number } = {},
 ): Promise<void> {
-  const adminDb = db.client.db('admin');
-  const deadline = Date.now() + timeoutMs;
+  const adminDb = db.client.db('admin')
+  const deadline = Date.now() + timeoutMs
 
   while (true) {
-    const stable = await getLastCommittedTs(adminDb);
-    if (stable && stable.comp(oplogTs) >= 0) return;
+    const stable = await getLastCommittedTs(adminDb)
+    if (stable && stable.comp(oplogTs) >= 0) return
 
     if (Date.now() > deadline) {
-      throw new Error("Timed out waiting for stable timestamp to reach oplog event time");
+      throw new Error('Timed out waiting for stable timestamp to reach oplog event time')
     }
-    await sleep(pollMs);
+    await sleep(pollMs)
   }
 }
 export async function* tailOplog(
   db: Db, // this should be the "local" DB on a replica set member
   opts: TailOptions,
-): AsyncGenerator<{ ns: string; fields: Set<string>; doc: OplogEntry }, never, void> {
+): AsyncGenerator<{ fields: Set<string>; doc: OplogEntry } | null, never, void> {
   let lastTs = opts.since ?? (await getCurrentTimestamp(db))
   const reopenDelayMs = opts.reopenDelayMs ?? 250
 
@@ -79,12 +76,12 @@ export async function* tailOplog(
     try {
       for await (const doc of cursor) {
         lastTs = doc.ts // checkpoint: resume after this
-        if (doc.op === 'i') {
-          yield { ns: doc.ns, fields: new Set(Object.keys(doc.o)), doc }
+        if (doc.op === 'i' || '_id' in doc.o) {
+          yield { fields: new Set(Object.keys(doc.o)), doc }
         } else {
           // doc.op is 'u'
           if (doc.o['$v'] !== 2) {
-            throw new Error(`Expected update with $v: 2, got ${JSON.stringify(doc.o)}`)
+            throw new Error(`Expected update with $v: 2, got ${JSON.stringify(doc)}`)
           }
           const updatedFields = []
           const diff = doc.o['diff'] as Record<string, unknown>
@@ -95,11 +92,13 @@ export async function* tailOplog(
               updatedFields.push(updateOp.slice(1))
             }
           }
-          yield { ns: doc.ns, fields: new Set(updatedFields), doc }
+          yield { fields: new Set(updatedFields), doc }
         }
       }
     } catch (e) {
-      log('oplog loop error', e)
+      log('oplog loop error, notifying watchers and reopening')
+      console.error(e)
+      yield null
       // swallow and reopen; caller can add their own logging around consumption
     } finally {
       log('oplog loop ended')
@@ -112,18 +111,53 @@ export async function* tailOplog(
 
 const watchers = new Map<
   string,
-  Map<string, { cb: (doc: OplogEntry) => void; keys: readonly string[] | null }>
+  Map<string, { cb: (doc: OplogEntry | null) => void; keys: readonly string[] | null }>
 >()
 let running = false
+
+const makePromise = <T>() => {
+  let resolve: (val: T) => void = () => {}
+  let promise = new Promise<T>(r => (resolve = r))
+  return { promise, resolve }
+}
+
 const loop = async (db: Db) => {
   log('starting oplog loop')
-  for await (const { ns, fields, doc } of tailOplog(db, {})) {
-    log('oplog event', ns, doc.op, [...fields])
-    const m = watchers.get(ns)
-    if (!m) continue
-    for (const { cb, keys } of m.values()) {
-      if (!keys || keys.some(k => fields.has(k))) {
-        cb(doc)
+  let notify = makePromise<void>()
+  let batch: { fields: Set<string>; doc: OplogEntry }[] | null = []
+  const run = async () => {
+    for await (const event of tailOplog(db, {})) {
+      batch = event && batch ? [...batch, event] : null
+      notify.resolve()
+    }
+  }
+  run()
+  const iter = async function* () {
+    while (true) {
+      await notify.promise
+      const b = batch
+      batch = []
+      notify = makePromise()
+      yield b
+    }
+  }
+  for await (const events of iter()) {
+    if (!events) {
+      log('notifying watchers of oplog loop restart')
+      for (const m of watchers.values()) {
+        for (const { cb } of m.values()) {
+          cb(null)
+        }
+      }
+      continue
+    }
+    for (const { fields, doc } of events) {
+      const m = watchers.get(doc.ns)
+      if (!m) continue
+      for (const { cb, keys } of m.values()) {
+        if (!keys || keys.some(k => fields.has(k))) {
+          cb(doc)
+        }
       }
     }
   }
@@ -132,7 +166,7 @@ const loop = async (db: Db) => {
 const register = (
   coll: ReadonlyCollection<unknown>,
   keys: readonly string[] | null,
-  cb: (doc: OplogEntry) => void,
+  cb: (doc: OplogEntry | null) => void,
 ) => {
   const ns = coll.namespace
   let m = watchers.get(ns)
@@ -160,9 +194,9 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
 ) => {
   const projection = { ...(p ? mapExactToObject(p, v => v) : {}), deletedAt: 1 }
 
-  let resolve = (_: OplogEntry) => {}
-  const promise = new Promise<OplogEntry>(r => (resolve = r))
-  const close = register(collection, p ? Object.keys(projection) : null, (doc) => {
+  let resolve = (_: OplogEntry | null) => {}
+  const promise = new Promise<OplogEntry | null>(r => (resolve = r))
+  const close = register(collection, p ? Object.keys(projection) : null, doc => {
     log(streamName, 'change detected', doc)
     resolve(doc)
     close()
@@ -173,9 +207,9 @@ export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
       const doc = await promise
       // wait until the server’s lastStableRecoveryTimestamp / stable time has advanced past the oplog entry time
       const start = Date.now()
-      await waitUntilStablePast(collection.s.db, doc.ts)
+      if (doc) await waitUntilStablePast(collection.s.db, doc.ts)
       log(streamName, 'stable past took', Date.now() - start)
-      return doc
+      return doc ?? {}
     },
     close: async () => close(),
   }

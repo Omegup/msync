@@ -3,7 +3,7 @@ import type { Db, ReadonlyCollection } from '../../types'
 import type { RawStages } from '../types'
 import { log } from '../utils/log'
 
-export const state = { steady: false, f: (_: { input: any }) => Promise.resolve() }
+export const state = { steady: true, f: (_: { input: any }) => Promise.resolve() }
 let timeout: NodeJS.Timeout | null = null
 
 export const setF = (f: ({ input }: { input: any }) => Promise<void>) => {
@@ -58,11 +58,11 @@ export const aggregate = <Result>(
           Date.now() - start,
         )
         if (!state.steady) {
-          if (timeout !== null) throw new Error('timeout should be null')
+          if (timeout !== null) clearTimeout(timeout)
           timeout = setTimeout(() => {
             state.steady = true
             console.log('steady')
-          }, 10000)
+          }, 2000)
         }
         return r
       },
