@@ -7,11 +7,14 @@ export const mergeIterators = <K extends KEYS, Result, Info extends Record<K, Ha
   sources: SourceIteratorResults<K, Result, Info>
   interrupt?: (key: KEYS) => boolean
   select?: Race<K, Result, Info>
+  hooks?: {
+    start?: (frame: Frame<Result, Info[K]>, result: IteratorResult<Result, Info[K]>) => void
+  }
 }): IteratorResult<Result, SourceResults<K, Info>> => {
   type Sources = SourceIteratorResults<K, Result, Info>
   type Winner = RaceWinner<K, Result, Info>
   type CurFrame = Frame<Result, SourceResults<K, Info>>
-  const { sources, interrupt, select = race } = params
+  const { sources, interrupt, select = race, hooks } = params
   /**
    * Reiterates over the results, continuing the iteration process.
    * - `frame`: The resulting frame from the asynchronous source.
@@ -22,10 +25,12 @@ export const mergeIterators = <K extends KEYS, Result, Info extends Record<K, Ha
     return {
       cont: () => {
         const result = frame.cont()
+        hooks?.start?.(frame, result)
         return mergeIterators<K, Result, Info>({
           sources: patch<Sources, K>(sources, key, result),
           interrupt,
           select: sources => nextWinner(winner, result.next, sources, interrupt),
+          hooks,
         })
       },
       data: frame.data,
@@ -34,7 +39,7 @@ export const mergeIterators = <K extends KEYS, Result, Info extends Record<K, Ha
   }
   // The main `IteratorResult` returned by `mergeItResults`.
   return {
-    stop: () => mergeIterators({ sources: restart(sources), interrupt }),
+    stop: () => mergeIterators({ sources: restart(sources), interrupt, select, hooks }),
     next: select(sources).then(reiterate),
     clear: async () => {
       for (const key in sources) {
