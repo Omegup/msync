@@ -47,10 +47,7 @@ export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, r
       c<Out, 'updateMany'>({
         collection: out,
         method: 'updateMany',
-        params: [
-          filter as Filter<Out>,
-          [{ $set: { deletedAt: '$$NOW', touchedAt: '$$CLUSTER_TIME' } }],
-        ],
+        params: [filter as Filter<Out>, [{ $set: { deletedAt: '$$NOW', touchedAt: '$$CLUSTER_TIME' } }]],
       }),
     raw: (): RawStages<unknown, D, 'out'> => {
       const replacer = map(

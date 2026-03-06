@@ -1,4 +1,4 @@
-import type { Timestamp } from 'mongodb'
+import { MaxKey, type Timestamp } from 'mongodb'
 import type { Arr, ConstHKT, N, O, RORec, StrKey, jsonItem, rawItem } from '../../types'
 import type { Expr } from '../types'
 import { asExpr, asExprRaw } from './expr-base'
@@ -16,7 +16,7 @@ export const val = <T extends rawItem>(val: T): Expr<T, unknown> =>
   })
 
 export const current: Expr<Timestamp, unknown> = asExpr({
-  raw: () => asExprRaw<Timestamp, unknown, unknown>('$$CLUSTER_TIME'),
+  raw: () => asExprRaw<Timestamp, unknown, unknown>(new MaxKey()),
 })
 export const $let = <T, D, C, V extends RORec<string, jsonItem>>(
   vars: ExprsExact<V, D, C>,

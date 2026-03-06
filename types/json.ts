@@ -1,10 +1,10 @@
-import type { Timestamp } from 'mongodb'
+import type { MaxKey, Timestamp } from 'mongodb'
 import { Type } from './class'
 export { Type } from './class'
 
 export type U = undefined
 export type N = null | U
-export type jsonPrim = number | null | string | boolean | Timestamp | Date
+export type jsonPrim = number | null | string | boolean | Timestamp | MaxKey | Date
 export type notObj = jsonPrim | U
 export type notArr = notObj | O
 export type jsonItem = unknown

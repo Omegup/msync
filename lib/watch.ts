@@ -1,6 +1,6 @@
-import type { Db, Timestamp } from 'mongodb'
-import type { O, ReadonlyCollection, StrKey, View } from '../types'
-import { type Field } from './field'
+import { MaxKey, type Db, type Timestamp } from 'mongodb'
+import type { AnyBulkWriteOperation, O, ReadonlyCollection, StrKey, View } from '../types'
+import type { Field } from './field'
 import type { Model, Query } from './types'
 import { log } from './utils'
 import { mapExactToObject } from './utils/map-object'
@@ -10,7 +10,7 @@ export type OplogEntry = {
   ns: string // "db.collection"
   op: 'i' | 'u' | 'd' | 'c' | 'n'
   o: Record<string, unknown> // operation object
-  o2?: Document // update query (for updates)
+  o2?: { _id: string } // update query (for updates)
   wall?: Date
 } & Document
 
@@ -50,10 +50,11 @@ export async function waitUntilStablePast(
     await sleep(pollMs)
   }
 }
+type Event = { fields: Set<string>; doc: OplogEntry; changeTouched: boolean }
 export async function* tailOplog(
-  db: Db, // this should be the "local" DB on a replica set member
+  db: Db,
   opts: TailOptions,
-): AsyncGenerator<{ fields: Set<string>; doc: OplogEntry } | null, never, void> {
+): AsyncGenerator<Event | null, never, void> {
   let lastTs = opts.since ?? (await getCurrentTimestamp(db))
   const reopenDelayMs = opts.reopenDelayMs ?? 250
 
@@ -77,9 +78,12 @@ export async function* tailOplog(
       for await (const doc of cursor) {
         lastTs = doc.ts // checkpoint: resume after this
         if (doc.op === 'i' || '_id' in doc.o) {
-          yield { fields: new Set(Object.keys(doc.o)), doc }
+          const fields = new Set(Object.keys(doc.o))
+          fields.delete('_id')
+          yield { fields, doc, changeTouched: doc.o['touchedAt'] instanceof MaxKey }
         } else {
           // doc.op is 'u'
+          let changeTouched = false
           if (doc.o['$v'] !== 2) {
             throw new Error(`Expected update with $v: 2, got ${JSON.stringify(doc)}`)
           }
@@ -88,11 +92,14 @@ export async function* tailOplog(
           for (const updateOp in diff) {
             if ((['u', 'i', 'd'] as const).includes(updateOp)) {
               updatedFields.push(...Object.keys(diff[updateOp] as Record<string, unknown>))
+              if ((diff[updateOp] as Record<string, unknown>)['touchedAt'] instanceof MaxKey) {
+                changeTouched = true
+              }
             } else if (updateOp.startsWith('s')) {
               updatedFields.push(updateOp.slice(1))
             }
           }
-          yield { fields: new Set(updatedFields), doc }
+          yield { fields: new Set(updatedFields), doc, changeTouched }
         }
       }
     } catch (e) {
@@ -124,9 +131,13 @@ const makePromise = <T>() => {
 const loop = async (db: Db) => {
   log('starting oplog loop')
   let notify = makePromise<void>()
-  let batch: { fields: Set<string>; doc: OplogEntry }[] | null = []
+  let batch: Event[] | null = []
+  const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   const run = async () => {
-    for await (const event of tailOplog(db, {})) {
+    for await (const event of tailOplog(db, {
+      since: (await last.findOne({ _id: 'oplog' }))?.ts,
+    })) {
+      if (event?.fields.size === 0) continue
       batch = event && batch ? [...batch, event] : null
       notify.resolve()
     }
@@ -136,6 +147,11 @@ const loop = async (db: Db) => {
     while (true) {
       await notify.promise
       const b = batch
+      if (b?.length) {
+        last
+          .updateOne({ _id: 'oplog' }, { $set: { ts: b[b.length - 1].doc.ts } }, { upsert: true })
+          .catch(() => {})
+      }
       batch = []
       notify = makePromise()
       yield b
@@ -150,6 +166,28 @@ const loop = async (db: Db) => {
         }
       }
       continue
+    }
+    const groups = Object.groupBy(
+      events.filter(e => e.changeTouched),
+      ev => ev.doc.ns,
+    )
+    for (const [ns, evs] of Object.entries(groups)) {
+      if (!evs) continue
+      const [dbName, collName] = ns.split('.')
+      if (dbName !== db.databaseName) continue
+      const coll = db.collection<{ _id: string; touchedAt: Timestamp }>(collName)
+      coll
+        .bulkWrite(
+          evs.map(
+            (e): AnyBulkWriteOperation<{ _id: string; touchedAt: Timestamp }> => ({
+              updateOne: {
+                filter: { _id: e.doc.o['_id'] ?? e.doc.o2?._id },
+                update: { $set: { touchedAt: e.doc.ts } },
+              },
+            }),
+          ),
+        )
+        .catch(() => {})
     }
     for (const { fields, doc } of events) {
       const m = watchers.get(doc.ns)
