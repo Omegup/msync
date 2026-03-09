@@ -147,13 +147,11 @@ const executes = <
         },
       )
 
-      log('start stream', { streamName, data })
-      await last.findOne()
-      console.log('got last update')
-      const p = last.findOne({ _id: streamName, data })
-      await p
       log('stream started', { streamName, data })
-      const ts = await Promise.all([p, last.findOne({ _id: streamName })])
+      const ts = await Promise.all([
+        last.findOne({ _id: streamName, data }),
+        last.findOne({ _id: streamName }),
+      ])
       log('got last update', { streamName, ts })
       return next(step2_5(ts), 'handle teardown')
     }
@@ -193,6 +191,7 @@ const executes = <
       const raw = stages(lastTS).with(finalInput.raw(lastTS === null)).stages
       const stream = await makeStream()
       // const currTime = await getCurrentTimestamp(db)
+      const nextRes = stream.tryNext()
       const aggResult = await aggregate<Result2>(pdb, streamName, c =>
         c<V | Del, V | Del>({
           coll: collection,
@@ -200,8 +199,7 @@ const executes = <
         }),
       )
 
-      const nextRes = stream.tryNext()
-      
+
       if (false) {
         const intoColl = (raw.at(-1) as any).$merge.into.coll
         await db
