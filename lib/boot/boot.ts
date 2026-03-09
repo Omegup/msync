@@ -292,6 +292,8 @@ const executes = <
             whenNotMatched: 'insert',
           }),
         ).stages
+    
+      const stream = await makeStream()
 
       const r = await aggregate<'out'>(pdb, streamName, c =>
         c({ coll: collection, input: cloneIntoNew }),
@@ -304,7 +306,7 @@ const executes = <
         res,
         `db['${snapshotCollection.collectionName}'].deleteMany({ updated: true, after: null, before: null })`,
       )
-      return next(step4({ result: r, ts: lastTS?.ts }), 'run the aggregation')
+      return next(step4({ result: r, ts: lastTS?.ts, stream }), 'run the aggregation')
     }
 
     type Res = {}
@@ -313,7 +315,7 @@ const executes = <
     // Step 4 : run the aggregation // idempotent
     const makeStream = (): Promise<C> => makeWatchStream(view, streamName)
     const step4 =
-      ({ result, ts }: { result: AggregateCommand<'out'>; ts?: Timestamp }) =>
+      ({ result, ts, stream }: { result: AggregateCommand<'out'>; ts?: Timestamp; stream: C }) =>
       async (): Next => {
         const start = Date.now()
         // await snapshotCollection.updateMany({ before: null }, { $set: { before: null } })
@@ -321,7 +323,6 @@ const executes = <
         const first = ts === undefined
         const stages = finalInput.raw(first)
         await last.updateOne({ _id: streamName }, { $set: { job: 1 } }, { upsert: true })
-        const stream = await makeStream()
         // log('updated docs', await snapshotCollection.find({ updated: true }).toArray())
         const nextRes = stream.tryNext()
         const aggResult = await aggregate<Result2>(
