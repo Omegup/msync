@@ -1,4 +1,4 @@
-import { MaxKey, type Db, type Timestamp } from 'mongodb'
+import { type Db, Timestamp } from 'mongodb'
 import type { AnyBulkWriteOperation, O, ReadonlyCollection, StrKey, View } from '../types'
 import type { Field } from './field'
 import type { Model, Query } from './types'
@@ -19,6 +19,9 @@ type TailOptions = {
   reopenDelayMs?: number // delay before reopening if cursor ends
 }
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
+
+const maxTimestamp = new Timestamp(0xffffffffffffffffn)
+const isMax = (x: unknown) => x instanceof Timestamp && x.equals(maxTimestamp)
 
 export const getCurrentTimestamp = async (db: Db): Promise<Timestamp> => {
   // Get the current timestamp from the server
@@ -80,7 +83,7 @@ export async function* tailOplog(
         if (doc.op === 'i' || '_id' in doc.o) {
           const fields = new Set(Object.keys(doc.o))
           fields.delete('_id')
-          yield { fields, doc, changeTouched: doc.o['touchedAt'] instanceof MaxKey }
+          yield { fields, doc, changeTouched: isMax(doc.o['touchedAt']) }
         } else {
           // doc.op is 'u'
           let changeTouched = false
@@ -92,7 +95,7 @@ export async function* tailOplog(
           for (const updateOp in diff) {
             if ((['u', 'i', 'd'] as const).includes(updateOp)) {
               updatedFields.push(...Object.keys(diff[updateOp] as Record<string, unknown>))
-              if ((diff[updateOp] as Record<string, unknown>)['touchedAt'] instanceof MaxKey) {
+              if (isMax((diff[updateOp] as Record<string, unknown>)['touchedAt'])) {
                 changeTouched = true
               }
             } else if (updateOp.startsWith('s')) {
@@ -230,7 +233,7 @@ export const makeWatchStream = async <V extends Model, K extends StrKey<V>>(
       x =>
         void db
           .collection(x.name)
-          .updateMany({ touchedAt: new MaxKey() }, [{ $set: { touchedAt: '$$CLUSTER_TIME' } }]),
+          .updateMany({ touchedAt: maxTimestamp }, [{ $set: { touchedAt: '$$CLUSTER_TIME' } }]),
     ),
   ).then(() => {}))
 
