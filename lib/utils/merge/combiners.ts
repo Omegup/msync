@@ -2,7 +2,7 @@ import { mergeIterators } from './merge'
 import type { RORec } from '../../../types'
 import type { Iterator, IteratorResult, HasJob } from '../../types'
 
-const state = { steady: false, f: (_: { input: any }) => Promise.resolve() }
+const state = { steady: false }
 let timeout: NodeJS.Timeout | null = null
 
 export { mergeIterators } from './merge'
@@ -16,7 +16,7 @@ export const firstWorksMerge = <Result, Info extends HasJob>(
     return mergeIterators<string, Result, RORec<string, Info>>({
       sources,
       // interrupt: key => key !== '0',
-      interrupt: key => false,
+      interrupt: key => state.steady,
       hooks: {
         start: (frame, result) => {
           if (!frame.info.job) return

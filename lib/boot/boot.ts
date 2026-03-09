@@ -29,7 +29,7 @@ import type {
 } from '../types/stream'
 import { noop } from '../utils'
 import { asBefore } from '../utils/before'
-import { createIndex } from '../utils/db-indexes'
+import { createIndex, indexMap } from '../utils/db-indexes'
 import { log } from '../utils/log'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
@@ -71,82 +71,34 @@ const executes = <
     .digest('base64url')
   if (!streamNames[streamName]) streamNames[streamName] = hash
   else if (streamNames[streamName] != hash) throw new Error(`streamName ${streamName} already used`)
-  db.command({
-    collMod: coll,
-    changeStreamPreAndPostImages: { enabled: true },
-  })
-  createIndex(
-    collection,
-    { touchedAt: 1 },
-    hardMatch
-      ? {
-          partialFilterExpression: hardMatch.raw(root()),
-          name: 'touchedAt_hard_' + new UUID().toString('base64'),
-        }
-      : {},
-  ).catch(e => e.code == 86 || Promise.reject(e))
 
   const last = db.collection<Last>('__last')
   const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
 
-  createIndex(
-    snapshotCollection,
-    { before: 1 },
-    {
-      partialFilterExpression: { before: null },
-      name: 'before_' + new UUID().toString('base64'),
-    },
-  )
-
-  createIndex(
-    snapshotCollection,
-    { updated: 1 },
-    {
-      partialFilterExpression: { updated: true },
-      name: 'updated_' + new UUID().toString('base64'),
-    },
-  )
-
-  createIndex(
-    snapshotCollection,
-    { updated: 1, after: 1, before: 1 },
-    {
-      partialFilterExpression: { updated: true, after: null, before: null },
-      name: 'updated_nulls_' + new UUID().toString('base64'),
-    },
-  )
-
-  createIndex(
-    snapshotCollection,
-    { updated: 1, after: 1 },
-    {
-      partialFilterExpression: { updated: true, after: null },
-      name: 'updated_no_after_' + new UUID().toString('base64'),
-    },
-  )
-
-  createIndex(
-    snapshotCollection,
-    { updated: 1 },
-    {
-      partialFilterExpression: { updated: true, after: null, before: null },
-      name: 'updated_nulls_' + new UUID().toString('base64'),
-    },
-  )
-
   const job = {}
   const run = <Result2>(
     finalInput: StreamRunnerParam<Delta<Result>, Result2>,
+    setup?: () => Promise<void>,
   ): Runner<readonly Result2[], HasJob> => {
     type W = HasJob & { debug: string }
     type It = Iterator<readonly Result2[], W>
     type FrameD = Frame<readonly Result2[], W>
     type Next = Promise<FrameD>
-    const clear = async () =>
-      Promise.all([
-        snapshotCollection.drop().catch(noop).catch(noop),
-        last.deleteOne({ _id: streamName }),
-      ])
+    const dropSnapshot = async () => {
+      await snapshotCollection.drop().catch(noop)
+      log(
+        'snapshot collection dropped',
+        streamName,
+        `db['${snapshotCollection.collectionName}'].drop()`,
+      )
+      log(
+        'with',
+        [...(indexMap.get(snapshotCollection.collectionName)?.keys() ?? [])],
+        'indexes in map before deletion',
+      )
+      indexMap.delete(snapshotCollection.collectionName)
+    }
+    const clear = async () => Promise.all([dropSnapshot(), last.deleteOne({ _id: streamName })])
 
     const withStop = (next: () => PromiseLike<FrameD>, tr?: () => Promise<void>): It => {
       return addTeardown(() => ({ stop, next: next(), clear }), tr)
@@ -181,10 +133,16 @@ const executes = <
 
     // Step 1 : empty new collection
     const step1 = async (): Next => {
+      log(
+        'reset collection',
+        streamName,
+        `db['${snapshotCollection.collectionName}'].updateMany( updated: true }, { $set: { updated: false, after: null } })`,
+      )
       await snapshotCollection.updateMany(
         { updated: true },
         { $set: { updated: false, after: null } },
       )
+      log('reset collection done', streamName)
       // we don't need to remove null before because they will be reinserted anyway in step 3
       return next(step2, 'get last update')
     }
@@ -218,13 +176,75 @@ const executes = <
           }
           const [action, out] = actions[method](collection, params)
           log('teardown', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
-          await Promise.all([snapshotCollection.drop().catch(noop), action])
+          await Promise.all([dropSnapshot(), action])
           log('teardown done', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
         }
         if (!same) {
           log('not same, new data', streamName, data)
           await handleTeardown(exists ?? { data })
         }
+        log('creating indexes')
+
+        await createIndex(
+          snapshotCollection,
+          { before: 1 },
+          {
+            partialFilterExpression: { before: null },
+            name: 'before_' + new UUID().toString('base64'),
+          },
+        )
+
+        await createIndex(
+          snapshotCollection,
+          { updated: 1 },
+          {
+            partialFilterExpression: { updated: true },
+            name: 'updated_' + new UUID().toString('base64'),
+          },
+        )
+
+        await createIndex(
+          snapshotCollection,
+          { updated: 1, after: 1, before: 1 },
+          {
+            partialFilterExpression: { updated: true, after: null, before: null },
+            name: 'updated_nulls_' + new UUID().toString('base64'),
+          },
+        )
+
+        await createIndex(
+          snapshotCollection,
+          { updated: 1, after: 1 },
+          {
+            partialFilterExpression: { updated: true, after: null },
+            name: 'updated_no_after_' + new UUID().toString('base64'),
+          },
+        )
+
+        await createIndex(
+          snapshotCollection,
+          { updated: 1 },
+          {
+            partialFilterExpression: { updated: true, after: null, before: null },
+            name: 'updated_nulls_' + new UUID().toString('base64'),
+          },
+        )
+        await db.command({
+          collMod: coll,
+          changeStreamPreAndPostImages: { enabled: true },
+        })
+        await createIndex(
+          collection,
+          { touchedAt: 1 },
+          hardMatch
+            ? {
+                partialFilterExpression: hardMatch.raw(root()),
+                name: 'touchedAt_hard_' + new UUID().toString('base64'),
+              }
+            : {},
+        )
+        await setup?.()
+
         await after?.()
         return nextData([])(async () => {
           // @TODO: use a proper way to execute teardowns before streams
@@ -291,7 +311,7 @@ const executes = <
     type C = Pick<ChangeStream<{}, Res>, 'close' | 'tryNext'>
 
     // Step 4 : run the aggregation // idempotent
-    const makeStream = (): C => makeWatchStream(view, streamName)
+    const makeStream = (): Promise<C> => makeWatchStream(view, streamName)
     const step4 =
       ({ result, ts }: { result: AggregateCommand<'out'>; ts?: Timestamp }) =>
       async (): Next => {
@@ -301,7 +321,9 @@ const executes = <
         const first = ts === undefined
         const stages = finalInput.raw(first)
         await last.updateOne({ _id: streamName }, { $set: { job: 1 } }, { upsert: true })
-        const stream = makeStream()
+        const stream = await makeStream()
+        // log('updated docs', await snapshotCollection.find({ updated: true }).toArray())
+        const nextRes = stream.tryNext()
         const aggResult = await aggregate<Result2>(
           pdb,
           streamName,
@@ -326,14 +348,14 @@ const executes = <
           false,
           start,
         )
-        const nextRes = stream.tryNext()
         const intoColl = (stages.at(-1) as any).$merge.into.coll
         const startx = Date.now()
         if (false) {
           await db
             .collection(intoColl)
-            .countDocuments({ touchedAt: { $gte: result.cursor.atClusterTime } })
-            .then(count => log(`documents updated ${intoColl}`, count, 'took', Date.now() - startx))
+            .find({ touchedAt: { $gte: result.cursor.atClusterTime } })
+            .toArray()
+            .then(docs => log(`documents updated ${intoColl}`, docs, 'took', Date.now() - startx))
         }
         return next(
           step5({ ts: result.cursor.atClusterTime, aggResult, stream, nextRes, first }),

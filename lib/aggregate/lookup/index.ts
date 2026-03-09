@@ -1,4 +1,13 @@
-import type { AsLiteral, ID, O, RORec, Rec, doc, notArr } from '../../../types'
+import {
+  UUID,
+  type AsLiteral,
+  type ID,
+  type O,
+  type RORec,
+  type Rec,
+  type doc,
+  type notArr,
+} from '../../../types'
 import { mergeObjects } from '../../expression/array'
 import { fieldM } from '../../expression/concat'
 import { root, type Field } from '../../field'
@@ -20,6 +29,7 @@ import { $lookupRaw } from './$lookup-raw'
 import { asBefore } from '../../utils/before'
 import { createIndex } from '../../utils/db-indexes'
 import { mergeIterators } from '../../utils/merge'
+import { log } from '../../utils'
 
 type Next<L, R> = ({ key: 'L'; value: L } | { key: 'R'; value: R }) & HasJob
 
@@ -53,13 +63,6 @@ const join = <
   stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE | Null>, Result>,
   outerLeft?: Null,
 ): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
-  createIndex(leftSnapshot.coll, { [`before.${lField.str()}`]: 1 }).catch(
-    e => e.code == 86 || Promise.reject(e),
-  )
-  createIndex(rightSnapshot.coll, { [`before.${rField.str()}`]: 1 }).catch(
-    e => e.code == 86 || Promise.reject(e),
-  )
-
   const rightJoinField = { field1: lField, field2: rField }
   // const joinId = lField.str() === '_id' ? 'right' : rField.str() === '_id' ? 'left' : false
   const joinId = 'left'
@@ -89,17 +92,21 @@ const join = <
         'right',
         'left',
         joinId,
-        outerLeft
-      )
-      const joinR_Delta: JoinStages<LE> = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, L, R, never, Null>(
-        rightJoinField,
-        rightSnapshot,
-        'left',
-        'right',
-        joinId,
-        undefined,
         outerLeft,
       )
+      const joinR_Delta: JoinStages<LE> = $lookupDelta<
+        LQ,
+        LE,
+        RQ,
+        RE,
+        BRB,
+        RS,
+        S,
+        L,
+        R,
+        never,
+        Null
+      >(rightJoinField, rightSnapshot, 'left', 'right', joinId, undefined, outerLeft)
 
       type OuterLE = LE
 
@@ -129,10 +136,30 @@ const join = <
         stages: RawStages<unknown, Delta<V, BA, ID>, Delta<B>>,
         final: StreamRunnerParam<Delta<B>, C>,
       ) =>
-        f.out({
-          raw: first => concatStages(stages, final.raw(first)),
-          teardown: final.teardown,
-        })
+        f.out(
+          {
+            raw: first => concatStages(stages, final.raw(first)),
+            teardown: final.teardown,
+          },
+          async () => {
+            log('Creating indexes for lookup left', leftSnapshot.coll.collectionName, {
+              [`before.${lField.str()}`]: 1,
+            })
+            await createIndex(
+              leftSnapshot.coll,
+              { [`before.${lField.str()}`]: 1 },
+              { name: 'left_' + new UUID().toString('base64') },
+            )
+            log('Creating indexes for lookup right', rightSnapshot.coll.collectionName, {
+              [`before.${rField.str()}`]: 1,
+            })
+            await createIndex(
+              rightSnapshot.coll,
+              { [`before.${rField.str()}`]: 1 },
+              { name: 'right_' + new UUID().toString('base64') },
+            )
+          },
+        )
       const lRunner = getRunner(left, lRunnerInput, finalInput)
       const rRunner = getRunner(right, rRunnerInput, finalInput)
 
@@ -209,13 +236,7 @@ export const $lookup =
     })
 
 export const $outerLookup =
-  <
-    As extends string,
-    LQ extends doc,
-    RQ extends O,
-    RE extends RQ & doc,
-    S extends notArr,
-  >(
+  <As extends string, LQ extends doc, RQ extends O, RE extends RQ & doc, S extends notArr>(
     p: Params<As, LQ, RQ, RE, S>,
   ) =>
   <LE extends LQ>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE | null>> =>

@@ -72,6 +72,7 @@ export type StreamRunnerParam<in V, out Result> = {
 export type StreamRunner<out V> = <Result>(
   // this is the final input that should end with a merge stage
   input: StreamRunnerParam<V, Result>,
+  setup?: () => Promise<void>,
 ) => Runner<readonly Result[], HasJob>
 
 export type SimpleStreamExecutionResult<out Q, out V extends Q> = {

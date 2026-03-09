@@ -69,19 +69,6 @@ const executes = <
   const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
-  db.command({
-    collMod: coll,
-    changeStreamPreAndPostImages: { enabled: true },
-  })
-
-  createIndex(
-    collection,
-    { touchedAt: 1 },
-    {
-      partialFilterExpression: { deletedAt: { $eq: null } },
-      name: 'touchedAt_' + new UUID().toString('base64'),
-    },
-  )
   const last = db.collection<Last>('__last')
   type D_ID = 'deletedAt' | '_id'
   // TODO create indexes (if snapshot is in sources)
@@ -144,11 +131,32 @@ const executes = <
     const stop: It = withStop(step0)
 
     // Step 1 : get last update
-    const step1 = (): Next =>
-      Promise.all([
-        last.findOne({ _id: streamName, data }),
-        last.findOne({ _id: streamName }),
-      ]).then(ts => next(step2_5(ts), 'handle teardown'))
+    const step1 = async (): Next => {
+      log('creating indexes')
+      await db.command({
+        collMod: coll,
+        changeStreamPreAndPostImages: { enabled: true },
+      })
+
+      await createIndex(
+        collection,
+        { touchedAt: 1 },
+        {
+          partialFilterExpression: { deletedAt: { $eq: null } },
+          name: 'touchedAt_' + new UUID().toString('base64'),
+        },
+      )
+
+      log('start stream', { streamName, data })
+      await last.findOne()
+      console.log('got last update')
+      const p = last.findOne({ _id: streamName, data })
+      await p
+      log('stream started', { streamName, data })
+      const ts = await Promise.all([p, last.findOne({ _id: streamName })])
+      log('got last update', { streamName, ts })
+      return next(step2_5(ts), 'handle teardown')
+    }
     const step2_5 =
       ([same, exists]: [Last | null, Last | null]) =>
       async (): Next => {
@@ -180,10 +188,11 @@ const executes = <
 
     type C = Pick<ChangeStream<{}, {}>, 'close' | 'tryNext'>
     // Step 4 : run the aggregation // idempotent
-    const makeStream = (): C => makeWatchStream( view, streamName)
+    const makeStream = (): Promise<C> => makeWatchStream(view, streamName)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
       const raw = stages(lastTS).with(finalInput.raw(lastTS === null)).stages
-      const stream = makeStream()
+      const stream = await makeStream()
+      // const currTime = await getCurrentTimestamp(db)
       const aggResult = await aggregate<Result2>(pdb, streamName, c =>
         c<V | Del, V | Del>({
           coll: collection,
@@ -192,6 +201,16 @@ const executes = <
       )
 
       const nextRes = stream.tryNext()
+      
+      if (false) {
+        const intoColl = (raw.at(-1) as any).$merge.into.coll
+        await db
+          .collection(intoColl)
+          .find({ touchedAt: { $gte: null /* currTime */ } })
+          .toArray()
+          .then(docs => log(`documents updated ${intoColl}`, docs))
+      }
+
       return next(
         step7({ aggResult, ts: aggResult.cursor.atClusterTime, stream, nextRes }),
         'update __last',

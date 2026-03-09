@@ -20,7 +20,7 @@ type TailOptions = {
 }
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
-const getCurrentTimestamp = async (db: Db): Promise<Timestamp> => {
+export const getCurrentTimestamp = async (db: Db): Promise<Timestamp> => {
   // Get the current timestamp from the server
   const adminDb = db.admin()
   const serverStatus = await adminDb.command({ serverStatus: 1 })
@@ -132,11 +132,8 @@ const loop = async (db: Db) => {
   log('starting oplog loop')
   let notify = makePromise<void>()
   let batch: Event[] | null = []
-  const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
   const run = async () => {
-    for await (const event of tailOplog(db, {
-      since: (await last.findOne({ _id: 'oplog' }))?.ts,
-    })) {
+    for await (const event of tailOplog(db, {})) {
       if (event?.fields.size === 0) continue
       batch = event && batch ? [...batch, event] : null
       notify.resolve()
@@ -147,11 +144,6 @@ const loop = async (db: Db) => {
     while (true) {
       await notify.promise
       const b = batch
-      if (b?.length) {
-        last
-          .updateOne({ _id: 'oplog' }, { $set: { ts: b[b.length - 1].doc.ts } }, { upsert: true })
-          .catch(() => {})
-      }
       batch = []
       notify = makePromise()
       yield b
@@ -226,10 +218,22 @@ export const subQ = <D extends O, C, DeltaD extends O>(
   f: Field<DeltaD, D>,
 ): Query<DeltaD, C> => ({ raw: g => a.raw(g.with(f)) })
 
-export const makeWatchStream = <V extends Model, K extends StrKey<V>>(
+let maxKeysRemoved: Promise<void> | null = null
+
+export const makeWatchStream = async <V extends Model, K extends StrKey<V>>(
   { collection, projection: p, hardMatch: m }: View<V, K>,
   streamName: string,
 ) => {
+  const { db } = collection.s
+  await (maxKeysRemoved ??= Promise.all(
+    (await db.listCollections({}, { nameOnly: true }).toArray()).map(
+      x =>
+        void db
+          .collection(x.name)
+          .updateMany({ touchedAt: new MaxKey() }, [{ $set: { touchedAt: '$$CLUSTER_TIME' } }]),
+    ),
+  ).then(() => {}))
+
   const projection = { ...(p ? mapExactToObject(p, v => v) : {}), deletedAt: 1 }
 
   let resolve = (_: OplogEntry | null) => {}
