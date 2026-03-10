@@ -16,7 +16,7 @@ export const firstWorksMerge = <Result, Info extends HasJob>(
     return mergeIterators<string, Result, RORec<string, Info>>({
       sources,
       // interrupt: key => key !== '0',
-      interrupt: key => state.steady,
+      interrupt: key => false,
       hooks: {
         start: (frame, result) => {
           if (!frame.info.job) return

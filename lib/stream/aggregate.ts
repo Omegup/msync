@@ -27,30 +27,34 @@ export const aggregate = <Result>(
     //   return state.f({ input: req }).then(() => new Promise(res => {}))
     // }
     const start2 = Date.now()
-    return db.then(d => d.command(req)).then(
-      result => {
-        log('prepare', streamName, Date.now() - start)
-        log('prepare2', streamName, start2 - start)
-        const r = result as AggregateCommand<Result>
-        log(
-          'execed',
-          streamName,
-          (replace: (s: string) => string) =>
-            replace(
-              JSON.stringify(req).replaceAll(
-                '"$$CLUSTER_TIME"',
-                JSON.stringify(r.cursor.atClusterTime),
+    return db
+      .then(d => d.command(req))
+      .then(
+        result => {
+          log('prepare', streamName, Date.now() - start)
+          log('prepare2', streamName, start2 - start)
+          const r = result as AggregateCommand<Result>
+          log(
+            'execed',
+            streamName,
+            (replace: (s: string) => string) =>
+              replace(
+                JSON.stringify(req).replaceAll(
+                  '"$$CLUSTER_TIME"',
+                  JSON.stringify(r.cursor.atClusterTime),
+                ),
               ),
-            ),
-          result,
-          'took',
-          Date.now() - start,
-        )
-        return r
-      },
-      err => {
-        log('err', req, err)
-        throw new Error(err)
-      },
-    )
+            result,
+            'took',
+            Date.now() - start,
+          )
+          return r
+        },
+        async err => {
+          log('err', req, err)
+          console.error(err)
+          await new Promise(() => {})
+          throw new Error(err)
+        },
+      )
   })
