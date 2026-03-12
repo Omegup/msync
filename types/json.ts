@@ -1,6 +1,6 @@
 import type { Timestamp } from 'mongodb'
-import { Type } from './class'
-export { Type } from './class'
+import type { Type } from './class'
+export type { Type } from './class'
 
 export type U = undefined
 export type N = null | U

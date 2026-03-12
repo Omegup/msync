@@ -29,7 +29,7 @@ import type {
 } from '../types/stream'
 import { noop } from '../utils'
 import { asBefore } from '../utils/before'
-import { createIndex, indexMap } from '../utils/db-indexes'
+import { createIndex, ensureCollection, indexMap } from '../utils/db-indexes'
 import { log } from '../utils/log'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
@@ -229,6 +229,7 @@ const executes = <
             name: 'updated_nulls_' + new UUID().toString('base64'),
           },
         )
+        await ensureCollection(db, coll)
         await db.command({
           collMod: coll,
           changeStreamPreAndPostImages: { enabled: true },
@@ -292,7 +293,7 @@ const executes = <
             whenNotMatched: 'insert',
           }),
         ).stages
-    
+
       const stream = await makeStream()
 
       const r = await aggregate<'out'>(pdb, streamName, c =>

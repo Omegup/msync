@@ -1,4 +1,5 @@
 export * from './global'
+import type {} from './global-aug'
 export * from './json'
 export * from './hkt'
 export * from './class'

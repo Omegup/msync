@@ -16,8 +16,11 @@ export const val = <T extends rawItem>(val: T): Expr<T, unknown> =>
       ),
   })
 
-export const current: Expr<Timestamp, unknown> = asExpr({
+export const afterWriteTime: Expr<Timestamp, unknown> = asExpr({
   raw: () => asExprRaw<Timestamp, unknown, unknown>(new TimestampCtr(0xffffffffffffffffn)),
+})
+export const current: Expr<Timestamp, unknown> = asExpr({
+  raw: () => asExprRaw<Timestamp, unknown, unknown>('$$CLUSTER_TIME'),
 })
 export const $let = <T, D, C, V extends RORec<string, jsonItem>>(
   vars: ExprsExact<V, D, C>,

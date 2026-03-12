@@ -22,7 +22,7 @@ import type {
   TeardownRecord,
 } from '../types/stream'
 import { log } from '../utils'
-import { createIndex } from '../utils/db-indexes'
+import { createIndex, ensureCollection } from '../utils/db-indexes'
 import { mapExactToObject, spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
@@ -133,6 +133,7 @@ const executes = <
     // Step 1 : get last update
     const step1 = async (): Next => {
       log('creating indexes')
+      await ensureCollection(db, coll)
       await db.command({
         collMod: coll,
         changeStreamPreAndPostImages: { enabled: true },

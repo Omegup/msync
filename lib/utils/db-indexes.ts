@@ -1,6 +1,5 @@
-import type { Collection, CreateIndexesOptions, IndexSpecification } from 'mongodb'
-import { type log as log1 } from './log';
-
+import type { Collection, CreateIndexesOptions, Db, IndexSpecification } from 'mongodb'
+import { type log as log1 } from './log'
 
 export const indexMap = new Map<string, Map<string, Promise<void>>>()
 
@@ -36,7 +35,11 @@ const createIndexWithRetry = async (
       if ([85, 276].includes(e.code)) {
         // 85 index exists with different name, just ignore creating
         // 276 operation interrupted, it is ok
-        log('Index created with different name', e.code, { collection: collection.collectionName, indexSpec, options })
+        log('Index created with different name', e.code, {
+          collection: collection.collectionName,
+          indexSpec,
+          options,
+        })
         break
       }
       if (e.code == 12587) {
@@ -54,5 +57,11 @@ const createIndexWithRetry = async (
       throw e
     }
     break
+  }
+}
+
+export const ensureCollection = async (db: Db, collectionName: string) => {
+  if (!(await db.listCollections({ name: collectionName }, { nameOnly: true }).next())) {
+    await db.createCollection(collectionName)
   }
 }

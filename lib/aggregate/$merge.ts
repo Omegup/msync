@@ -13,7 +13,7 @@ import type { doc, ID, N, O, rawItem, Rec, Replace, RORec, StrKey } from '../../
 import { mergeObjects } from '../expression'
 import { field, type ExprHKT, type ExprsExact, type ExprsExactHKT } from '../expression/concat'
 import { $ifNull, eq, eqTyped, ite, sub } from '../expression/logic'
-import { current, nil } from '../expression/val'
+import { afterWriteTime, current, nil } from '../expression/val'
 import { ctx, Field, root } from '../field'
 import type {
   Before,
@@ -163,7 +163,7 @@ const $mergeX = <
       omitPick<KK, never, keyof (TS & ID), V>().backward<ExprsExactHKT<TS & doc, Intermediate>>(
         spread<Pick<V, K>, ID & TS, ExprHKT<Intermediate>, O>(patch, {
           _id: ['_id', f.of('_id').expr()],
-          touchedAt: ['touchedAt', current],
+          touchedAt: ['touchedAt', afterWriteTime],
         }),
       ),
     ),
@@ -268,7 +268,7 @@ export const $mergeId =
                 ),
                 {
                   _id: ['_id', id],
-                  touchedAt: ['touchedAt', current],
+                  touchedAt: ['touchedAt', afterWriteTime],
                 },
               ),
             ),

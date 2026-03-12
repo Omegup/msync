@@ -9,7 +9,7 @@ import {
   type ExprsExactHKT,
 } from '../expression/concat'
 import { eq, ite } from '../expression/logic'
-import { current, nil, val } from '../expression/val'
+import { afterWriteTime, current, nil, val } from '../expression/val'
 import { root } from '../field'
 import type { DDel, Del, Delta, Expr, RawStages, StreamRunnerParam, TS } from '../types'
 import { translateOmit } from '../utils/guard'
@@ -56,7 +56,7 @@ export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, r
           field(
             mergeExpr<EE, ND & TS, D>(extExpr, {
               deletedAt: ['deletedAt', nil],
-              touchedAt: ['touchedAt', current],
+              touchedAt: ['touchedAt', afterWriteTime],
             }),
           ),
         ),
@@ -105,7 +105,7 @@ export const $insertPart = <T extends doc, EEE extends RORec<string, rawItem>>(
             {
               deletedAt: ['deletedAt', current],
               _id: ['_id', assertNotNull(root<Delta<doc>>().of('before').of('_id').expr())],
-              touchedAt: ['touchedAt', current],
+              touchedAt: ['touchedAt', afterWriteTime],
             },
           ),
         ),
