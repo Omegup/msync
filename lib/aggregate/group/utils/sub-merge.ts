@@ -12,7 +12,7 @@ import type {
   notArr,
 } from '../../../../types'
 import { concat, field, type ExprHKT, type ExprsExact } from '../../../expression/concat'
-import { $rand, afterWriteTime, nil, val } from '../../../expression/val'
+import { $rand, current, nil, val } from '../../../expression/val'
 import { ctx, root } from '../../../field'
 import type { Expr, Model, RawStages, TS } from '../../../types'
 import type { DeltaAccumulatorHKT, DeltaAccumulators } from '../../../types/accumulator'
@@ -113,7 +113,7 @@ export const subMerge = <
 
   const F1: MapO<ID & TS, Update<V_Grp, ID & TS>> = {
     _id: ['_id', to(idPrefix ? concat(val(idPrefix), $rand) : $rand)],
-    touchedAt: ['touchedAt', to(afterWriteTime)],
+    touchedAt: ['touchedAt', to(current)],
   }
   const F2: MapO<RORec<GID, Grp>, Update<V_Grp, RORec<GID, Grp>>> = mapId<
     GID,
@@ -133,7 +133,7 @@ export const subMerge = <
       to,
     ),
     ...(out.whenNotMatched === 'insert' ? { deletedAt: ['deletedAt', to(nil)] } : {}),
-    touchedAt: ['touchedAt', to(afterWriteTime)],
+    touchedAt: ['touchedAt', to(current)],
   } as MapO<Extra, Update<ReadyForExtra, Extra, New>>
 
   type ReadyForExtra = Replace<Out, V>

@@ -29,6 +29,7 @@ import { makeWatchStream } from '../watch'
 import { streamNames } from './boot'
 import { actions, type Last, type Teardown, type TsData } from './boot-utils'
 import { prepare } from '../../test/mongodb'
+import { previous } from './first-stages'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -85,7 +86,7 @@ const executes = <
 
   const stages = (lastTS: { _id: string; ts: Timestamp } | null) => {
     const hardQuery: Query<V> | undefined = $and(
-      lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
+      lastTS && root<Model>().of('touchedAt').has($gteTs(previous(lastTS.ts))),
       hardMatch,
       notDeleted,
       match && $expr(match),

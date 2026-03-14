@@ -1,4 +1,4 @@
-import { type Timestamp } from 'mongodb'
+import { Timestamp } from 'mongodb'
 import type { N, O, RORec, StrKey, View } from '../../types'
 import type { ConstHKT, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
@@ -11,6 +11,8 @@ import type { Query } from '../types'
 import type { D, Del, Model, RawStages } from '../types/stream'
 import { mapExactToObject, spread } from '../utils/map-object'
 import type { Allowed } from './boot-utils'
+
+export const previous = (ts: Timestamp) => new Timestamp({t: ts.high - 60, i:0})
 
 export const getFirstStages = <V extends Model, KK extends StrKey<V>>(
   view: View<V, Allowed<KK>>,
@@ -39,7 +41,7 @@ export const getFirstStages = <V extends Model, KK extends StrKey<V>>(
   ): Concat<V | O | Del, Del | V, V, unknown> => {
     const hardQuery = $and(
       lastTS
-        ? root<Model>().of('touchedAt').has($gtTs(lastTS.ts))
+        ? root<Model>().of('touchedAt').has($gtTs(previous(lastTS.ts)))
         : root<D>().of('deletedAt').has($eq<Timestamp | N>(null)),
       lastTS ? null : match && $expr(match),
       keepNulls ? pre : hardMatch,
