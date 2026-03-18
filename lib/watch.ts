@@ -49,9 +49,7 @@ export async function waitUntilStablePast(
   }
 }
 type Event = { fields: Set<string>; doc: OplogEntry }
-export async function* tailOplog(
-  db: Db,
-): AsyncGenerator<Event | null, never, void> {
+export async function* tailOplog(db: Db): AsyncGenerator<Event | null, never, void> {
   let lastTs = await getCurrentTimestamp(db)
   const reopenDelayMs = 250
 
@@ -61,8 +59,22 @@ export async function* tailOplog(
     const cursor = coll.find(
       {
         ts: { $gt: lastTs },
-        ns: RegExp(`^${db.namespace}\\.(?!tmp_)(?!__).*(?<!_snapshot)$`),
-        op: { $in: ['i', 'u'] },
+        $or: [
+          {
+            ns: RegExp(`^${db.namespace}\\.(?!tmp_)(?!__).*(?<!_snapshot)$`),
+            op: { $in: ['i', 'u'] },
+          },
+          {
+            ns: 'admin.$cmd',
+            op: 'c',
+            'o.applyOps': {
+              $elemMatch: {
+                ns: RegExp(`^${db.namespace}\\.(?!tmp_)(?!__).*(?<!_snapshot)$`),
+                op: { $in: ['i', 'u'] },
+              },
+            },
+          },
+        ],
       },
       {
         tailable: true,
@@ -72,26 +84,29 @@ export async function* tailOplog(
     )
 
     try {
-      for await (const doc of cursor) {
-        if (doc.op === 'i' || '_id' in doc.o) {
-          const fields = new Set(Object.keys(doc.o))
-          fields.delete('_id')
-          yield { fields, doc  }
-        } else {
-          // doc.op is 'u'
-          if (doc.o['$v'] !== 2) {
-            throw new Error(`Expected update with $v: 2, got ${JSON.stringify(doc)}`)
-          }
-          const updatedFields = []
-          const diff = doc.o['diff'] as Record<string, unknown>
-          for (const updateOp in diff) {
-            if ((['u', 'i', 'd'] as const).includes(updateOp)) {
-              updatedFields.push(...Object.keys(diff[updateOp] as Record<string, unknown>))
-            } else if (updateOp.startsWith('s')) {
-              updatedFields.push(updateOp.slice(1))
+      for await (const docs of cursor) {
+        for (const doc of docs.op === 'c' ? docs.o['applyOps'] as OplogEntry[] : [docs]) {
+          doc.ts = docs.ts
+          if (doc.op === 'i' || '_id' in doc.o) {
+            const fields = new Set(Object.keys(doc.o))
+            fields.delete('_id')
+            yield { fields, doc }
+          } else {
+            // doc.op is 'u'
+            if (doc.o['$v'] !== 2) {
+              throw new Error(`Expected update with $v: 2, got ${JSON.stringify(doc)}`)
             }
+            const updatedFields = []
+            const diff = doc.o['diff'] as Record<string, unknown>
+            for (const updateOp in diff) {
+              if ((['u', 'i', 'd'] as const).includes(updateOp)) {
+                updatedFields.push(...Object.keys(diff[updateOp] as Record<string, unknown>))
+              } else if (updateOp.startsWith('s')) {
+                updatedFields.push(updateOp.slice(1))
+              }
+            }
+            yield { fields: new Set(updatedFields), doc }
           }
-          yield { fields: new Set(updatedFields), doc }
         }
       }
     } catch (e) {
