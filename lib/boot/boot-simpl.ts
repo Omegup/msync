@@ -1,6 +1,5 @@
 import crypto from 'crypto'
 import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
-import { SynchronousPromise } from 'synchronous-promise'
 import type { N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
 import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
@@ -128,7 +127,7 @@ const executes = <
     }
 
     // Step 0 : declare we are starting a job
-    const step0 = () => SynchronousPromise.resolve(next(step1, 'get last update'))
+    const step0 = () => Promise.resolve(next(step1, 'get last update'))
     const stop: It = withStop(step0)
 
     // Step 1 : get last update

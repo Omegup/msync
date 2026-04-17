@@ -126,7 +126,7 @@ export async function* tailOplog(db: Db): AsyncGenerator<Event | null, never, vo
 
 const watchers = new Map<
   string,
-  Map<string, { cb: (doc: OplogEntry | null) => void; keys: readonly string[] | null }>
+  Map<string, { cb: (doc: OplogEntry | null) => void; keys: readonly string[] | null; rem: ()=>void }>
 >()
 let running = false
 
@@ -161,7 +161,7 @@ const loop = async (db: Db) => {
     if (!events) {
       log('notifying watchers of oplog loop restart')
       for (const m of watchers.values()) {
-        for (const { cb } of m.values()) {
+        for (const { cb } of [...m.values()]) {
           cb(null)
         }
       }
@@ -170,9 +170,10 @@ const loop = async (db: Db) => {
     for (const { fields, doc } of events) {
       const m = watchers.get(doc.ns)
       if (!m) continue
-      for (const { cb, keys } of m.values()) {
+      for (const { cb, keys, rem } of [...m.values()]) {
         if (!keys || keys.some(k => fields.has(k))) {
           cb(doc)
+          rem()
         }
       }
     }
@@ -188,15 +189,16 @@ const register = (
   let m = watchers.get(ns)
   if (!m) watchers.set(ns, (m = new Map()))
   const id = crypto.randomUUID()
-  m.set(id, { cb, keys })
+  const rem = () => {
+    m!.delete(id)
+    if (m!.size === 0) watchers.delete(ns)
+  }
+  m.set(id, { cb, keys, rem })
   if (!running) {
     running = true
     loop(coll.s.db)
   }
-  return () => {
-    m!.delete(id)
-    if (m!.size === 0) watchers.delete(ns)
-  }
+  return rem
 }
 
 export const subQ = <D extends O, C, DeltaD extends O>(
@@ -222,23 +224,21 @@ export const makeWatchStream = async <V extends Model, K extends StrKey<V>>(
 
   const projection = { ...(p ? mapExactToObject(p, v => v) : {}), deletedAt: 1 }
 
-  let resolve = (_: OplogEntry | null) => {}
-  const promise = new Promise<OplogEntry | null>(r => (resolve = r))
-  const close = register(collection, p ? Object.keys(projection) : null, doc => {
+  let notify = makePromise<OplogEntry | null>()
+  register(collection, p ? Object.keys(projection) : null, doc => {
     log(streamName, 'change detected', doc)
-    resolve(doc)
-    close()
+    notify.resolve(doc)
   })
 
   return {
     tryNext: async () => {
-      const doc = await promise
+      const doc = await notify.promise
       // wait until the server’s lastStableRecoveryTimestamp / stable time has advanced past the oplog entry time
       const start = Date.now()
       if (doc) await waitUntilStablePast(collection.s.db, doc.ts)
       log(streamName, 'stable past took', Date.now() - start)
       return doc ?? {}
     },
-    close: async () => close(),
+    close: async () => {},
   }
 }

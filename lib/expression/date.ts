@@ -255,3 +255,38 @@ export const dateDiff = <D, C>({
         },
       }),
   })
+
+export const mapFromPlainDateTime = <D, C>({
+  plainDate,
+  timezone,
+}: {
+  plainDate: Expr<Date, D, C>
+  timezone: Expr<string, D, C>
+}): Expr<Date, D, C> =>
+  asExpr<Date, D, C>({
+    raw: f =>
+      asExprRaw({
+        $dateFromString: {
+          dateString: {
+            $dateToString: { date: plainDate.raw(f).get(), timezone: 'GMT' },
+          },
+          timezone: timezone.raw(f).get(),
+        },
+      }),
+  })
+
+export const mapToPlainDateTime = <D, C>(
+  date: Expr<Date, D, C>,
+  timezone: Expr<string, D, C>,
+): Expr<Date, D, C> =>
+  asExpr<Date, D, C>({
+    raw: f =>
+      asExprRaw({
+        $dateFromString: {
+          $dateToString: {
+            date: date.raw(f).get(),
+            timezone: timezone.raw(f).get(),
+          },
+        },
+      }),
+  })

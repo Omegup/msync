@@ -1,6 +1,5 @@
 import crypto from 'crypto'
 import { Collection, UUID, type ChangeStream, type Timestamp } from 'mongodb'
-import { SynchronousPromise } from 'synchronous-promise'
 import type { N, O, O2, O3, RORec, StrKey, UpdateFilter, View } from '../../types'
 import type { HKT, I } from '../../types/hkt'
 import { $match_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
@@ -128,7 +127,7 @@ const executes = <
     }
 
     // Step 0 : declare we are starting a job
-    const step0 = () => SynchronousPromise.resolve(next(step1, 'empty new collection'))
+    const step0 = () => Promise.resolve(next(step1, 'empty new collection'))
     const stop: It = withStop(step0)
 
     // Step 1 : empty new collection
@@ -307,7 +306,9 @@ const executes = <
         res,
         `db['${snapshotCollection.collectionName}'].deleteMany({ updated: true, after: null, before: null })`,
       )
-      return next(step4({ result: r, ts: lastTS?.ts, stream }), 'run the aggregation')
+      return next(step4({ result: r, ts: lastTS?.ts, stream }), 'run the aggregation', () =>
+        stream.close(),
+      )
     }
 
     type Res = {}
@@ -362,7 +363,6 @@ const executes = <
         return next(
           step5({ ts: result.cursor.atClusterTime, aggResult, stream, nextRes, first }),
           'remove handled deleted updated',
-          () => stream.close(),
         )
       }
 
@@ -437,7 +437,7 @@ const executes = <
       )
     }
     return skip
-      ? withStop(() => SynchronousPromise.resolve(next(step3(null), 'clone into new collection')))
+      ? withStop(() => Promise.resolve(next(step3(null), 'clone into new collection')))
       : stop
   }
   const hasBefore = root<UDelta<T>>().of('before').has($ne<T | N>(null))

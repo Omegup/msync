@@ -28,7 +28,7 @@ importers:
         specifier: ^12.3.0
         version: 12.3.0(rollup@4.59.0)(tslib@2.8.1)(typescript@5.7.3)
       '@types/node':
-        specifier: latest
+        specifier: ^22.10.7
         version: 22.10.7
       prettier:
         specifier: ^3.3.3

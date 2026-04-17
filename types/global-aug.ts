@@ -138,12 +138,10 @@ declare global {
     ): Promise<{ -readonly [P in keyof T]: Awaited<T[P]> }>
     race<T extends readonly unknown[] | []>(values: T): Promise<Awaited<T[number]>>
   }
-}
-declare module 'synchronous-promise' {
-  interface SynchronousPromiseConstructor {
+  interface PromiseConstructor {
     any<T extends readonly unknown[] | [], _ extends 0 = 0>(
       values: AppMap<PromiseHKT, T>,
-    ): SynchronousPromise<T[number]>
-    any<T extends readonly unknown[] | []>(values: T): SynchronousPromise<Awaited<T[number]>>
+    ): Promise<T[number]>
+    any<T extends readonly unknown[] | []>(values: T): Promise<Awaited<T[number]>>
   }
 }

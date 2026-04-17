@@ -1,4 +1,3 @@
-import { SynchronousPromise } from 'synchronous-promise'
 import { map } from '../map-object'
 import type { KEYS, RaceWinner, SourceIteratorResults } from './types'
 
@@ -38,7 +37,7 @@ export const race = <W, K extends KEYS, Result, Info extends Record<K, W>>(
       ),
     ),
   )
-  return SynchronousPromise.any<readonly (Winner | Error)[], 0>(promises).then<Winner>(
+  return Promise.any<readonly (Winner | Error)[], 0>(promises).then<Winner>(
     (result: Winner | Error) => {
       if (result instanceof Error) {
         throw result
