@@ -1,4 +1,17 @@
-import type { App, ConstHKT, HKT, I, IdHKT, N, O, RORec, StrKey, U, Undef, rawItem } from '../../types'
+import type {
+  App,
+  ConstHKT,
+  HKT,
+  I,
+  IdHKT,
+  N,
+  O,
+  RORec,
+  StrKey,
+  U,
+  Undef,
+  rawItem,
+} from '../../types'
 import type { Field } from '../field'
 import type { Expr } from '../types'
 import {
@@ -19,6 +32,21 @@ export const concat: {
 } = <D, C>(...expr: Expr<string | N, D, C>[]) =>
   asExpr<string, D, C>({
     raw: f => asExprRaw({ $concat: expr.map(e => e.raw(f).get()) }),
+  })
+
+export const padLeft = <D, C>(expr: Expr<string, D, C>, pad: string) =>
+  asExpr<string, D, C>({
+    raw: f =>
+      asExprRaw({
+        $let: {
+          vars: {
+            x: {
+              $concat: [{ $literal: pad }, expr.raw(f).get()],
+            },
+          },
+          in: { $substrCP: ['$$x', { $subtract: [{ $strLenCP: '$$x' }, pad.length] }, pad.length] },
+        },
+      }),
   })
 export const regex = <D, C>(
   expr: Expr<string, D, C>,
@@ -59,10 +87,9 @@ export const fieldM = <
     raw: <DeltaD extends O, I extends U, Ctx>(f: Field<DeltaD, D | Undef<I>, Ctx>) =>
       asExprRaw<O<{ readonly [K in Dom]: T[M[K]] }>, DeltaD, C>(
         Object.fromEntries(
-          Object.entries(m).flatMap(<K extends Dom>([dom, ref]: readonly [K, M[K]]) => expr[ref] ? [[
-            dom,
-            expr[ref].raw(f).get(),
-          ]] : []),
+          Object.entries(m).flatMap(<K extends Dom>([dom, ref]: readonly [K, M[K]]) =>
+            expr[ref] ? [[dom, expr[ref].raw(f).get()]] : [],
+          ),
         ),
       ),
   })
