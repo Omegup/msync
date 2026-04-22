@@ -1,7 +1,7 @@
 import { type Db, Timestamp } from 'mongodb'
 import type { O, ReadonlyCollection, StrKey, View } from '../types'
 import type { Field } from './field'
-import type { Model, Query } from './types'
+import type { Del, Model, Query } from './types'
 import { log } from './utils'
 import { mapExactToObject } from './utils/map-object'
 
@@ -85,7 +85,7 @@ export async function* tailOplog(db: Db): AsyncGenerator<Event | null, never, vo
 
     try {
       for await (const docs of cursor) {
-        for (const doc of docs.op === 'c' ? docs.o['applyOps'] as OplogEntry[] : [docs]) {
+        for (const doc of docs.op === 'c' ? (docs.o['applyOps'] as OplogEntry[]) : [docs]) {
           doc.ts = docs.ts
           if (doc.op === 'i' || '_id' in doc.o) {
             const fields = new Set(Object.keys(doc.o))
@@ -126,7 +126,15 @@ export async function* tailOplog(db: Db): AsyncGenerator<Event | null, never, vo
 
 const watchers = new Map<
   string,
-  Map<string, { cb: (doc: OplogEntry | null) => void; keys: readonly string[] | null; rem: ()=>void }>
+  Map<
+    string,
+    {
+      cb: (doc: OplogEntry | null) => void
+      keys: readonly string[] | null
+      match: Query<never> | undefined
+      rem: () => void
+    }
+  >
 >()
 let running = false
 
@@ -170,8 +178,8 @@ const loop = async (db: Db) => {
     for (const { fields, doc } of events) {
       const m = watchers.get(doc.ns)
       if (!m) continue
-      for (const { cb, keys, rem } of [...m.values()]) {
-        if (!keys || keys.some(k => fields.has(k))) {
+      for (const { cb, keys, rem, match } of [...m.values()]) {
+        if (!keys || (doc.op === 'i' ? (match ? true : true) : keys.some(k => fields.has(k)))) {
           cb(doc)
           rem()
         }
@@ -180,9 +188,10 @@ const loop = async (db: Db) => {
   }
 }
 
-const register = (
-  coll: ReadonlyCollection<unknown>,
+const register = <V extends O>(
+  coll: ReadonlyCollection<V | Del>,
   keys: readonly string[] | null,
+  match: Query<V> | undefined,
   cb: (doc: OplogEntry | null) => void,
 ) => {
   const ns = coll.namespace
@@ -193,7 +202,7 @@ const register = (
     m!.delete(id)
     if (m!.size === 0) watchers.delete(ns)
   }
-  m.set(id, { cb, keys, rem })
+  m.set(id, { cb, keys, match, rem })
   if (!running) {
     running = true
     loop(coll.s.db)
@@ -225,7 +234,7 @@ export const makeWatchStream = async <V extends Model, K extends StrKey<V>>(
   const projection = { ...(p ? mapExactToObject(p, v => v) : {}), deletedAt: 1 }
 
   let notify = makePromise<OplogEntry | null>()
-  register(collection, p ? Object.keys(projection) : null, doc => {
+  register(collection, p ? Object.keys(projection) : null, m, doc => {
     log(streamName, 'change detected', doc)
     notify.resolve(doc)
   })
