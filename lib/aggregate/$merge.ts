@@ -215,8 +215,7 @@ const $mergeX = <
     raw: (first: boolean): RawStages<unknown, Source, 'out'> =>
       link<Source>().with<unknown, P>($replaceWith_<Source, P>(replacer)).with<unknown, 'out'>(sss)
         .stages,
-    // blame typescript for this, not me ¯\_(ツ)_/¯
-    teardown: c => (setDeleted ? c(teardown(out.coll)) : c(teardown(out.coll))),
+    teardown: c => c(teardown(out.coll)),
   }
 }
 
