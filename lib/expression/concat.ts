@@ -34,6 +34,17 @@ export const concat: {
     raw: f => asExprRaw({ $concat: expr.map(e => e.raw(f).get()) }),
   })
 
+export const $substr = <D, C>(
+  expr: Expr<string, D, C>,
+  start: Expr<number, D, C>,
+  length: Expr<number, D, C>,
+) =>
+  asExpr<string, D, C>({
+    raw: f =>
+      asExprRaw({
+        $substrCP: [expr.raw(f).get(), start.raw(f).get(), length.raw(f).get()],
+      }),
+  })
 export const padLeft = <D, C>(expr: Expr<string, D, C>, pad: string) =>
   asExpr<string, D, C>({
     raw: f =>
