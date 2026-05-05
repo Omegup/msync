@@ -47,12 +47,20 @@ type TakeDoc<V, E = ID, KK extends StrKey<V> = StrKey<V>> = OPick<V, Allowed<KK>
 type ND = { readonly deletedAt?: null }
 
 type SafeE<E> = Omit<E, `$${string}` | keyof ID>
+
+type Args<P, Out> = [added: Expr<P, unknown, { new: P }>, old: Expr<Out, Out>]
+type Result<P> = Expr<P, unknown, { new: P }>
+type Update<P, Out> = (...args: Args<P, Out>) => Result<P>
+type UpdateF<P, Out> = <K extends keyof IsDeleted>(
+  ...args: Args<Replace<P, RORec<K, Timestamp>>, Out>
+) => Result<Replace<P, RORec<K, Timestamp>>>
 export const getWhenMatchedForMerge = <
   Out extends Model,
   P extends Model,
   K extends keyof IsDeleted,
 >(
   whenNotMatched: 'discard' | 'fail' | 'insert',
+  update: Update<Replace<P, RORec<K, Timestamp>>, Out>,
 ): RawStages<O, Out, Out | Replace<Out, P>, RORec<'new', Replace<P, RORec<K, Timestamp>>>> => {
   const orNull = <T, C>(e: Expr<Timestamp | N, T, C>) =>
     whenNotMatched === 'discard' ? $ifNull(e, nil) : e
@@ -67,7 +75,7 @@ export const getWhenMatchedForMerge = <
     : root<O<DeletedAt>>()
   const merged = mergeObjects<Out | Merged, O<DeletedAt>, Out, { new: PP }>(
     root<Out>().expr(),
-    ctx<PP>()('new').expr(),
+    update(ctx<PP>()('new').expr(), root<Out>().expr()),
     field<O<DeletedAt>, Out, { new: PP }>({
       deletedAt: ['deletedAt', orNull(newOrOld.of('deletedAt').expr())],
     }),
@@ -121,6 +129,10 @@ type MergeCollection<V extends O, Out extends Model> =
       coll: RWCollection<Out | Replace<Out, Patch<V>>, Out>
       whenNotMatched: 'fail'
     }
+type MergeUpdate<V, Out> = UpdateF<
+  ((OPick<V, Allowed<StrKey<V>>> & ID) | (Rec<Allowed<StrKey<V>>, N> & ID)) & TS,
+  Out
+>
 
 const $mergeX = <
   V extends O,
@@ -135,6 +147,7 @@ const $mergeX = <
   f: Field<Intermediate, SourcePart>,
   map: (x: Expr<Patch<V>, Intermediate>) => Expr<Patch<V>, Source>,
   ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
+  update: MergeUpdate<V, Out>,
 ): StreamRunnerParam<Source, 'out'> => {
   type EE = SafeE<EEE>
   type E = Omit<EE, keyof (ND & TS)>
@@ -184,7 +197,10 @@ const $mergeX = <
             on: root<doc>().of('_id'),
             whenNotMatched: 'insert',
             stages: true,
-            whenMatched: getWhenMatchedForMerge<Out, P, keyof IsDeleted>(out.whenNotMatched),
+            whenMatched: getWhenMatchedForMerge<Out, P, keyof IsDeleted>(
+              out.whenNotMatched,
+              update,
+            ),
           }),
         ).stages
     : link<P>().with(
@@ -193,7 +209,7 @@ const $mergeX = <
           on: root<doc>().of('_id'),
           whenNotMatched: 'fail',
           stages: true,
-          whenMatched: getWhenMatchedForMerge<Out, P, never>(out.whenNotMatched),
+          whenMatched: getWhenMatchedForMerge<Out, P, never>(out.whenNotMatched, update),
         }),
       ).stages
 
@@ -226,6 +242,7 @@ export const $mergeId =
     keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
     id: Expr<string, OutInputE<TakeDoc<V>, E, null>>,
     ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
+    update: MergeUpdate<V, Out> = x => x,
   ): StreamRunnerParam<OutInputE<SourcePart, E>, 'out'> => {
     type OutInput<T, A = T | null> = OutInputE<T, E, A>
     interface AfterHKT<T> extends HKT {
@@ -276,6 +293,7 @@ export const $mergeId =
         )
       },
       ext,
+      update,
     )
   }
 
@@ -285,8 +303,9 @@ export const $simpleMergePart =
     out: MergeCollection<V, Out>,
     keys: ExprsExact<TakeDoc<V, unknown>, Source>,
     ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
+    update: MergeUpdate<V, Out> = x => x,
   ): StreamRunnerParam<Source, 'out'> =>
-    $mergeX<V, Out, Source, Source, EEE>(out, keys, root(), id, ext)
+    $mergeX<V, Out, Source, Source, EEE>(out, keys, root(), id, ext, update)
 
 export const $simpleMerge =
   <V extends O>() =>
@@ -294,8 +313,9 @@ export const $simpleMerge =
     out: RWCollection<Out | Replace<Out, Patch<V>> | Replace<Patch<V>, IsDeleted>, Out>,
     keys: ExprsExact<TakeDoc<V, unknown>, Source>,
     whenNotMatched: 'fail' | 'discard' = 'fail',
+    update: MergeUpdate<V, Out> = x => x,
   ): StreamRunnerParam<Source, 'out'> =>
-    $mergeX<V, Out, Source, Source, {}>({ coll: out, whenNotMatched }, keys, root(), id, {})
+    $mergeX<V, Out, Source, Source, {}>({ coll: out, whenNotMatched }, keys, root(), id, {}, update)
 
 export const $mergePart =
   <V extends O>() =>
@@ -303,12 +323,14 @@ export const $mergePart =
     out: RWCollection<Out | Replace<Out, Patch<V>>, Out>,
     keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
     ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
+    update: MergeUpdate<V, Out> = x => x,
   ): StreamRunnerParam<Delta<SourcePart>, 'out'> =>
     $mergeId<V>()<SourcePart, Out, Before<SourcePart | null>, EEE>(
       { coll: out, whenNotMatched: 'fail' },
       keys,
       assertNotNull(root<Rec<'before', (doc & SourcePart) | null>>().of('before').of('_id').expr()),
       ext,
+      update,
     )
 
 export const $merge =
@@ -316,7 +338,8 @@ export const $merge =
   <Out extends Model, SourcePart extends doc>(
     out: RWCollection<Out | Replace<Out, Patch<V>>, Out>,
     keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
+    update: MergeUpdate<V, Out> = x => x,
   ): StreamRunnerParam<Delta<SourcePart>, 'out'> =>
-    $mergePart<V>()<Out, SourcePart, {}>(out, keys, {})
+    $mergePart<V>()<Out, SourcePart, {}>(out, keys, {}, update)
 
 const assertNotNull = <T, D, C>(expr: Expr<T | N, D, C>) => expr as Expr<T, D, C>
