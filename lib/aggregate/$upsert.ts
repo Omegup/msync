@@ -1,4 +1,4 @@
-import type { Filter, HKT, I, IdHKT, RWCollection } from '../../types'
+import type { Filter, HKT, I, IdHKT, Replace, RWCollection } from '../../types'
 import type { ID, N, O, RORec, StrKey, doc, rawItem } from '../../types/json'
 import { mergeObjects } from '../expression/array'
 import {
@@ -25,12 +25,16 @@ type ND = { readonly deletedAt?: null }
 type SafeE<E> = Omit<E, `$${string}` | keyof ID>
 export type Merge<T extends doc, E> = Omit<SafeE<E>, keyof (ND & TS)> & ((T & ND & TS) | Del)
 
+type ExprP<P> = Expr<P, unknown, { new: P }>
+type Update<P, Out> = (added: ExprP<P>, old: Expr<Out, Out>) => ExprP<P>
+
 export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, rawItem>>(
   out: RWCollection<Merge<T, EEE>>,
   expr: Expr<T, D>,
   map: (x: Expr<T & ND & TS & Omit<SafeE<EEE>, keyof (ND & TS)>, D>) => Expr<Merge<T, EEE>, D>,
   ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
   extExpr: ExprsExact<Omit<SafeE<EEE>, keyof (ND & TS)>, unknown>,
+  update: Update<Replace<Merge<T, EEE>, {}>, Merge<T, EEE>> = x => x,
 ): StreamRunnerParam<D, 'out'> => {
   type EE = SafeE<EEE>
   type E = Omit<EE, keyof (ND & TS)>
@@ -69,7 +73,7 @@ export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, r
             into: out,
             on: root<O<ID>>().of('_id'),
             stages: true,
-            whenMatched: getWhenMatchedForMerge<Out, Out, never>('insert'),
+            whenMatched: getWhenMatchedForMerge<Out, Out, never>('insert', update),
             whenNotMatched: 'insert',
           }),
         ).stages
