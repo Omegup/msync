@@ -38,7 +38,7 @@ export const $lookupDelta = <
   N1 extends null = never,
   N2 extends null = never,
 >(
-  { field1, field2 }: { field1: Field<LQ, S | N>; field2: Field<RQ, S | N> },
+  { field1, field2 }: { field1: Field<LQ, S | N | Arr<S>>; field2: Field<RQ, S | N | Arr<S>> },
   { coll, exec, input }: TStages<RS, UBefore<RQ>, BRB, Before<RE>>,
   k1: AsLiteral<K1>,
   k2: AsLiteral<Exclude<KK2, BA | K1>>,
@@ -54,9 +54,9 @@ export const $lookupDelta = <
   const omit = omitRORec<KK2, BA, K1, Arr<RE>>()
   const hash = crypto.createHash('md5').update(coll.collectionName+str(input)+str(exec)).digest('base64url')
 
-  type ABIds = Rec<'aId' | 'bId', S>
+  type ABIds = Rec<'aId' | 'bId', S | Arr<S>>
   const ss = (f: BA) =>
-    to($ifNull(root<Delta<Rec<K1, LE>>>().of(f).of(k1).with(field1).expr(), val<S>(hash as S)))
+    to($ifNull(root<Delta<Rec<K1, LE>>>().of(f).of(k1).with(field1).expr(), val<S | S>(hash as S)))
   return link<Delta<LE>>()
     .with<unknown, Delta<Rec<K1, LE>>>(
       $replaceWithDelta<LE, Rec<K1, LE>>(field<RORec<K1, LE>, LE>(map1(k1, root<LE>().expr()))),

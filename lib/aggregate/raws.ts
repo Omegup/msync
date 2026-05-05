@@ -113,6 +113,7 @@ export const $simpleLookup1 =
   ): FRawStages<T, T, T & Rec<K, Arr<U>>, C, 1> =>
   f => {
     const { coll, k, vars, fields, ...etc } = args
+    const letVars = rawVars(vars, f<T>())
     return asStages([
       {
         $lookup: {
@@ -122,7 +123,7 @@ export const $simpleLookup1 =
             foreignField: root<R & O>().with(fields.foreign).str(),
           }),
           as: f<Rec<K, Arr<U>>>().of(k).str(),
-          let: rawVars(vars, f<T>()),
+          ...(Object.keys(letVars).length > 0 && { let: letVars }),
           ...etc,
         },
       },

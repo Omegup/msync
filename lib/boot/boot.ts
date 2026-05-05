@@ -445,7 +445,7 @@ const executes = <
     stages: c =>
       c<UDelta<T>, Before<T>>({
         coll: snapshotCollection,
-        input: $match_(hasBefore) as RawStages<unknown, UDelta<T>, Before<T>>,
+        input: $match_(hasBefore) as RawStages<unknown, UDelta<T>, Before<T> & UDelta<T>>,
         exec: asBefore(input.raw),
       }),
     out: run,

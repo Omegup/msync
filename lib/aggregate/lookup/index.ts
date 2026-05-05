@@ -7,6 +7,7 @@ import {
   type Rec,
   type doc,
   type notArr,
+  type Arr,
 } from '../../../types'
 import { mergeObjects } from '../../expression/array'
 import { fieldM } from '../../expression/concat'
@@ -169,8 +170,8 @@ const join = <
 }
 
 type Params<As extends string, LQ extends O, RQ extends O, RE extends RQ, S extends notArr> = {
-  localField: Field<LQ, S>
-  foreignField: Field<RQ, S>
+  localField: Field<LQ, S | Arr<S>>
+  foreignField: Field<RQ, S | Arr<S>>
   from: SnapshotStreamExecutionResult<RQ, RE>
   as: AsLiteral<As>
 }
@@ -182,8 +183,8 @@ type LookupParams<
   RE extends RQ,
   S extends notArr,
 > = {
-  lField: Field<LQ, S>
-  rField: Field<RQ, S>
+  lField: Field<LQ, S | Arr<S>>
+  rField: Field<RQ, S | Arr<S>>
   right: SnapshotStreamExecutionResult<RQ, RE>
   as: AsLiteral<As>
   left: SnapshotStreamExecutionResult<LQ, LE>

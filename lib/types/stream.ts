@@ -46,7 +46,7 @@ export type TStages<
   M extends number = number,
 > = {
   coll: ReadonlyCollection<S>
-  input: RawStages<unknown, S, B, unknown, M>
+  input: RawStages<unknown, S, S & B, unknown, M>
   exec: RawStages<Q, B, R, unknown, M>
 }
 export type Stages<out Q, out R extends Q, out SDom> = <E>(
