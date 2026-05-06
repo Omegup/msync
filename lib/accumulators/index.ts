@@ -77,6 +77,29 @@ export const $countDict = <D extends O, C = unknown>(
       }, a || {})
     },
   )
+export const $countDictArray = <D extends O, C = unknown>(
+  expr: Expr<Arr<string>, D, C>,
+): DeltaAccumulator<D, Rec<string, number>, C> =>
+  $accumulator<D, Rec<string, number>, C, [Arr<string>, boolean]>(
+    function () {
+      return {}
+    },
+    [sub(expr, root<Part<D>>().of('v')), root<Part<D>>().of('old').expr()],
+    function (a, keys, old) {
+      keys.forEach(k => {
+        const y = (a[k] || 0) + (old ? -1 : 1)
+        if (y) a[k] = y
+        else delete a[k]
+      })
+      return a
+    },
+    function (a, b) {
+      return Object.keys(b).reduce((a, k) => {
+        let y = (a[k] || 0) + b[k]
+        return y ? (a[k] = y) : delete a[k], a
+      }, a || {})
+    },
+  )
 export const $pushDict = <D extends O, V, C = unknown>(
   key: Expr<string, D, C>,
   value: Expr<V, D, C>,
