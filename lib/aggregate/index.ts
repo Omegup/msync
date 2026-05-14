@@ -1,3 +1,4 @@
+export { emptyDelta } from './prefix'
 export * from './group'
 export * from './lookup'
 export * from './match'

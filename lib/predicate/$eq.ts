@@ -1,5 +1,5 @@
 import type { Timestamp } from 'mongodb'
-import type { ArrHKT, ConstHKT, HKT, I, IdHKT, N, rawItem, RawObj, RConstHKT } from '../../types'
+import type { Arr, ArrHKT, ConstHKT, HKT, I, IdHKT, N, rawItem, RawObj, RConstHKT } from '../../types'
 import { operator } from './utils'
 
 const dualEq = operator<'$eq' | '$ne', ConstHKT<IdHKT<unknown>>, unknown>()
@@ -25,7 +25,7 @@ interface DictHKT<T> extends HKT<keyof T, unknown> {
 declare const unknown: unique symbol
 type MongoTypes = {
   number: number,
-  array: readonly rawItem[],
+  array: Arr<rawItem>,
   string: string,
   object: RawObj,
   [i: number]: unknown
