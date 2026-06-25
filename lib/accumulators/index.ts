@@ -119,6 +119,7 @@ export const $pushDict = <D extends O, V, C = unknown>(
       //@ts-ignore
       const equal = (a, b) => {
         if (!a || !b) return a === b
+        if (a instanceof Date) return b instanceof Date && a.getTime() === b.getTime()
         if ([a, b].some(a => Object.getPrototypeOf(a) != Object.prototype)) return a.valueOf() === b.valueOf()
         const keys = Object.keys(a)
         //@ts-ignore
