@@ -27,7 +27,6 @@ import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 import { streamNames } from './boot'
 import { actions, type Last, type Teardown, type TsData } from './boot-utils'
-import { prepare } from '../../test/mongodb'
 import { previous } from './first-stages'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
@@ -52,8 +51,6 @@ const executes = <
   else if (streamNames[streamName] != hash) throw new Error('streamName already used')
   type K = Allowed<KK>
   const { collection, projection, hardMatch: pre, match } = view
-  const client = prepare()
-  const pdb = client.then(cl => cl.db(collection.dbName))
 
   const removeNotYetSynchronizedFields: null | readonly Query<V>[] =
     projection &&
@@ -193,7 +190,7 @@ const executes = <
       const stream = await makeStream()
       // const currTime = await getCurrentTimestamp(db)
       const nextRes = stream.tryNext()
-      const aggResult = await aggregate<Result2>(pdb, streamName, c =>
+      const aggResult = await aggregate<Result2>(db, streamName, c =>
         c<V | Del, V | Del>({
           coll: collection,
           input: raw,

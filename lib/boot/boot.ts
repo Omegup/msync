@@ -35,7 +35,6 @@ import { makeWatchStream } from '../watch'
 import type { Allowed, AllowedPick, Last, Teardown, TsData } from './boot-utils'
 import { actions } from './boot-utils'
 import { getFirstStages } from './first-stages'
-import { prepare } from '../../test/mongodb'
 import { set, to } from '../update'
 
 export const streamNames: Record<string, string> = {}
@@ -55,9 +54,6 @@ const executes = <
   type T = AllowedPick<V, KK>
 
   const { collection, projection, match } = view
-
-  const client = prepare()
-  const pdb = client.then(cl => cl.db(collection.dbName))
 
   const { firstStages, hardMatch } = getFirstStages(view, needs)
 
@@ -295,7 +291,7 @@ const executes = <
 
       const stream = await makeStream()
 
-      const r = await aggregate<'out'>(pdb, streamName, c =>
+      const r = await aggregate<'out'>(db, streamName, c =>
         c({ coll: collection, input: cloneIntoNew }),
       )
       const start = Date.now()
@@ -328,7 +324,7 @@ const executes = <
         // log('updated docs', await snapshotCollection.find({ updated: true }).toArray())
         const nextRes = stream.tryNext()
         const aggResult = await aggregate<Result2>(
-          pdb,
+          db,
           streamName,
           c =>
             c<UDelta<T>, UDelta<T> & Delta<T>>({

@@ -4,7 +4,7 @@ import type { RawStages } from '../types'
 import { log } from '../utils/log'
 
 export const aggregate = <Result>(
-  db: Promise<Db>,
+  db: Db,
   streamName: string,
   input: <E>(
     consume: <S, B>(value: {
@@ -27,8 +27,7 @@ export const aggregate = <Result>(
     //   return state.f({ input: req }).then(() => new Promise(res => {}))
     // }
     const start2 = Date.now()
-    return db
-      .then(d => d.command(req))
+    return db.command(req)
       .then(
         result => {
           log('prepare', streamName, Date.now() - start)
