@@ -42,6 +42,4 @@ export type AsLiteral<T extends keyof any | boolean, V = NoUnion<T>> = T extends
     ? never
     : V
   : V
-type NoUnion<T, V = T> = T extends unknown ? ([V] extends [T] ? T : never) : never
-export type Literal<K> = string extends K ? never : K
-export type RemoveSignature<T> = { [K in keyof T as Literal<K>]: T[K] }
+type NoUnion<T, V = T> = T extends T ? ([V] extends [T] ? T : never) : never

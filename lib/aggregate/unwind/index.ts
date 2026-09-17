@@ -17,7 +17,7 @@ type TOf<TT, K extends string> = doc & Omit<TT, K>
 export const $unwind = <TT extends O, K extends s, U extends doc>(
   k: AsLiteral<K>,
   dict: RORec<K, 'key'> & RORec<'_id', 'id'>,
-  middle?: string,
+  middle = '.',
 ): DeltaStages<O, TOf<TT, K> & Rec<K, Arr<U>>, TOf<TT, K> & Rec<K, U>> => {
   type T = TOf<TT, K>
   return {

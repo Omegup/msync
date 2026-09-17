@@ -63,15 +63,15 @@ const join = <
   rightSnapshot: TStages<RS, Before<RQ>, BRB, Before<RE>>,
   stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE | Null>, Result>,
   outerLeft?: Null,
+  middle = '.'
 ): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
   const rightJoinField = { field1: lField, field2: rField }
-  // const joinId = lField.str() === '_id' ? 'right' : rField.str() === '_id' ? 'left' : false
-  const joinId = 'left'
+  const joinId = rField.str() === '_id' && 'left'
   const joinR_Snapshot: RawStages<
     Before<LQ | Q2>,
     Before<LE>,
     Before<LE & Rec<As, RE | Null> & ID>
-  > = asBefore($lookupRaw(rightJoinField, rightSnapshot, as, joinId, outerLeft))
+  > = asBefore($lookupRaw(rightJoinField, rightSnapshot, as, outerLeft, middle))
   const resultingSnapshot = concatTStages(leftSnapshot, joinR_Snapshot)
   const dict = { [as]: 'a' } as RORec<As, 'a'>
   const idB: RORec<'_id', 'b'> = { _id: 'b' }
@@ -87,7 +87,8 @@ const join = <
       type R = 'right'
       type LeftRight = Rec<L, LE> & Rec<R, RE | Null> & ID
       type JoinStages<RR> = RawStages<unknown, Delta<RR>, Delta<LeftRight>>
-      const joinL_Delta: JoinStages<RE> = $lookupDelta<RQ, RE, LQ, LE, BLB, LS, S, R, L, Null>(
+      const lookupLeft = $lookupDelta<RQ, RE, LQ, LE, BLB, LS, S, R, L, Null>
+      const joinL_Delta: JoinStages<RE> = lookupLeft(
         leftJoinField,
         leftSnapshot,
         'right',
@@ -95,30 +96,25 @@ const join = <
         joinId,
         outerLeft,
       )
-      const joinR_Delta: JoinStages<LE> = $lookupDelta<
-        LQ,
-        LE,
-        RQ,
-        RE,
-        BRB,
-        RS,
-        S,
-        L,
-        R,
-        never,
-        Null
-      >(rightJoinField, rightSnapshot, 'left', 'right', joinId, undefined, outerLeft)
-
-      type OuterLE = LE
+      const lookupRight = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, L, R, never, Null>
+      const joinR_Delta: JoinStages<LE> = lookupRight(
+        rightJoinField,
+        rightSnapshot,
+        'left',
+        'right',
+        joinId,
+        undefined,
+        outerLeft,
+      )
 
       const mergeForeignIntoDoc = concatStages<
         unknown,
         Delta<LeftRight>,
-        Delta<OuterLE & RORec<As, RE | Null>>,
+        Delta<LE & RORec<As, RE | Null>>,
         Delta<Result>,
         unknown
       >(
-        $replaceWithDelta<LeftRight, OuterLE & RORec<As, RE | Null>>(
+        $replaceWithDelta<LeftRight, LE & RORec<As, RE | Null>>(
           mergeObjects<LE, ID & RORec<As, RE | Null>, LeftRight>(
             root<LeftRight>().of('left').expr(),
             fieldM<RORec<As, 'a'> & RORec<'_id', 'b'>, { a: RE | Null; b: string }, LeftRight>(
@@ -134,7 +130,7 @@ const join = <
       const rRunnerInput = concatStages(joinL_Delta, mergeForeignIntoDoc)
       const getRunner = <Q, V extends Q, B, C>(
         f: SnapshotStreamExecutionResult<Q, V>,
-        stages: RawStages<unknown, Delta<V, BA, ID>, Delta<B>>,
+        stages: RawStages<unknown, Delta<V, BA>, Delta<B>>,
         final: StreamRunnerParam<Delta<B>, C>,
       ) =>
         f.out(

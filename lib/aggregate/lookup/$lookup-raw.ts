@@ -1,4 +1,5 @@
 import type { App, Arr, AsLiteral, HKT, ID, N, O, Rec, RORec } from '../../../types';
+import { $ifNull, concat, val } from '../../expression';
 import { root, type Field } from '../../field';
 import type { Before, RawStages, TStages, UBefore } from '../../types';
 import { set, to } from '../../update';
@@ -22,16 +23,19 @@ export const $lookupRaw =
     { field1, field2 }: { field1: Field<LQ, S | Arr<S>>; field2: Field<RQ, S | Arr<S>> },
     { coll, exec, input }: TStages<RS, Before<RQ>, BRB, Before<RE>>,
     k2: AsLiteral<As>,
-    k: 'left',
     includeNull?: Null,
+    middle = '.'
   ) =>
   <F extends HKT<O, O>>(
     f: <T extends O>() => Field<App<F, T>, T>,
   ): RawStages<App<F, LQ>, App<F, LE>, App<F, LE & Rec<As, RE> & ID>> => {
     type D = LE & Rec<As, RE | Null>
     const left = root<D>().of('_id').expr()
+    const right = root<D>().of<D, As>(k2).of<RE, '_id', Null>('_id').expr()
 
-    const idVal = to(left)
+    const isManyToOne = field2.str() === '_id'
+
+    const composedId = to($ifNull(concat(left, val(middle), right), left))
 
     return link<App<F, LE>>()
       .with<App<F, LE>, App<F, LE & Rec<As, Arr<RE>>>>(
@@ -48,8 +52,8 @@ export const $lookupRaw =
       )
       .with<App<F, LE>, App<F, D>>($unwind1<LE, As, RE, Null>(k2, includeNull)(f))
       .with<App<F, LE>, App<F, D>>(
-        k === 'left'
+        isManyToOne
           ? link<App<F, D>>().stages
-          : $set1(set<RORec<'_id', string>>()<D, D>({ _id: ['_id', idVal] }))(f),
+          : $set1(set<RORec<'_id', string>>()<D, D>({ _id: ['_id', composedId] }))(f),
       ).stages
   }
