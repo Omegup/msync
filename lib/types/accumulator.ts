@@ -38,7 +38,7 @@ export type Accumulator<in Doc, out T, in Ctx = unknown> = {
     ): AccumulatorRaw<T | I, DeltaD, Ctx>
   }
 }
-export type Part<Doc> = Rec<'v', Doc> & RORec<'old', boolean>
+export type Part<Doc> = Rec<'v', Doc> & RORec<'old', boolean> & { readonly deleted?: true | N }
 
 export type DeltaAccumulator<in out Doc, in out T, in out Ctx = unknown> = {
   group: Accumulator<Part<Doc>, T, Ctx>

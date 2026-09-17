@@ -112,7 +112,9 @@ export type SimpleStream<in out Q extends O, out T extends Q> = <Q2 extends O, R
 
 export type BA = 'before' | 'after'
 export type PreDelta<T, K extends BA = BA, E = unknown> = Rec<K, T> & E
-export type Delta<T, K extends BA = BA, E = ID> = PreDelta<T | null, K, E>
+export type DeletedFlags = O<{ readonly before?: true; readonly after?: true }>
+export type Deleted = { readonly deleted?: DeletedFlags }
+export type Delta<T, K extends BA = BA, E = ID & Deleted> = PreDelta<T | null, K, E>
 export type Before<T> = PreDelta<T, 'before'>
 export type After<T> = Delta<T, 'after'>
 export type UBefore<T> = O & Partial<Delta<T | null, 'before'>>

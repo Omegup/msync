@@ -16,9 +16,13 @@ export const $sum = <D extends O, C = unknown>(
 ): DeltaAccumulator<D, number, C> => ({
   group: $sum_(
     ite(
-      root<Part<D>>().of('old').expr(),
-      subtract(val(0), $ifNull(sub(expr, root<Part<D>>().of('v')), val(0))),
-      sub(expr, root<Part<D>>().of('v')),
+      root<Part<D>>().of('deleted').expr(),
+      val(0),
+      ite(
+        root<Part<D>>().of('old').expr(),
+        subtract(val(0), $ifNull(sub(expr, root<Part<D>>().of('v')), val(0))),
+        sub(expr, root<Part<D>>().of('v')),
+      ),
     ),
   ),
   merge: (x, y) => add($ifNull(x, val(0)), y),
@@ -61,12 +65,17 @@ export const $accumulator = <D, T, Ctx, A extends readonly unknown[]>(
 export const $countDict = <D extends O, C = unknown>(
   expr: Expr<string, D, C>,
 ): DeltaAccumulator<D, Rec<string, number>, C> =>
-  $accumulator<D, Rec<string, number>, C, [string, boolean]>(
+  $accumulator<D, Rec<string, number>, C, [string, boolean, true | N]>(
     function () {
       return {}
     },
-    [sub(expr, root<Part<D>>().of('v')), root<Part<D>>().of('old').expr()],
-    function (a, k, old) {
+    [
+      sub(expr, root<Part<D>>().of('v')),
+      root<Part<D>>().of('old').expr(),
+      root<Part<D>>().of('deleted').expr(),
+    ],
+    function (a, k, old, deleted) {
+      if (deleted) return a
       let y = (a[k] || 0) + (old ? -1 : 1)
       return y ? (a[k] = y) : delete a[k], a
     },
@@ -80,12 +89,17 @@ export const $countDict = <D extends O, C = unknown>(
 export const $countDictArray = <D extends O, C = unknown>(
   expr: Expr<Arr<string>, D, C>,
 ): DeltaAccumulator<D, Rec<string, number>, C> =>
-  $accumulator<D, Rec<string, number>, C, [Arr<string>, boolean]>(
+  $accumulator<D, Rec<string, number>, C, [Arr<string>, boolean, true | N]>(
     function () {
       return {}
     },
-    [sub(expr, root<Part<D>>().of('v')), root<Part<D>>().of('old').expr()],
-    function (a, keys, old) {
+    [
+      sub(expr, root<Part<D>>().of('v')),
+      root<Part<D>>().of('old').expr(),
+      root<Part<D>>().of('deleted').expr(),
+    ],
+    function (a, keys, old, deleted) {
+      if (deleted) return a
       keys.forEach(k => {
         const y = (a[k] || 0) + (old ? -1 : 1)
         if (y) a[k] = y
@@ -105,7 +119,7 @@ export const $pushDict = <D extends O, V, C = unknown>(
   value: Expr<V, D, C>,
 ) =>
   // '1' => 'old'
-  $accumulator<D, Rec<string, Rec<'1' | '0', Arr<V>>>, C, [string, V, boolean]>(
+  $accumulator<D, Rec<string, Rec<'1' | '0', Arr<V>>>, C, [string, V, boolean, true | N]>(
     function () {
       return {}
     },
@@ -113,8 +127,10 @@ export const $pushDict = <D extends O, V, C = unknown>(
       sub(key, root<Part<D>>().of('v')),
       sub(value, root<Part<D>>().of('v')),
       root<Part<D>>().of('old').expr(),
+      root<Part<D>>().of('deleted').expr(),
     ],
-    function (ra, k, v, old) {
+    function (ra, k, v, old, deleted) {
+      if (deleted) return ra
       let a = { ...ra }
       //@ts-ignore
       const equal = (a, b) => {

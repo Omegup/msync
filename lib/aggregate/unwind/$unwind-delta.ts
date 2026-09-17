@@ -19,11 +19,12 @@ import {
   ne,
   nil,
   not,
+  or,
   val,
 } from '../../expression'
 import { ctx, Field, root } from '../../field'
 import { $expr } from '../../predicate'
-import type { BA, Delta, Expr, PreDelta, RawStages } from '../../types'
+import type { BA, Deleted, DeletedFlags, Delta, Expr, PreDelta, RawStages } from '../../types'
 import { $match_, $replaceWith_, $unwind_ } from '../mongo-stages'
 import { link } from '../prefix'
 import { map1 } from '../../utils/json'
@@ -169,6 +170,7 @@ export const $unwindDelta = <
     oldDeltas,
     newItems,
     unpad,
+    isPad,
     join,
   }: {
     oldDeltas: Expr<Arr<K2Delta<Pad>>, In>
@@ -177,6 +179,9 @@ export const $unwindDelta = <
       k2: Expr<U | Pad | null, App<F, U | Pad | null>>,
       keep: Expr<U | null, App<F, U | null>>,
     ) => Expr<U | null, App<F, U | Pad | null>>
+    isPad: <F extends HKT<U | Pad | null>>(
+      k2: Expr<U | Pad | null, App<F, U | Pad | null>>,
+    ) => Expr<boolean, App<F, U | Pad | null>>
     join: (parts: {
       k1: Expr<T | null, Unwound<Pad>>
       k2: Expr<U | null, Unwound<Pad>>
@@ -318,21 +323,46 @@ export const $unwindDelta = <
       ),
     )
 
+    const padded = (side: BA): Expr<boolean, Doc> => isPad<UnwoundK2<Pad>>(k2Raw(side))
+    const emptyObj: Expr<O<{}>, Doc> = field<{}, Doc>({})
+    const deletedFlags: Expr<DeletedFlags, Doc> = mergeObjects<
+      Rec<'before', true> | O<{}>,
+      Rec<'after', true> | O<{}>,
+      Doc
+    >(
+      ite<Rec<'before', true> | O<{}>, Doc>(
+        padded('before'),
+        field<RORec<'before', true>, Doc>({ before: ['before', val<true>(true)] }),
+        emptyObj,
+      ),
+      ite<Rec<'after', true> | O<{}>, Doc>(
+        padded('after'),
+        field<RORec<'after', true>, Doc>({ after: ['after', val<true>(true)] }),
+        emptyObj,
+      ),
+    )
+    type JoinCore = Rec<BA, Join | null> & ID
+    const joinDelta = (joinAt: (side: BA) => Expr<Join | null, Doc>): Expr<Delta<Join>, Doc> =>
+      mergeObjects<JoinCore, Deleted | O<{}>, Doc>(
+        field<JoinCore, Doc>({
+          _id: ['_id', parentId],
+          before: ['before', joinAt('before')],
+          after: ['after', joinAt('after')],
+        }),
+        ite<Deleted | O<{}>, Doc>(
+          or<Doc>(padded('before'), padded('after')),
+          field<Deleted, Doc>({ deleted: ['deleted', deletedFlags] }),
+          emptyObj,
+        ),
+      )
+
     const pipeline = (joinAt: (side: BA) => Expr<Join | null, Doc>): Out =>
       link<In>()
         .with<unknown, PreUnwind>(
           $replaceWith_<In, PreUnwind>(mergeObjects<In, Deltas, In>(src.expr(), deltas)),
         )
         .with<unknown, Doc>($unwind_<In & Rec<K1, K1Delta>, K2, Delta2>(k2))
-        .with<unknown, Delta<Join>>(
-          $replaceWith_<Doc, Delta<Join>>(
-            field<Delta<Join>, Doc>({
-              _id: ['_id', parentId],
-              before: ['before', joinAt('before')],
-              after: ['after', joinAt('after')],
-            }),
-          ),
-        )
+        .with<unknown, Delta<Join>>($replaceWith_<Doc, Delta<Join>>(joinDelta(joinAt)))
         .with<unknown, Delta<Join>>(k === false ? liftRowId : link<Delta<Join>>().stages)
         .with<unknown, Delta<Join>>(
           $match_<O, Delta<Join>>(
@@ -359,6 +389,9 @@ export const $unwindDelta = <
   const noUnpad = <F extends HKT<U | null>>(
     k2: Expr<U | null, App<F, U | null>>,
   ): Expr<U | null, App<F, U | null>> => k2
+  const noPad = <F extends HKT<U | null>>(
+    _k2: Expr<U | null, App<F, U | null>>,
+  ): Expr<boolean, App<F, U | null>> => val(false)
 
   if (includeNull2 === null) {
     const padObj: Expr<O<{}>, In> = field<{}, In>({})
@@ -395,6 +428,14 @@ export const $unwindDelta = <
           nil,
           keep,
         ),
+      isPad: <F extends HKT<U | O | null>>(
+        k2: Expr<U | O | null, App<F, U | O | null>>,
+      ): Expr<boolean, App<F, U | O | null>> =>
+        ite<boolean, O, U | null, F>(
+          eqTyped<O, U | null, F, unknown, U | O | null>(k2, field<O, App<F, U | O | null>>({})),
+          val(true),
+          val(false),
+        ),
     }
     if (includeNull1 === null) {
       return unwindJoin<O>({
@@ -415,6 +456,7 @@ export const $unwindDelta = <
       oldDeltas,
       newItems,
       unpad: noUnpad,
+      isPad: noPad,
       join: ({ k2, rowK2 }): Expr<Join | null, Unwound<never>> =>
         orNil<U, Join, UnwoundK2<never>>(k2, rowK2),
     })
@@ -424,6 +466,7 @@ export const $unwindDelta = <
     oldDeltas,
     newItems,
     unpad: noUnpad,
+    isPad: noPad,
     join: ({ k1, k2AtK1, rowK1K2 }): Expr<Join | null, Unwound<never>> =>
       orNil<T, Join | null, UnwoundK1<never>>(
         k1,
