@@ -1,6 +1,5 @@
 import type { App, Arr, AsLiteral, HKT, I, ID, Rec, RORec, doc, O } from '../../../types'
 import {
-  $getField,
   $ifNull,
   $map0,
   $map1,
@@ -63,7 +62,9 @@ const orNil = <T, V, F extends HKT<null | T>, C = unknown>(
  *    A tuple is concat order + separator; pairing still matches by k2 `_id`.
  * 2. If outer `k2`, pad empty arrays with `{}` so `$unwind` still emits a row.
  * 3. Attach `{ [k1]: Δ(T|null), [k2]: Δ(U|{}|null)[] }` and `$unwind` `k2`.
- * 4. Rebuild each before/after as a join row, or null if an inner side is missing.
+ * 4. Rebuild each before/after. Missing non-pad sides are the whole side null
+ *    (no `parentId` fallback). A k2-pad row’s `_id` is `k1._id`; a k1-pad
+ *    row’s `_id` is `k2._id`; a complete row’s `_id` is `k`.
  * 5. Drop rows whose before and after are equal.
  */
 export const $unwindDelta = <
@@ -106,6 +107,14 @@ export const $unwindDelta = <
   /** `UnwoundK2` after `k1` has already been narrowed to `T`. */
   interface UnwoundK1K2<Pad> extends HKT<U | Pad | null> {
     readonly out: In & Pair<PreDelta<T>, PreDelta<I<U | Pad | null, this>>>
+  }
+  /** `k2` already present (`U`); `k1` still `T | null`. */
+  interface UnwoundK2ThenK1 extends HKT<T | null> {
+    readonly out: In & Pair<PreDelta<I<T | null, this>>, PreDelta<U>>
+  }
+  /** k2-pad (`{}`); `k1` still `T | null`. */
+  interface UnwoundK2PadThenK1 extends HKT<T | null> {
+    readonly out: In & Pair<PreDelta<I<T | null, this>>, PreDelta<O>>
   }
 
   const emptyArr: Expr<Arr<U>, In> = array<U, In>()
@@ -209,17 +218,29 @@ export const $unwindDelta = <
     join: (parts: {
       k1: Expr<T | null, Unwound<Pad>>
       k2: Expr<U | null, Unwound<Pad>>
-      row: Expr<Row<T | null, U | null>, Unwound<Pad>>
-      rowK1: Expr<Row<T, U | null>, App<UnwoundK1<Pad>, T>>
-      rowK2: Expr<Row<T | null, U>, App<UnwoundK2<Pad>, U>>
-      rowK1K2: Expr<Row<T, U>, App<UnwoundK1K2<Pad>, U>>
-      k2AtK1: Expr<U | null, App<UnwoundK1<Pad>, T>>
+      rowK1K2: Expr<Row<T, U>, In & Pair<PreDelta<T>, PreDelta<U>>>
+      k2PadRow: Expr<Row<T, null>, In & Pair<PreDelta<T>, PreDelta<Pad>>>
+      k1PadRow: Expr<Row<null, U>, In & Pair<PreDelta<null>, PreDelta<U>>>
+      k2RawK1: Expr<U | Pad | null, In & Pair<PreDelta<T>, K2Delta<Pad>>>
+      k2KeepK1K2: Expr<U | null, In & Pair<PreDelta<T>, PreDelta<U | null>>>
+      k1AtK2: Expr<T | null, In & Pair<K1Delta, PreDelta<U>>>
+      k2Raw: Expr<U | Pad | null, Unwound<Pad>>
+      k2Keep: Expr<U | null, In & Pair<K1Delta, PreDelta<U | null>>>
+      k1AtK2Pad: Expr<T | null, In & Pair<K1Delta, PreDelta<Pad>>>
     }) => Expr<Join | null, Unwound<Pad>>
   }): Out => {
     type Delta2 = K2Delta<Pad>
     type Deltas = Pair<K1Delta, Arr<Delta2>>
     type PreUnwind = In & Deltas
     type Doc = Unwound<Pad>
+    type K1T = In & Pair<PreDelta<T>, K2Delta<Pad>>
+    type K2U = In & Pair<K1Delta, PreDelta<U>>
+    type Both = In & Pair<PreDelta<T>, PreDelta<U>>
+    type K2UNull = In & Pair<K1Delta, PreDelta<U | null>>
+    type K1T_K2UNull = In & Pair<PreDelta<T>, PreDelta<U | null>>
+    type K2PadDoc = In & Pair<K1Delta, PreDelta<Pad>>
+    type K1T_K2Pad = In & Pair<PreDelta<T>, PreDelta<Pad>>
+    type K1Null_K2U = In & Pair<PreDelta<null>, PreDelta<U>>
 
     const newDeltas: Expr<Arr<Delta2>, In> = $map0<'a', U | Pad, Delta2, In, unknown>({
       input: newItems,
@@ -243,18 +264,10 @@ export const $unwindDelta = <
     const k2Raw = (side: BA): Expr<U | Pad | null, Doc> =>
       doc.of<Doc, K2>(k2).of<Delta2, BA>(side).expr()
 
-    const docK2Null: Field<App<UnwoundK2<Pad>, U | null>, App<UnwoundK2<Pad>, U | null>> = root<
-      App<UnwoundK2<Pad>, U | null>
-    >()
-    const k2Keep = (side: BA): Expr<U | null, App<UnwoundK2<Pad>, U | null>> =>
-      docK2Null.of<App<UnwoundK2<Pad>, U | null>, K2>(k2).of<PreDelta<U | null>, BA>(side).expr()
+    const docK2Null: Field<K2UNull, K2UNull> = root<K2UNull>()
+    const k2Keep = (side: BA): Expr<U | null, K2UNull> =>
+      docK2Null.of<K2UNull, K2>(k2).of<PreDelta<U | null>, BA>(side).expr()
     const k2At = (side: BA): Expr<U | null, Doc> => unpad<UnwoundK2<Pad>>(k2Raw(side), k2Keep(side))
-
-    const k1Id = (side: BA): Expr<s | null, Doc> =>
-      doc.of<Doc, K1>(k1).of<K1Delta, BA>(side).of<T, '_id', null>('_id').expr()
-    const k2Id = (side: BA): Expr<s | null, Doc> => $getField<U, '_id', Doc>(k2At(side), '_id')
-    const idAt = (key: K1 | K2, side: BA): Expr<s | null, Doc> =>
-      key === k1 ? k1Id(side) : k2Id(side)
 
     const rowOf = <A, B, D>(id: Expr<s, D>, a: Expr<A, D>, b: Expr<B, D>): Expr<Row<A, B>, D> =>
       mergeObjects<ID & Rec<K1, A>, Rec<K2, B>, D>(
@@ -265,57 +278,47 @@ export const $unwindDelta = <
         field<RORec<K2, B>, D>(map1(k2, b)),
       )
 
-    // Scalar `k`: that side’s `_id`. Tuple: concat in the given order.
-    // If the chosen `_id` is null, fall back to parentId (the pre-unwind stream key).
-    const rowId = (side: BA): Expr<s, Doc> =>
-      typeof k === 'string'
-        ? $ifNull<s, Doc, unknown>(idAt(k, side), parentId)
-        : $ifNull<s, Doc, unknown>(
-            concat<Doc, unknown>(idAt(k[0], side), val<s>(k[1]), idAt(k[2], side)),
-            $ifNull<s, Doc, unknown>(idAt(k[0], side), parentId),
-          )
-
-    const row = (side: BA): Expr<Row<T | null, U | null>, Doc> =>
-      rowOf<T | null, U | null, Doc>(rowId(side), k1At(side), k2At(side))
-
-    // Same row at a root where a side is already known present, so `orNil`'s
-    // `keep` is typed at `App<F, T>` rather than `App<F, T | null>`.
-
-    const docK1: Field<App<UnwoundK1<Pad>, T>, App<UnwoundK1<Pad>, T>> = root<
-      App<UnwoundK1<Pad>, T>
-    >()
-    const k1AtK1 = (side: BA): Expr<T, App<UnwoundK1<Pad>, T>> =>
-      docK1.of<App<UnwoundK1<Pad>, T>, K1>(k1).of<PreDelta<T>, BA>(side).expr()
-    const k2AtK1 = (side: BA): Expr<U | null, App<UnwoundK1<Pad>, T>> => {
-      type D = App<UnwoundK1K2<Pad>, U | null>
-      const docK1K2Null: Field<D, D> = root<D>()
-      return unpad<UnwoundK1K2<Pad>>(
-        docK1.of<App<UnwoundK1<Pad>, T>, K2>(k2).of<PreDelta<U | Pad | null>, BA>(side).expr(),
-        docK1K2Null.of<D, K2>(k2).of<PreDelta<U | null>, BA>(side).expr(),
-      )
+    const docK1: Field<K1T, K1T> = root<K1T>()
+    const k2RawK1 = (side: BA): Expr<U | Pad | null, K1T> =>
+      docK1.of<K1T, K2>(k2).of<K2Delta<Pad>, BA>(side).expr()
+    const k2KeepK1K2 = (side: BA): Expr<U | null, K1T_K2UNull> =>
+      root<K1T_K2UNull>().of<K1T_K2UNull, K2>(k2).of<PreDelta<U | null>, BA>(side).expr()
+    const k2PadRow = (side: BA): Expr<Row<T, null>, K1T_K2Pad> => {
+      const r: Field<K1T_K2Pad, K1T_K2Pad> = root<K1T_K2Pad>()
+      const t = r.of<K1T_K2Pad, K1>(k1).of<PreDelta<T>, BA>(side)
+      return rowOf<T, null, K1T_K2Pad>(t.of<T, '_id'>('_id').expr(), t.expr(), nil)
     }
-    const rowK1 = (side: BA): Expr<Row<T, U | null>, App<UnwoundK1<Pad>, T>> =>
-      rowOf<T, U | null, App<UnwoundK1<Pad>, T>>(rowId(side), k1AtK1(side), k2AtK1(side))
 
-    const docK2: Field<App<UnwoundK2<Pad>, U>, App<UnwoundK2<Pad>, U>> = root<
-      App<UnwoundK2<Pad>, U>
-    >()
-    const k1AtK2 = (side: BA): Expr<T | null, App<UnwoundK2<Pad>, U>> =>
-      docK2.of<App<UnwoundK2<Pad>, U>, K1>(k1).of<K1Delta, BA>(side).expr()
-    const k2AtK2 = (side: BA): Expr<U, App<UnwoundK2<Pad>, U>> =>
-      docK2.of<App<UnwoundK2<Pad>, U>, K2>(k2).of<PreDelta<U>, BA>(side).expr()
-    const rowK2 = (side: BA): Expr<Row<T | null, U>, App<UnwoundK2<Pad>, U>> =>
-      rowOf<T | null, U, App<UnwoundK2<Pad>, U>>(rowId(side), k1AtK2(side), k2AtK2(side))
+    const docK2: Field<K2U, K2U> = root<K2U>()
+    const k1AtK2 = (side: BA): Expr<T | null, K2U> =>
+      docK2.of<K2U, K1>(k1).of<K1Delta, BA>(side).expr()
+    const k1AtK2Pad = (side: BA): Expr<T | null, K2PadDoc> =>
+      root<K2PadDoc>().of<K2PadDoc, K1>(k1).of<K1Delta, BA>(side).expr()
 
-    const docK1K2: Field<App<UnwoundK1K2<Pad>, U>, App<UnwoundK1K2<Pad>, U>> = root<
-      App<UnwoundK1K2<Pad>, U>
-    >()
-    const k1AtK1K2 = (side: BA): Expr<T, App<UnwoundK1K2<Pad>, U>> =>
-      docK1K2.of<App<UnwoundK1K2<Pad>, U>, K1>(k1).of<PreDelta<T>, BA>(side).expr()
-    const k2AtK1K2 = (side: BA): Expr<U, App<UnwoundK1K2<Pad>, U>> =>
-      docK1K2.of<App<UnwoundK1K2<Pad>, U>, K2>(k2).of<PreDelta<U>, BA>(side).expr()
-    const rowK1K2 = (side: BA): Expr<Row<T, U>, App<UnwoundK1K2<Pad>, U>> =>
-      rowOf<T, U, App<UnwoundK1K2<Pad>, U>>(rowId(side), k1AtK1K2(side), k2AtK1K2(side))
+    const k1PadRow = (side: BA): Expr<Row<null, U>, K1Null_K2U> => {
+      const r: Field<K1Null_K2U, K1Null_K2U> = root<K1Null_K2U>()
+      const u = r.of<K1Null_K2U, K2>(k2).of<PreDelta<U>, BA>(side)
+      return rowOf<null, U, K1Null_K2U>(u.of<U, '_id'>('_id').expr(), nil, u.expr())
+    }
+
+    const docK1K2: Field<Both, Both> = root<Both>()
+    const k1AtK1K2 = (side: BA): Expr<T, Both> =>
+      docK1K2.of<Both, K1>(k1).of<PreDelta<T>, BA>(side).expr()
+    const k2AtK1K2 = (side: BA): Expr<U, Both> =>
+      docK1K2.of<Both, K2>(k2).of<PreDelta<U>, BA>(side).expr()
+    const k1IdK1K2 = (side: BA): Expr<s, Both> =>
+      docK1K2.of<Both, K1>(k1).of<PreDelta<T>, BA>(side).of<T, '_id'>('_id').expr()
+    const k2IdK1K2 = (side: BA): Expr<s, Both> =>
+      docK1K2.of<Both, K2>(k2).of<PreDelta<U>, BA>(side).of<U, '_id'>('_id').expr()
+    const idAtK1K2 = (key: K1 | K2, side: BA): Expr<s, Both> =>
+      key === k1 ? k1IdK1K2(side) : k2IdK1K2(side)
+    const completeId = (side: BA): Expr<s, Both> => {
+      if (k === k1) return k1IdK1K2(side)
+      if (typeof k === 'string') return k2IdK1K2(side)
+      return concat<Both, unknown>(idAtK1K2(k[0], side), val<s>(k[1]), idAtK1K2(k[2], side))
+    }
+    const rowK1K2 = (side: BA): Expr<Row<T, U>, Both> =>
+      rowOf<T, U, Both>(completeId(side), k1AtK1K2(side), k2AtK1K2(side))
 
     const outJoin = (side: BA): Expr<Join | null, Delta<Join>> =>
       root<Delta<Join>>().of<Delta<Join>, BA, null>(side).expr()
@@ -386,7 +389,7 @@ export const $unwindDelta = <
         )
         .with<unknown, Doc>($unwind_<In & Rec<K1, K1Delta>, K2, Delta2>(k2))
         .with<unknown, Delta<Join>>($replaceWith_<Doc, Delta<Join>>(joinDelta(joinAt)))
-        .with<unknown, Delta<Join>>(k !== k1 ? liftRowId : link<Delta<Join>>().stages)
+        .with<unknown, Delta<Join>>(liftRowId)
         .with<unknown, Delta<Join>>(
           $match_<O, Delta<Join>>(
             $expr<Delta<Join>, unknown>(
@@ -400,11 +403,15 @@ export const $unwindDelta = <
         join({
           k1: k1At(side),
           k2: k2At(side),
-          row: row(side),
-          rowK1: rowK1(side),
-          rowK2: rowK2(side),
           rowK1K2: rowK1K2(side),
-          k2AtK1: k2AtK1(side),
+          k2PadRow: k2PadRow(side),
+          k1PadRow: k1PadRow(side),
+          k2RawK1: k2RawK1(side),
+          k2KeepK1K2: k2KeepK1K2(side),
+          k1AtK2: k1AtK2(side),
+          k2Raw: k2Raw(side),
+          k2Keep: k2Keep(side),
+          k1AtK2Pad: k1AtK2Pad(side),
         }),
     )
   }
@@ -469,33 +476,84 @@ export const $unwindDelta = <
     if (includeNull1 === null) {
       const eq1 = literalsEqaul<null, N1>(includeNull1)
       const eq2 = literalsEqaul<null, N2>(includeNull2)
-      interface RowN1HKT extends HKT<null> {
-        readonly out: Expr<Row<T | I<null, this>, U | null>, Unwound<O>>
+      interface JoinN1HKT extends HKT<null> {
+        readonly out: Expr<Row<T | I<null, this>, U | null> | null, Unwound<O>>
       }
-      interface RowN2HKT extends HKT<null> {
-        readonly out: Expr<Row<T | N1, U | I<null, this>>, Unwound<O>>
+      interface JoinN2HKT extends HKT<null> {
+        readonly out: Expr<Row<T | N1, U | I<null, this>> | null, Unwound<O>>
       }
       return unwindJoin<O>({
         ...padded,
-        join: ({ row }): Expr<Join | null, Unwound<O>> =>
-          eq2.forward<RowN2HKT>(eq1.forward<RowN1HKT>(row)),
+        join: ({
+          k2Raw,
+          k2Keep,
+          k1AtK2Pad,
+          k1AtK2,
+          k2PadRow,
+          k1PadRow,
+          rowK1K2,
+        }): Expr<Join | null, Unwound<O>> =>
+          eq2.forward<JoinN2HKT>(
+            eq1.forward<JoinN1HKT>(
+              ite<Row<T | null, U | null> | null, O, U | null, UnwoundK2<O>>(
+                eqTyped<O, U | null, UnwoundK2<O>, unknown, U | O | null>(
+                  k2Raw,
+                  field<O, Unwound<O>>({}),
+                ),
+                orNil<T, Row<T, null>, UnwoundK2PadThenK1>(k1AtK2Pad, k2PadRow),
+                orNil<U, Row<T | null, U>, UnwoundK2<O>>(
+                  k2Keep,
+                  ite<Row<T | null, U>, null, T, UnwoundK2ThenK1>(
+                    eqTyped<null, T, UnwoundK2ThenK1, unknown, T | null>(k1AtK2, nil),
+                    k1PadRow,
+                    rowK1K2,
+                  ),
+                ),
+              ),
+            ),
+          ),
       })
     }
     return unwindJoin<O>({
       ...padded,
-      join: ({ k1, rowK1 }): Expr<Join | null, Unwound<O>> =>
-        orNil<T, Join, UnwoundK1<O>>(k1, rowK1),
+      join: ({ k1, rowK1K2, k2RawK1, k2KeepK1K2, k2PadRow }): Expr<Join | null, Unwound<O>> =>
+        orNil<T, Join | null, UnwoundK1<O>>(
+          k1,
+          ite<Join | null, O, U | null, UnwoundK1K2<O>>(
+            eqTyped<O, U | null, UnwoundK1K2<O>, unknown, U | O | null>(
+              k2RawK1,
+              field<O, In & Pair<PreDelta<T>, K2Delta<O>>>({}),
+            ),
+            k2PadRow,
+            orNil<U, Join, UnwoundK1K2<O>>(k2KeepK1K2, rowK1K2),
+          ),
+        ),
     })
   }
 
   if (includeNull1 === null) {
+    const eq1 = literalsEqaul<null, N1>(includeNull1)
     return unwindJoin<never>({
       oldDeltas,
       newItems,
       unpad: noUnpad,
       isPad: noPad,
-      join: ({ k2, rowK2 }): Expr<Join | null, Unwound<never>> =>
-        orNil<U, Join, UnwoundK2<never>>(k2, rowK2),
+      join: ({ k2, rowK1K2, k1AtK2, k1PadRow }): Expr<Join | null, Unwound<never>> => {
+        interface CompleteN1HKT extends HKT<null> {
+          readonly out: Expr<Row<T | I<null, this>, U>, In & Pair<PreDelta<T>, PreDelta<U>>>
+        }
+        interface Pad1N1HKT extends HKT<null> {
+          readonly out: Expr<Row<I<null, this>, U>, In & Pair<PreDelta<null>, PreDelta<U>>>
+        }
+        return orNil<U, Join, UnwoundK2<never>>(
+          k2,
+          ite<Join, null, T, UnwoundK2ThenK1>(
+            eqTyped<null, T, UnwoundK2ThenK1, unknown, T | null>(k1AtK2, nil),
+            eq1.forward<Pad1N1HKT>(k1PadRow),
+            eq1.forward<CompleteN1HKT>(rowK1K2),
+          ),
+        )
+      },
     })
   }
 
@@ -504,10 +562,10 @@ export const $unwindDelta = <
     newItems,
     unpad: noUnpad,
     isPad: noPad,
-    join: ({ k1, k2AtK1, rowK1K2 }): Expr<Join | null, Unwound<never>> =>
+    join: ({ k1, k2KeepK1K2, rowK1K2 }): Expr<Join | null, Unwound<never>> =>
       orNil<T, Join | null, UnwoundK1<never>>(
         k1,
-        orNil<U, Join, UnwoundK1K2<never>>(k2AtK1, rowK1K2),
+        orNil<U, Join, UnwoundK1K2<never>>(k2KeepK1K2, rowK1K2),
       ),
   })
 }
