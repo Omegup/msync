@@ -8,7 +8,7 @@ import { link } from '../prefix'
 import { $replaceWithDelta } from '../set/$set-delta'
 import { $unwindDelta } from './$unwind-delta'
 
-export { $unwindDelta } from './$unwind-delta'
+export { $unwindDelta, type JoinId } from './$unwind-delta'
 type s = string
 
 type LR<T, U> = doc & { readonly left: T; readonly right: U }
@@ -35,8 +35,7 @@ export const $unwind = <TT extends O, K extends s, U extends doc>(
         $unwindDelta<'left', T & Rec<K, Arr<U>>, 'right', U>(
           'left',
           'right',
-          false,
-          middle,
+          ['left', middle, 'right'],
         ),
       )
       .with<unknown, Delta<T & Rec<K, U>>>(

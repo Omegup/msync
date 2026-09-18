@@ -13,7 +13,7 @@ import { link } from '../prefix'
 import { canonicalize as str } from 'json-canonicalize'
 import { $replaceWithEach, $replaceWithEach1 } from '../set/$replace-with-each'
 import { $replaceWithDelta } from '../set/$set-delta'
-import { $unwindDelta } from '../unwind'
+import { $unwindDelta, type JoinId } from '../unwind'
 
 type s = string
 type Both<
@@ -45,10 +45,9 @@ export const $lookupDelta = <
   k:
     | ([N1] extends [never] ? K1 : never)
     | ([N2] extends [never] ? Exclude<KK2, BA | K1> : never)
-    | false,
+    | Exclude<JoinId<K1, Exclude<KK2, BA | K1>>, K1 | Exclude<KK2, BA | K1>>,
   includeNull1?: N1,
   includeNull2?: N2,
-  middle = '.'
 ): RawStages<unknown, Delta<LE>, Both<K1, LE, KK2, RE, N1, N2>> => {
   type K2 = Exclude<KK2, BA | K1>
   type BU = Before<RE>
@@ -158,6 +157,6 @@ export const $lookupDelta = <
         : link<Delta<Rec<K1, LE> & Rec<K2, Arr<RE>>>>().stages,
     )
     .with<unknown, Delta<Rec<K1, LE | N1> & Rec<K2, RE | N2> & ID>>(
-      $unwindDelta<K1, LE, K2, RE, N1, N2>(k1, k2, k, middle, false, includeNull1, includeNull2),
+      $unwindDelta<K1, LE, K2, RE, N1, N2>(k1, k2, k, includeNull1, includeNull2),
     ).stages
 }

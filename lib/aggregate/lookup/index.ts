@@ -66,7 +66,7 @@ const join = <
   middle = '.'
 ): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
   const rightJoinField = { field1: lField, field2: rField }
-  const joinId = rField.str() === '_id' && 'left'
+  const joinId = rField.str() === '_id' ? 'left' : (['left', middle, 'right'] as const)
   const joinR_Snapshot: RawStages<
     Before<LQ | Q2>,
     Before<LE>,

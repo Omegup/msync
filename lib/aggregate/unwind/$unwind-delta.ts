@@ -32,6 +32,13 @@ import { literalsEqaul } from '../../utils/guard'
 
 type s = string
 
+/** Identity of an unwound join row: one side’s `_id`, or a concat of both. */
+export type JoinId<K1 extends s, K2 extends s> =
+  | K1
+  | K2
+  | readonly [K1, middle: s, K2]
+  | readonly [K2, middle: s, K1]
+
 /**
  * If `probe` is null, the root is `App<F, null>` and the result is null.
  * Otherwise the root is `App<F, T>` and `keep` (typed at that root) is the result.
@@ -53,6 +60,7 @@ const orNil = <T, V, F extends HKT<null | T>, C = unknown>(
  * 1. Split `k2` arrays into items kept by `_id` vs newly added.
  *    If `k === k1`, pair `first(before)` with `first(after)` as one slot instead
  *    (identity is `k1._id`; a k2 `_id` change must not emit two rows).
+ *    A tuple is concat order + separator; pairing still matches by k2 `_id`.
  * 2. If outer `k2`, pad empty arrays with `{}` so `$unwind` still emits a row.
  * 3. Attach `{ [k1]: Δ(T|null), [k2]: Δ(U|{}|null)[] }` and `$unwind` `k2`.
  * 4. Rebuild each before/after as a join row, or null if an inner side is missing.
@@ -68,9 +76,7 @@ export const $unwindDelta = <
 >(
   k1: AsLiteral<K1>,
   k2: AsLiteral<K2>,
-  k: K1 | K2 | false,
-  middle: s,
-  k1_middle_k2: boolean,
+  k: JoinId<K1, K2>,
   includeNull1?: N1,
   includeNull2?: N2,
 ): RawStages<
@@ -231,8 +237,6 @@ export const $unwindDelta = <
       ),
     )
 
-    const idLeft: K1 | K2 = k1_middle_k2 ? k1 : k2
-    const idRight: K1 | K2 = k1_middle_k2 ? k2 : k1
     const doc: Field<Doc, Doc> = root<Doc>()
     const parentId: Expr<s, Doc> = doc.of<Doc, '_id'>('_id').expr()
     const k1At = (side: BA): Expr<T | null, Doc> => doc.of<Doc, K1>(k1).of<K1Delta, BA>(side).expr()
@@ -261,15 +265,14 @@ export const $unwindDelta = <
         field<RORec<K2, B>, D>(map1(k2, b)),
       )
 
-    // `k` names the side whose `_id` to use; `false` concatenates left + middle + right.
-    // if the required id is null, use the other one, the non null, 
-    // which should be parentId because it is not null
+    // Scalar `k`: that side’s `_id`. Tuple: concat in the given order.
+    // If the chosen `_id` is null, fall back to parentId (the pre-unwind stream key).
     const rowId = (side: BA): Expr<s, Doc> =>
-      k
+      typeof k === 'string'
         ? $ifNull<s, Doc, unknown>(idAt(k, side), parentId)
         : $ifNull<s, Doc, unknown>(
-            concat<Doc, unknown>(idAt(idLeft, side), val<s>(middle), idAt(idRight, side)),
-            $ifNull<s, Doc, unknown>(idAt(idLeft, side), parentId),
+            concat<Doc, unknown>(idAt(k[0], side), val<s>(k[1]), idAt(k[2], side)),
+            $ifNull<s, Doc, unknown>(idAt(k[0], side), parentId),
           )
 
     const row = (side: BA): Expr<Row<T | null, U | null>, Doc> =>
