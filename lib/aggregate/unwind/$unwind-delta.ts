@@ -70,7 +70,7 @@ export const $unwindDelta = <
   k2: AsLiteral<K2>,
   k: K1 | K2 | false,
   middle: s,
-  reversed: boolean = false,
+  k1_middle_k2: boolean,
   includeNull1?: N1,
   includeNull2?: N2,
 ): RawStages<
@@ -231,8 +231,8 @@ export const $unwindDelta = <
       ),
     )
 
-    const idLeft: K1 | K2 = reversed ? k2 : k1
-    const idRight: K1 | K2 = reversed ? k1 : k2
+    const idLeft: K1 | K2 = k1_middle_k2 ? k1 : k2
+    const idRight: K1 | K2 = k1_middle_k2 ? k2 : k1
     const doc: Field<Doc, Doc> = root<Doc>()
     const parentId: Expr<s, Doc> = doc.of<Doc, '_id'>('_id').expr()
     const k1At = (side: BA): Expr<T | null, Doc> => doc.of<Doc, K1>(k1).of<K1Delta, BA>(side).expr()
@@ -262,6 +262,8 @@ export const $unwindDelta = <
       )
 
     // `k` names the side whose `_id` to use; `false` concatenates left + middle + right.
+    // if the required id is null, use the other one, the non null, 
+    // which should be parentId because it is not null
     const rowId = (side: BA): Expr<s, Doc> =>
       k
         ? $ifNull<s, Doc, unknown>(idAt(k, side), parentId)
@@ -381,7 +383,7 @@ export const $unwindDelta = <
         )
         .with<unknown, Doc>($unwind_<In & Rec<K1, K1Delta>, K2, Delta2>(k2))
         .with<unknown, Delta<Join>>($replaceWith_<Doc, Delta<Join>>(joinDelta(joinAt)))
-        .with<unknown, Delta<Join>>(k === false ? liftRowId : link<Delta<Join>>().stages)
+        .with<unknown, Delta<Join>>(k !== k1 ? liftRowId : link<Delta<Join>>().stages)
         .with<unknown, Delta<Join>>(
           $match_<O, Delta<Join>>(
             $expr<Delta<Join>, unknown>(
