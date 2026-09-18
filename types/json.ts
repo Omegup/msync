@@ -37,7 +37,7 @@ export type Replace<R, V> = Omit<R, StrKey<V>> & V & O
 
 // a generic type that restricts another type to be a literal
 // for exemple AsLiteral<'a'> is 'a' and AsLiteral<string> is never, AsLiteral<1> is 1 and AsLiteral<number> is never
-export type AsLiteral<T extends keyof any | boolean, V = NoUnion<T>> = T extends keyof any
+export type AsLiteral<T extends keyof any | boolean | N, V = NoUnion<T>> = T extends keyof any
   ? {} extends { [K in T]: 1 }
     ? never
     : V

@@ -1,4 +1,4 @@
-import type { App, HKT, jsonItem, Par, Rec, RORec } from '../../types'
+import type { App, AsLiteral, HKT, jsonItem, N, Par, Rec, RORec } from '../../types'
 
 export type Equal<Dom, T extends Dom, V extends Dom> = {
   forward: <F extends HKT<Dom>>(x: App<F, T>) => App<F, V>
@@ -20,6 +20,8 @@ const assertEqual = <Dom, T extends Dom, V extends Dom>() =>
     forward1: id,
     backward1: id,
   }) as Equal<Dom, T, V>
+
+export const literalsEqaul = <T extends keyof any | boolean | N, V extends T>(_: AsLiteral<T> & V) => assertEqual<T, T, V>()
 
 export const omitRORec = <
   K extends string,
