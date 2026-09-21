@@ -1,15 +1,15 @@
 # @omegup/msync
 
+[![npm](https://img.shields.io/npm/v/@omegup/msync)](https://www.npmjs.com/package/@omegup/msync)
+
 `msync` keeps derived MongoDB data in sync with the documents it comes from.
 
-You describe the derivation the way you would write an aggregation: project the fields you read, join, reshape, group, and write the result back. `msync` runs that description once over the existing data, then again on every change. Joins, sums, and counts update from the delta. A deleted source drops out of the result. A changed source rewrites only the documents that depend on it.
-
-The school sync in `back-sync` is built this way: dozens of streams turn raw collections (users, groups, marks, invoices) into the fields and collections the app actually reads, and a single `Machine` keeps all of them running.
+You describe the derivation the way you would write an aggregation: project the fields you read, join, reshape, group, and write the result back. `msync` runs that description once over the existing data, then again on every change. Joins, sums, and counts update from the delta. A removed source undoes the write that depended on it. A changed source rewrites only the documents that depend on it.
 
 ## Install
 
 ```bash
-bun add @omegup/msync
+npm install @omegup/msync
 ```
 
 Peer runtime: MongoDB with change streams (a replica set), and TypeScript. `msync` enables change-stream pre- and post-images on every collection it watches.
@@ -32,7 +32,7 @@ A stream is a named, typed function from source documents to stored documents.
 
 5. **The name is the identity of the job.** Progress lives in a `__last` document keyed by that name. If the pipeline you registered under the name changes, `msync` tears the previous output down (unsets the fields it wrote, or soft-deletes the documents it inserted) and rebuilds.
 
-6. **Streams compose by reading each other's fields.** A field whose name starts with `_` is treated as derived. A later stream that projects `_rowName` waits until that field exists, so you can add every stream to one machine and they still line up.
+6. **Streams compose by reading each other's fields.** A field whose name starts with `_` is treated as derived. A later stream that projects `_accountName` waits until that field exists, so you can add every stream to one machine and they still line up.
 
 ```
 source collection
@@ -65,11 +65,11 @@ Two ways in:
 import type { Model } from '@omegup/msync'
 
 // Model is { _id, touchedAt, deletedAt? } intersected with your fields.
-type User = {
+type Account = {
   _id: string
-  birthdate: Date
-  _dayOfBirth?: string | null   // written by a stream
-  _yearOfBirth?: number | null
+  name: string
+  createdAt: Date
+  _cohort?: string | null   // written by a stream, e.g. "2026-03"
 } & Model
 ```
 
@@ -99,347 +99,266 @@ A projection entry is a pair, `[fieldName, 1]`, under the same name:
 
 ```ts
 projection: {
-  birthdate: ['birthdate', 1],
-  classId: ['classId', 1],
+  createdAt: ['createdAt', 1],
+  regionId: ['regionId', 1],
 }
 ```
 
 A field expression is a pair too, `[fieldName, expr]`, inside `field({ ... })` and inside merge and group maps.
 
 ```ts
-root<User>().of('birthdate').expr()   // this document's field
-val(' - ')                             // a literal
-concat(row, val(' - '), column)        // an expression
+root<Account>().of('createdAt').expr()   // this document's field
+val('-')                                  // a literal
+concat(accountId, val('-'), planId)       // an expression
 ```
 
 `root<T>()` is the current document, typed as `T`. `.of('key')` steps into a field. `.expr()` turns the path into a value you can pass to `concat`, `$sum`, `$merge`, and the rest.
 
 ## Tutorial
 
-Each example is a function from collections to a runner. The runners are what you hand to a `Machine`. They are the same shapes used throughout `back-sync`.
+One small domain runs through every example: accounts place orders, and plans are sold per region. Each function takes the collections it touches and returns a runner. The runners are what you hand to a `Machine`.
 
-### 1. Patch the document you just read
+### 1. Derive a field from the document itself
 
-A user has a `birthdate`. Keep `_dayOfBirth` (`MM-DD`) and `_yearOfBirth` on that same user, and refresh them whenever `birthdate` changes.
+An account has `createdAt`. List pages want the cohort (`YYYY-MM`) without parsing dates on every read. Keep `_cohort` on the account, and refresh it when `createdAt` changes.
 
 `from` is enough: there is no join and no previous value to subtract.
 
 ```ts
 import type { Collection, Model, N, O } from '@omegup/msync'
-import { $simpleMerge, dayAndMonthPart, from, root, year } from '@omegup/msync'
+import { $simpleMerge, from, monthPart, root } from '@omegup/msync'
 
-type User = O<{
+type Account = O<{
   _id: string
-  birthdate: Date
-  _dayOfBirth: string | N
-  _yearOfBirth: number | N
+  name: string
+  createdAt: Date
+  _cohort: string | N
 }>
 
-export const makeUserBirthdayStream = (users: Collection<User & Model>) =>
+export const makeAccountCohortStream = (accounts: Collection<Account & Model>) =>
   from(
     {
-      collection: users,
-      projection: { birthdate: ['birthdate', 1] },
+      collection: accounts,
+      projection: { createdAt: ['createdAt', 1] },
     },
-    'users-birthday',
+    'account-cohort',
   )
     .get()
     .out(
-      $simpleMerge<O<{ _dayOfBirth: string; _yearOfBirth: number }>>()(users, {
-        _dayOfBirth: ['_dayOfBirth', dayAndMonthPart(root<User>().of('birthdate').expr())],
-        _yearOfBirth: ['_yearOfBirth', year(root<User>().of('birthdate').expr())],
+      $simpleMerge<O<{ _cohort: string }>>()(accounts, {
+        _cohort: ['_cohort', monthPart(root<Account>().of('createdAt').expr())],
       }),
     )
 ```
 
-`$simpleMerge` writes those keys onto the same `_id`. The document is already there, so a missing target fails the merge. On the next change of `birthdate`, only that user is rewritten.
+`$simpleMerge` writes `_cohort` onto the same `_id`. The document is already there, so a missing target fails the merge. The next change of `createdAt` rewrites that account only.
 
-### 2. Copy a field across a join
+```
+{ _id: "a1", createdAt: 2026-03-02 }   →   { _cohort: "2026-03" }
+```
 
-An evaluation cell points at a row through `rowId`. The row has `_name`. Write that name onto the cell as `_rowName`.
+### 2. Copy a field across a reference
 
-This needs `staging`, because `$lookup` is incremental: it has to notice when the row's name changes, and when the cell's `rowId` changes, and update the cell either way.
+An order stores `accountId`. The account stores `name`. Reading an order should not look the account up again, and renaming an account should fix every order that points at it.
+
+This needs `staging`. `$lookup` watches both sides: the order's `accountId`, and the account's `name`.
 
 ```ts
 import type { Collection, Model, O, OPick, StrKey } from '@omegup/msync'
 import { $lookup, $merge, root, staging } from '@omegup/msync'
 
-type Cell = O<{ _id: string; rowId: string; _rowName?: string }>
-type Row = O<{ _id: string; _name: string }>
+type Account = O<{ _id: string; name: string }>
+type Order = O<{ _id: string; accountId: string; total: number; _accountName?: string }>
 
-type CellView = OPick<Cell & Model, '_id' | 'rowId'>
-type RowView = OPick<Row & Model, '_id' | '_name'>
-type Joined = CellView & { readonly row: RowView }
+type OrderView = OPick<Order & Model, '_id' | 'accountId'>
+type AccountView = OPick<Account & Model, '_id' | 'name'>
+type Joined = OrderView & { readonly account: AccountView }
 
-export const makeEvalCellRowNameStream = (
-  evalCells: Collection<Cell & Model>,
-  termRows: Collection<Row & Model>,
+export const makeOrderAccountNameStream = (
+  orders: Collection<Order & Model>,
+  accounts: Collection<Account & Model>,
 ) =>
-  staging<Cell & Model, StrKey<CellView>>(
+  staging<Order & Model, StrKey<OrderView>>(
     {
-      collection: evalCells,
-      projection: { rowId: ['rowId', 1] },
+      collection: orders,
+      projection: { accountId: ['accountId', 1] },
     },
-    'evalCells-rowName',
+    'order-account-name',
   )
     .with(
       $lookup({
-        as: 'row',
+        as: 'account',
         from: staging(
           {
-            collection: termRows,
-            projection: { _name: ['_name', 1] },
+            collection: accounts,
+            projection: { name: ['name', 1] },
           },
-          'termRows-evalCells',
+          'accounts-for-orders',
         ).get(),
-        localField: root<CellView>().of('rowId'),
-        foreignField: root<RowView>().of('_id'),
+        localField: root<OrderView>().of('accountId'),
+        foreignField: root<AccountView>().of('_id'),
       }),
     )
     .get()
     .out(
-      $merge<O<{ _rowName: string }>>()(evalCells, {
-        _rowName: ['_rowName', root<Joined>().of('row').of('_name').expr()],
+      $merge<O<{ _accountName: string }>>()(orders, {
+        _accountName: ['_accountName', root<Joined>().of('account').of('name').expr()],
       }),
     )
 ```
 
-The inner `staging(...).get()` is a stream of its own. `$lookup` watches both sides. `$merge` patches `_rowName` back onto the cell. A later stream that projects `_rowName` will wait until this one has written it.
+The inner `staging(...).get()` is a stream of its own, with its own snapshot. `$merge` patches `_accountName` back onto the order. A later stream that projects `_accountName` waits until this one has written it.
 
-`$lookup` keeps documents that match. `$outerLookup` keeps the left document when the right side is missing, and types the joined field as `T | null`. The joined array is unwound, one row per match. `toMany: true` gives each of those rows its own id, built from both sides. Leave it off when the foreign field is `_id` and a later `$groupId` folds every match back onto the left document.
+`$lookup` keeps documents that match. `$outerLookup` keeps the left document when the right side is missing, and types the joined field as `T | null`. A joined array is unwound into one row per match. Pass `toMany: true` when `localField` is an array and each match must keep its own id. Leave it off when the foreign field is `_id` and you want every match to keep the left `_id`, which is what a later `$groupId` folds on.
 
-### 3. Reshape, then fold the list back onto the source
+### 3. Keep a total on the parent
 
-An assessment holds `evalCellIds`. Each cell has a row name and a column name. The assessment should store the distinct `"row - column"` labels in `_evaluableNames`.
+Each order has an `accountId` and a `total`. The account should store `_lifetimeSpend`, the sum of its orders, including orders that change or disappear.
 
-The pipeline does three things:
-
-- read assessments that have `evalCellIds`
-- join those ids to cells, one row per matching cell, still carrying the assessment `_id`
-- replace each row with `{ _id, _evaluableNames }`, then group the rows by that `_id`
-
-`$groupId` folds into a document that already exists. The group key is that document's `_id`. The accumulator (`$countDict`) is delta-aware: adding a label increments its count, removing one decrements it, and a count of zero drops the key. `$keys` turns the surviving map into the array the app reads.
+`$groupId` folds into a document that already exists. The group key is that document's `_id`, here the account id. `$sum` is delta-aware: a new order adds its total, an edited order subtracts the old total and adds the new one, a deleted order subtracts. The account is never recomputed from scratch.
 
 ```ts
-import type { Arr, Collection, Model, O, Rec, RORec } from '@omegup/msync'
-import {
-  $countDict,
-  $groupId,
-  $keys,
-  $lookup,
-  $replaceWith,
-  concat,
-  field,
-  notNull,
-  root,
-  staging,
-  val,
-} from '@omegup/msync'
+import type { Collection, Model, O } from '@omegup/msync'
+import { $groupId, $sum, notNull, root, staging } from '@omegup/msync'
 
-type EvalCell = O<{ _id: string; _columnName: string; _rowName: string }>
-type Assessment = O<{ _id: string; evalCellIds: Arr<string> }>
-type WithName = O<{ _id: string; _evaluableNames: string }>
+type Account = O<{ _id: string; _lifetimeSpend?: number }>
+type Order = O<{ _id: string; accountId: string; total: number }>
 
-export const makeAssessmentEvaluableNamesStream = (
-  assessments: Collection<Assessment & Model>,
-  evalCells: Collection<EvalCell & Model>,
-) => {
-  type Joined = Assessment & RORec<'evalCell', EvalCell>
-
-  const evalCellsStage = staging(
+export const makeAccountSpendStream = (
+  orders: Collection<Order & Model>,
+  accounts: Collection<Account & Model>,
+) =>
+  staging<Order & Model, '_id' | 'accountId' | 'total'>(
     {
-      collection: evalCells,
+      collection: orders,
       projection: {
-        _columnName: ['_columnName', 1],
-        _rowName: ['_rowName', 1],
+        accountId: ['accountId', 1],
+        total: ['total', 1],
       },
+      match: notNull(root<Order>().of('accountId').expr()),
     },
-    'assessment-evaluable-names-evalCells',
-  ).get()
-
-  return staging<Assessment & Model, '_id' | 'evalCellIds'>(
-    {
-      collection: assessments,
-      projection: { evalCellIds: ['evalCellIds', 1] },
-      match: notNull(root<Assessment>().of('evalCellIds').expr()),
-    },
-    'assessment-evaluable-names',
+    'account-lifetime-spend',
   )
-    .with(
-      $lookup({
-        as: 'evalCell',
-        from: evalCellsStage,
-        localField: root<Assessment>().of('evalCellIds'),
-        foreignField: root<EvalCell>().of('_id'),
-      }),
-    )
-    .then(
-      $replaceWith(
-        field({
-          _id: ['_id', root<Joined>().of('_id').expr()],
-          _evaluableNames: [
-            '_evaluableNames',
-            concat(
-              root<Joined>().of('evalCell').of('_rowName').expr(),
-              val(' - '),
-              root<Joined>().of('evalCell').of('_columnName').expr(),
-            ),
-          ],
-        }),
-      ),
-    )
     .get()
     .out(
-      $groupId<
-        WithName,
-        O<{ readonly _evaluableNamesMap: Rec<string, number> }>,
-        { _evaluableNames: Arr<string> },
-        Model & Assessment
-      >(
-        root<WithName>().of('_id').expr(),
+      $groupId<Order, O<{ _lifetimeSpend: number }>, {}, Account & Model>(
+        root<Order>().of('accountId').expr(),
         {
-          _evaluableNamesMap: [
-            '_evaluableNamesMap',
-            $countDict(root<WithName>().of('_evaluableNames').expr()),
-          ],
+          _lifetimeSpend: ['_lifetimeSpend', $sum(root<Order>().of('total').expr())],
         },
-        assessments,
-        {
-          _evaluableNames: [
-            '_evaluableNames',
-            $keys(
-              root<O<{ _evaluableNamesMap: Rec<string, number> }>>()
-                .of('_evaluableNamesMap')
-                .expr(),
-            ),
-          ],
-        },
+        accounts,
+        {},
       ),
     )
-}
 ```
 
 Read `$groupId` as four arguments:
 
-1. The group key, a string expression. For `$groupId` it must equal `_id` on the target.
+1. The group key, a string expression. It must equal `_id` on the target.
 2. Accumulators. Each value is `['field', accumulator]`. These fields are maintained incrementally on the target.
 3. The target collection.
-4. Extra fields, computed from the accumulator output on every update. `$keys` here is a plain expression over the grouped document, so it sees `_evaluableNamesMap` after the fold.
+4. Extra fields, recomputed from the accumulator output on every update. `{}` when the accumulator value is already what you want to store.
 
-`$group` is the same fold when the target document does not exist yet. It stores the key in `_grp` and inserts a new document. Use it to build a summary collection. Use `$groupId` to hang a summary on a document you already have.
+`$group` is the same fold when the target document does not exist yet. It stores the key in `_grp` and inserts. Use it for a summary collection, such as revenue per month. Use `$groupId` to hang a summary on a document you already have, such as spend on an account.
 
-### 4. Create documents in another collection
+When the thing you are counting is a set of strings rather than a number, use `$countDict`. It stores a map of string to count, drops keys whose count falls to zero, and pairs with `$keys` in the extra-fields argument to publish the surviving strings as an array. A product that references tag ids, joined to the tag's name and folded with `$countDict`, keeps `_tags` on the product this way. The [guide](docs/guide.md) shows that accumulator next to `$sum`.
 
-A student evaluation system pairs with every grid of that system. Each pair is its own document in `studentEvalGrids`, with an `_id` of `studentId-gridId`. When the system or the grid goes away, the pair is soft-deleted.
+### 4. Materialize a collection of pairs
+
+Plans are sold per region. Every account in a region is entitled to every plan in that region. Each pair is its own document in `entitlements`, with `_id` of `accountId-planId`, so other streams can aggregate entitlements directly. When the plan's price changes, the entitlement updates. When the account or the plan goes away, the entitlement is soft-deleted.
 
 `$replaceWith` builds the new document. `$insert` upserts it by `_id`, and on a deleted input it sets `deletedAt` on that `_id`.
 
 ```ts
 import type { Collection, ID, Model, O, OPick } from '@omegup/msync'
-import {
-  $insert,
-  $lookup,
-  $replaceWith,
-  concat,
-  field,
-  root,
-  staging,
-  val,
-} from '@omegup/msync'
+import { $insert, $lookup, $replaceWith, concat, field, root, staging, val } from '@omegup/msync'
 
-type System = O<{ _id: string; studentId: string; evaluationSystemId: string }>
-type Grid = O<{ _id: string; evaluationSystemId: string; coef: number; order: number }>
-type StudentGrid = O<{
+type Account = O<{ _id: string; regionId: string }>
+type Plan = O<{ _id: string; regionId: string; price: number }>
+type Entitlement = O<{
   _id: string
-  studentId: string
-  evaluationGridId: string
-  studentSystemId: string
-  coef: number
-  _order: number
+  accountId: string
+  planId: string
+  price: number
 }>
 
-export const makeEvalGridStudentsStream = (
-  systems: Collection<System & Model>,
-  grids: Collection<Grid & Model>,
-  studentGrids: Collection<StudentGrid & Model>,
+export const makeEntitlementStream = (
+  accounts: Collection<Account & Model>,
+  plans: Collection<Plan & Model>,
+  entitlements: Collection<Entitlement & Model>,
 ) => {
-  type SystemView = OPick<System & Model, keyof ID | 'studentId' | 'evaluationSystemId'>
-  type GridView = OPick<Grid & Model, keyof ID | 'evaluationSystemId' | 'coef' | 'order'>
-  type Joined = SystemView & { readonly evalGrid: GridView }
+  type AccountView = OPick<Account & Model, keyof ID | 'regionId'>
+  type PlanView = OPick<Plan & Model, keyof ID | 'regionId' | 'price'>
+  type Joined = AccountView & { readonly plan: PlanView }
 
-  return staging<System & Model, keyof SystemView>(
+  return staging<Account & Model, keyof AccountView>(
     {
-      collection: systems,
-      projection: {
-        studentId: ['studentId', 1],
-        evaluationSystemId: ['evaluationSystemId', 1],
-      },
+      collection: accounts,
+      projection: { regionId: ['regionId', 1] },
     },
-    'evalGrid-students-create',
+    'entitlements-from-accounts',
   )
     .with(
       $lookup({
-        as: 'evalGrid',
+        as: 'plan',
         from: staging(
           {
-            collection: grids,
+            collection: plans,
             projection: {
-              coef: ['coef', 1],
-              order: ['order', 1],
-              evaluationSystemId: ['evaluationSystemId', 1],
+              regionId: ['regionId', 1],
+              price: ['price', 1],
             },
           },
-          'evalGrid-studentsSystems',
+          'plans-for-entitlements',
         ).get(),
-        localField: root<SystemView>().of('evaluationSystemId'),
-        foreignField: root<GridView>().of('evaluationSystemId'),
+        localField: root<AccountView>().of('regionId'),
+        foreignField: root<PlanView>().of('regionId'),
       }),
     )
     .then(
       $replaceWith(
-        field<StudentGrid, Joined>({
+        field<Entitlement, Joined>({
           _id: [
             '_id',
             concat(
-              root<Joined>().of('studentId').expr(),
+              root<Joined>().of('_id').expr(),
               val('-'),
-              root<Joined>().of('evalGrid').of('_id').expr(),
+              root<Joined>().of('plan').of('_id').expr(),
             ),
           ],
-          studentId: ['studentId', root<Joined>().of('studentId').expr()],
-          evaluationGridId: ['evaluationGridId', root<Joined>().of('evalGrid').of('_id').expr()],
-          studentSystemId: ['studentSystemId', root<Joined>().of('_id').expr()],
-          coef: ['coef', root<Joined>().of('evalGrid').of('coef').expr()],
-          _order: ['_order', root<Joined>().of('evalGrid').of('order').expr()],
+          accountId: ['accountId', root<Joined>().of('_id').expr()],
+          planId: ['planId', root<Joined>().of('plan').of('_id').expr()],
+          price: ['price', root<Joined>().of('plan').of('price').expr()],
         }),
       ),
     )
     .get()
-    .out($insert(studentGrids))
+    .out($insert(entitlements))
 }
 ```
 
-Give inserted documents a deterministic `_id`. That id is how the next run finds the same row to update or retire.
+Give inserted documents a deterministic `_id`. That id is how the next run finds the same row to update or retire. Joining on `regionId` (a field that is not `_id` on either side) yields one row per matching plan, and `$replaceWith` assigns the pair id before the insert.
 
 ## Run them together
 
-A `Machine` merges runners and loops forever. Each tick logs which stream did the work.
+A `Machine` merges runners and loops. Each tick reports which stream did the work.
 
 ```ts
 import { Machine, prepare } from '@omegup/msync'
 
-const client = await prepare() // or your own MongoClient.connect()
+const client = await prepare() // connects with MONGO_URL, or use your own MongoClient
 const db = client.db(process.env.MONGO_NAME)
 
+const accounts = db.collection('accounts')
+const orders = db.collection('orders')
+const plans = db.collection('plans')
+const entitlements = db.collection('entitlements')
+
 const machine = new Machine()
-machine.add(makeUserBirthdayStream(db.collection('users')))
-machine.add(makeEvalCellRowNameStream(db.collection('evaluationCells'), db.collection('termEvaluationRows')))
-machine.add(makeAssessmentEvaluableNamesStream(db.collection('assessments'), db.collection('evaluationCells')))
-machine.add(makeEvalGridStudentsStream(
-  db.collection('studentEvaluationSystems'),
-  db.collection('evaluationGrids'),
-  db.collection('studentEvalGrids'),
-))
+machine.add(makeAccountCohortStream(accounts))
+machine.add(makeOrderAccountNameStream(orders, accounts))
+machine.add(makeAccountSpendStream(orders, accounts))
+machine.add(makeEntitlementStream(accounts, plans, entitlements))
 
 await machine.start(info => {
   console.log(new Date(), info.debug)
@@ -448,11 +367,18 @@ await machine.start(info => {
 
 `.start` resolves only when it stops. Return `true` from the callback to stop after the current tick. Add streams in an order you can read — producers of `_` fields before the streams that project them — then let the machine run them side by side. The `_` prefix (and `needs`) is what makes a consumer skip a document until the producer has filled it.
 
-Stream names are unique inside the process. Reusing a name from two different call sites throws. Pick a name that says what the stream maintains: `'evalCells-rowName'`, `'users-birthday'`.
+Stream names are unique inside the process. Reusing a name from two different call sites throws. Pick a name that says what the stream maintains: `'account-cohort'`, `'order-account-name'`.
 
-## Where this is used
+Split a large sync by area. Each area builds a `Machine` and returns it. The process adds every area and starts once:
 
-`back-sync` splits the app into one machine per area (`evaluation`, `groups`, `invoice`, `attendance`, …) and adds each area's runners to a root `Machine`. Inside an area, the file comments mark phases: create the student grid, then the term rows that hang off it, then the cells, then the aggregates that read those cells. Each phase is a stream like the four above. The root process is the whole derived database, kept live.
+```ts
+const machine = new Machine()
+machine.add(billing(client).runner())
+machine.add(catalog(client).runner())
+await machine.start(info => {
+  console.log(new Date(), info.debug)
+})
+```
 
 ## Next
 

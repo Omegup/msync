@@ -1,6 +1,6 @@
 # Guide
 
-This is the rest of `@omegup/msync` after the [README](../README.md). The README walks the four pipelines you will write most often. Here is how the pieces fit, and what the process stores while they run.
+This is the rest of `@omegup/msync` after the [README](../README.md). The README walks the four pipelines you will write most often, on accounts, orders, and plans. Here is how the pieces fit, and what the process stores while they run.
 
 ## Views
 
@@ -24,7 +24,7 @@ staging(
 `match` is an expression, built with `root`, `notNull`, `eq`, `and`, `or`. It selects which documents enter the stream on a fresh start.
 
 ```ts
-match: notNull(root<Assessment>().of('evalCellIds').expr())
+match: notNull(root<Order>().of('accountId').expr())
 ```
 
 `hardMatch` is a MongoDB query predicate (`field.has($eq(...))`, combined with `$and` / `$or` / `$nor`). It also becomes the partial filter of the `touchedAt` index `msync` creates, so keep it selective and stable.
@@ -36,7 +36,7 @@ For every projected field, the stream requires the field to exist when either of
 - the field name starts with `_`, or
 - `needs[field] === 1`
 
-`needs[field] === 0` turns the wait off for that field, including `_` fields. This is how streams chain. The row-name stream writes `_rowName`. The next stream projects `_rowName` and therefore only sees cells that already have it.
+`needs[field] === 0` turns the wait off for that field, including `_` fields. This is how streams chain. The account-name stream writes `_accountName` onto orders. The next stream projects `_accountName` and therefore only sees orders that already have it.
 
 ## Building the pipeline
 
@@ -50,11 +50,11 @@ staging(view, name)
 
 `.with` rebuilds the stream by passing the current stream into a function. Lookups are functions of the left stream, so they go in `.with`.
 
-`.then` concatenates a stage onto the document currently flowing. After a `$lookup({ as: 'row' })`, the document type grows a `row` field, and the next `.then` sees it.
+`.then` concatenates a stage onto the document currently flowing. After a `$lookup({ as: 'account' })`, the document type grows an `account` field, and the next `.then` sees it.
 
 `.get()` on a `staging` pipeline is also a legal `from` for another `$lookup`. Give that inner pipeline its own stream name. It gets its own snapshot and its own `__last` entry.
 
-You can `.get()` a pipeline that still has stages left to add and pass that result around; further stages belong on the pipe before `.get()`, or on a lookup that consumes it.
+Further stages belong on the pipe before `.get()`. A lookup consumes a pipeline that has already been closed with `.get()`.
 
 ### `from`, `staging`, `single`
 
@@ -66,19 +66,19 @@ You can `.get()` a pipeline that still has stages left to add and pass that resu
 
 ## Expressions
 
-An `Expr<T, Doc>` is a value of type `T` in the context of `Doc`. You never write raw aggregation JSON. You combine typed builders, and `.raw` is an internal detail.
+An `Expr<T, Doc>` is a value of type `T` in the context of `Doc`. You combine typed builders. The aggregation JSON they lower to stays inside the library.
 
 ### Paths and literals
 
 ```ts
-root<User>().of('address').of('city').expr()
+root<Account>().of('address').of('city').expr()
 val(1)
-val(' - ')
+val('-')
 nil                      // null
 current                  // cluster time, as a Timestamp expression
 ```
 
-`root<T>()` is `$$ROOT` typed as `T`. `ctx<T>()('name')` is a `let` variable `$$name`, used inside `$lookup` merge stages and `$map`.
+`root<T>()` is `$$ROOT` typed as `T`. `ctx<T>()('name')` is a `let` variable `$$name`, used inside merge stages that bind `new` and inside `$map`.
 
 ### Objects
 
@@ -86,8 +86,8 @@ current                  // cluster time, as a Timestamp expression
 
 ```ts
 field({
-  _id: ['_id', root<Joined>().of('_id').expr()],
-  _label: ['_label', concat(row, val(' - '), column)],
+  _id: ['_id', concat(accountId, val('-'), planId)],
+  price: ['price', root<Joined>().of('plan').of('price').expr()],
 })
 ```
 
@@ -119,12 +119,12 @@ $map(expr, item => concat(item, val('_'), other))
 inArray(item, arrayExpr)
 ```
 
-`$map` binds each element as the expression you receive. The group-stats stream uses it to turn a `jobs` array into the keys of a count map:
+`$map` binds each element as the expression you receive. Folding a list of tag ids into countable keys looks like this:
 
 ```ts
 $countDictArray(
-  $map(root<Capture>().of('jobs').expr(), job =>
-    concat(root<Capture>().of('captureId').expr(), val('_'), job),
+  $map(root<Product>().of('tagIds').expr(), tagId =>
+    concat(root<Product>().of('catalogId').expr(), val('_'), tagId),
   ),
 )
 ```
@@ -135,14 +135,20 @@ $countDictArray(
 
 `$set<Patch>()({ field: ['field', to(expr)] })` writes keys onto the current document and leaves the rest in place.
 
-`$replaceWith(field({ ... }))` replaces the document. Use it when the output shape is a different collection's document, or when you want one row per joined element before a group. Keep `_id` unless the next stage is `$group`, which supplies its own.
+```ts
+$set<O<{ _cohort: string }>>()({
+  _cohort: ['_cohort', to(monthPart(root<Account>().of('createdAt').expr()))],
+})
+```
+
+`$replaceWith(field({ ... }))` replaces the document. Use it when the output shape is a different collection's document, or when you want one row per joined element before a group. Keep `_id` unless you are about to assign a new one, as the entitlement stream does.
 
 Both exist as delta stages, so they are legal in `staging` and in `from`.
 
 ### `$match`
 
 ```ts
-$match(notNull(root<Doc>().of('classId').expr()))
+$match(eq(root<Order>().of('status').expr())(val('open')))
 ```
 
 Drops documents for which the expression is false. On a delta, a document that stops matching is handled as a removal, so downstream sinks undo it.
@@ -151,11 +157,10 @@ Drops documents for which the expression is false. On a delta, a document that s
 
 ```ts
 $lookup({
-  as: 'evalCell',
-  from: otherStream.get(),
-  localField: root<Left>().of('evalCellIds'),
-  foreignField: root<Right>().of('_id'),
-  // toMany: true,   // when localField is an array and each match should stay an array element
+  as: 'account',
+  from: accountsStage, // a staging(...).get()
+  localField: root<Order>().of('accountId'),
+  foreignField: root<Account>().of('_id'),
 })
 ```
 
@@ -163,17 +168,19 @@ $lookup({
 
 `$lookup` is an inner join: a left document with no match produces nothing. `$outerLookup` keeps the left document and types `as` as `Right | null`.
 
-The join watches both sides. A change to the right-hand document updates the left rows that point at it, and a change to the local field re-runs the join from the left. `msync` indexes `before.<join field>` on both snapshot collections to make that lookup cheap.
+The join watches both sides. A change to the account updates every order that points at it, and a change to `accountId` re-runs the join from the order. `msync` indexes `before.<join field>` on both snapshot collections to make that lookup cheap.
 
-Join identity depends on `toMany`. When `foreignField` is `_id` and `toMany` is omitted, every match keeps the left `_id`. That is the right shape when the next sink is `$groupId` on that id: many cells collapse back onto one assessment. Pass `toMany: true` when `localField` is an array and each match must stay a distinct document; the row `_id` becomes the left id, a separator, and the right id. The type of `$lookup` asks for `toMany: true` whenever `localField` is an array. The assessment stream relies on the shared left id and omits the flag, which is the pattern to follow when you group immediately afterwards.
+Join identity depends on `toMany`. When `foreignField` is `_id` and `toMany` is omitted, every match keeps the left `_id`. Use that when a later `$groupId` folds those rows back onto the left document. Pass `toMany: true` when `localField` is an array and each match must stay a distinct document; the row `_id` becomes the left id, a separator, and the right id. The type of `$lookup` asks for `toMany: true` whenever `localField` is an array. Omit it only when you intentionally keep the left `_id` and group on it immediately.
+
+Joining on a field that is not `_id`, the way accounts and plans join on `regionId`, also produces one row per match, with a composite id for the duration of the pipeline. `$replaceWith` then assigns the id you actually want to store.
 
 ### `$unwind`
 
-`$unwind` expands an array field into one document per element and gives each element a stable join id, so a later group can tell insertions and removals of elements apart. The signature takes the array's key and a small rename map (`{ [key]: 'key', _id: 'id' }`) that `$unwind` uses while rebuilding the document. Reach for it when you need one output row per array element and a lookup's `toMany` flag is the wrong shape.
+`$unwind` expands an array field into one document per element and gives each element a stable join id, so a later group can tell insertions and removals of elements apart. The signature takes the array's key and a small rename map (`{ [key]: 'key', _id: 'id' }`) that `$unwind` uses while rebuilding the document. Reach for it when you need one output row per array element and a lookup is the wrong shape.
 
 ## Sinks
 
-Every `.out(...)` argument is a `StreamRunnerParam`: a `raw` pipeline that must end in a write, plus a `teardown` that knows how to remove what this sink wrote. You call the helpers below; you do not build that object yourself.
+Every `.out(...)` argument is a `StreamRunnerParam`: a `raw` pipeline that must end in a write, plus a `teardown` that knows how to remove what this sink wrote. You call the helpers below.
 
 | Helper | Pipe | Target document | On delete of the source |
 |---|---|---|---|
@@ -189,12 +196,12 @@ Every `.out(...)` argument is a `StreamRunnerParam`: a `raw` pipeline that must 
 Both take a patch type and a map of `['field', expr]`.
 
 ```ts
-$simpleMerge<O<{ _yearOfBirth: number }>>()(users, {
-  _yearOfBirth: ['_yearOfBirth', year(root<User>().of('birthdate').expr())],
+$simpleMerge<O<{ _cohort: string }>>()(accounts, {
+  _cohort: ['_cohort', monthPart(root<Account>().of('createdAt').expr())],
 })
 
-$merge<O<{ _rowName: string }>>()(evalCells, {
-  _rowName: ['_rowName', root<Joined>().of('row').of('_name').expr()],
+$merge<O<{ _accountName: string }>>()(orders, {
+  _accountName: ['_accountName', root<Joined>().of('account').of('name').expr()],
 })
 ```
 
@@ -221,37 +228,56 @@ $group<Source, GroupKey, Accumulated, Extra, Target>(
 )
 ```
 
-Accumulators live on the target and survive from tick to tick. Extra fields are recomputed from the accumulator values whenever the group changes. Put the incremental state in the accumulator map (`_evaluableNamesMap`) and the value the application reads in `extra` (`_evaluableNames`).
+Accumulators live on the target and survive from tick to tick. Extra fields are recomputed from the accumulator values whenever the group changes. A sum can be stored directly, as `_lifetimeSpend` is. A multiset is easier to query as an array, so the accumulator holds the map and `extra` publishes the keys:
 
-`$groupId` refuses to insert. The group key must already be the `_id` of a document in the target — typically the source collection itself, as in the assessment example. `$group` inserts, and the group's identity is `_grp` plus the prefix, so many groups can live in a collection that does not already contain them.
+```ts
+$groupId<
+  Product,
+  O<{ readonly _tagCounts: Rec<string, number> }>,
+  { _tags: Arr<string> },
+  Product & Model
+>(
+  root<Product>().of('_id').expr(),
+  {
+    _tagCounts: ['_tagCounts', $countDict(root<Tagged>().of('tagName').expr())],
+  },
+  products,
+  {
+    _tags: [
+      '_tags',
+      $keys(root<O<{ _tagCounts: Rec<string, number> }>>().of('_tagCounts').expr()),
+    ],
+  },
+)
+```
+
+`$groupId` refuses to insert. The group key must already be the `_id` of a document in the target. `$group` inserts, and the group's identity is `_grp` plus the optional prefix, so many groups can live in a collection that does not already contain them. Revenue per month is that shape: the group key is `monthPart(placedAt)`, the accumulator is `$sum(total)`, and the target is a `monthlyRevenue` collection.
 
 ### `$insert`
 
 ```ts
-.get().out($insert(studentEvalGrids))
+.get().out($insert(entitlements))
 ```
 
-The document in the pipeline must already have the stored shape, including `_id`, `touchedAt`, and `deletedAt`. Build it with `$replaceWith(field({...}))`. `$insert` sets `deletedAt: null` and `touchedAt` to the cluster time on insert, and sets `deletedAt` when the delta's `after` is null.
+The document in the pipeline must already have the stored shape, including `_id`. Build it with `$replaceWith(field({...}))`. `$insert` sets `deletedAt: null` and `touchedAt` to the cluster time on insert, and sets `deletedAt` when the delta's `after` is null.
 
-Choose `_id` so that the same logical row always hashes to the same id (`studentId + '-' + gridId`). A random id would insert a new row on every pass.
+Choose `_id` so that the same logical row always maps to the same id (`accountId + '-' + planId`). A random id would insert a new row on every pass.
 
 ## Accumulators
 
-Ordinary MongoDB `$sum` forgets how it got there. A delta accumulator knows three things: the new contribution, the previous contribution (`old`), and whether this member was deleted. The helpers in `msync` encode that, so a group stays correct without recomputing every member.
+Ordinary MongoDB `$sum` forgets how it got there. A delta accumulator knows three things: the new contribution, the previous contribution (`old`), and whether this member was deleted. The helpers encode that, so a group stays correct without recomputing every member.
 
 | Accumulator | State | Use it for |
 |---|---|---|
-| `$sum(expr)` | `number` | totals; deletions and edits subtract the old value |
+| `$sum(expr)` | `number` | totals such as `_lifetimeSpend`; deletions and edits subtract the old value |
 | `$countDict(expr)` | `Record<string, number>` | how many times each string appears; zero counts disappear |
 | `$countDictArray(expr)` | `Record<string, number>` | the same, when the input is an array of strings |
-| `$pushDict(key, value)` | map of values | collect values under a key, with add/remove |
+| `$pushDict(key, value)` | map of values | collect values under a key, with add and remove |
 | `$accumulator(init, args, accumulate, merge)` | whatever `init` returns | a fold you write in JavaScript |
 
-`$countDict` is the one the assessment stream uses: each joined cell contributes its `"row - column"` label, and the stored map is the multiset of labels still present.
+`$keys(map)` and `$entries(map)` are expressions over that stored state. They belong in the `extra` argument of `$group` / `$groupId`, where the document is the group result. `$keys` turns a `_tagCounts` map into the `_tags` array readers actually query.
 
-`$keys(map)` and `$entries(map)` are expressions over that stored state. They belong in the `extra` argument of `$group` / `$groupId`, where the document is the group result.
-
-`$accumulator` takes plain functions. They are shipped to MongoDB as JavaScript (`lang: 'js'`), so keep them self-contained: no closures over outside variables. `accumulate` receives the state plus the values you listed in the argument array. `merge` combines two states. The delta wiring (old value, deleted flag) is up to the argument expressions you pass; look at `$countDict` in `lib/accumulators/index.ts` for the pattern of reading `root<Part<Doc>>().of('v' | 'old' | 'deleted')`.
+`$accumulator` takes plain functions. They are shipped to MongoDB as JavaScript (`lang: 'js'`), so keep them self-contained: no closures over outside variables. `accumulate` receives the state plus the values you listed in the argument array. `merge` combines two states. The delta wiring (old value, deleted flag) is up to the argument expressions you pass. `$countDict` in `lib/accumulators/index.ts` is the pattern: it reads `root<Part<Doc>>().of('v' | 'old' | 'deleted')`.
 
 ## Predicates and queries
 
@@ -262,15 +288,14 @@ Two layers, used in different places:
 **Query predicates** (`$eq`, `$ne`, `$gt`, `$in`, `$exists`, `$type`, and `field.has(...)`) build a MongoDB filter. They show up in `hardMatch`, and internally in the resume filters `msync` writes for you.
 
 ```ts
-import { $and } from '@omegup/msync'
-import { $eq } from '@omegup/msync'
+import { $and, $eq } from '@omegup/msync'
 
 hardMatch: $and(
-  root<Invoice>().of('status').has($eq('open')),
+  root<Order>().of('status').has($eq('open')),
 )
 ```
 
-`$and`, `$or`, and `$nor` combine queries and skip any argument that is null, which is why internal code can pass `condition && query`.
+`$and`, `$or`, and `$nor` combine queries and skip any argument that is null, which is why a filter can be `condition && query`.
 
 ## Machine
 
@@ -288,17 +313,17 @@ await machine.start(info => {
 
 One runner: the machine is that runner. Several runners: they are merged, and the first one that has work proceeds. `.start` loops until the callback returns `true` or a tick throws. A thrown error is logged and the process exits.
 
-`wrap(machine)` is the identity; it exists so a function can accept a machine and return one.
+`wrap(machine)` is the identity. It exists so a function can accept a machine and return one.
 
-The `debug` string is the best runtime log. It names the stream, the collection, and the step: catching up, cloning into the snapshot, running the aggregation, waiting for a change. Log it from the `start` callback the way `back-sync` does.
+`info.debug` names the stream, the collection, and the step: catching up, cloning into the snapshot, running the aggregation, waiting for a change. Log it from the `start` callback.
 
 ## What gets stored
 
-For a `staging` stream named `evalCells-rowName` on `evaluationCells`:
+For a `staging` stream named `order-account-name` on `orders`:
 
 | Collection | Role |
 |---|---|
-| `evaluationCells_evalCells-rowName_snapshot` | Last committed `before`, in-flight `after`, `updated` flag |
+| `orders_order-account-name_snapshot` | Last committed `before`, in-flight `after`, `updated` flag |
 | `__last` | One document per stream name: resume time, the pipeline payload, and whether a job is in progress |
 
 `from` uses only `__last`.
@@ -317,55 +342,48 @@ Indexes `msync` ensures:
 - snapshot indexes on `updated`, `before`, and `after` so each tick can find the rows that just changed
 - `before.<localField>` and `before.<foreignField>` when a `$lookup` is involved
 
-Change-stream pre- and post-images are enabled on the source collection (`collMod`). The server-side expiry of those images is yours to set; `prepare()` in the test helpers sets `expireAfterSeconds: 60` at the cluster. A stream that falls further behind than that window has to rebuild, because the pre-image it needs has expired.
+Change-stream pre- and post-images are enabled on the source collection (`collMod`). The server-side expiry of those images is yours to set. `prepare()` sets `expireAfterSeconds: 60` at the cluster and connects with `MONGO_URL`. A stream that falls further behind than that window has to rebuild, because the pre-image it needs has expired.
 
 ## Names
 
 `staging` and `from` record the call stack next to the stream name. The same name from a second call site throws `streamName already used`. One name, one definition, one `__last` document.
 
-Include the role in the name (`'assessment-evaluable-names'`, `'termRows-evalCells'`). Inner lookups need their own names, because they are streams with their own snapshots.
+Include the role in the name (`'account-lifetime-spend'`, `'plans-for-entitlements'`). Inner lookups need their own names, because they are streams with their own snapshots.
 
-## Putting an area together
+## Composing areas
 
-Mirror the evaluation machine in `back-sync`:
+An area is a function from a client to a `Machine`. Billing owns orders and spend. Catalog owns plans and entitlements. The process does not care how many streams sit inside each one.
 
 ```ts
-export default function evaluation(client: MongoClient) {
+export function billing(client: MongoClient) {
   const db = client.db(process.env.MONGO_NAME)
   const machine = new Machine()
+  const accounts = db.collection<Account & Model>('accounts')
+  const orders = db.collection<Order & Model>('orders')
 
-  const evalCells = db.collection<Cell & Model>('evaluationCells')
-  const termRows = db.collection<Row & Model>('termEvaluationRows')
-  const assessments = db.collection<Assessment & Model>('assessments')
-
-  // phase 1 — fields other streams project
-  machine.add(makeEvalCellRowNameStream(evalCells, termRows))
-
-  // phase 2 — streams that read those fields
-  machine.add(makeAssessmentEvaluableNamesStream(assessments, evalCells))
-
+  machine.add(makeAccountCohortStream(accounts))
+  machine.add(makeOrderAccountNameStream(orders, accounts))
+  machine.add(makeAccountSpendStream(orders, accounts))
   return machine
 }
 ```
 
-The root process adds each area and starts once:
-
 ```ts
 const machine = new Machine()
-machine.add(evaluation(client).runner())
-machine.add(groups(client).runner())
+machine.add(billing(client).runner())
+machine.add(catalog(client).runner())
 await machine.start(info => {
   console.log(new Date(), info.debug)
 })
 ```
 
-Phases are a reading order. The `_` convention is the actual dependency. A stream that projects `_rowName` does not have to be scheduled after the stream that writes it; it simply ignores documents until the field is there. Writing them in phase order keeps the file honest about which collection is the source of which field.
+The order you `add` streams is a reading order. The `_` convention is the actual dependency. A stream that projects `_accountName` ignores orders until that field is there, whether or not it was registered after the stream that writes it.
 
 ## Conventions that keep types honest
 
-- Intersect your document type with `Model` at the collection boundary: `Collection<Assessment & Model>`.
-- Narrow the view with `OPick<Doc, '_id' | 'rowId'>` (or a projection `as const` and `keyof typeof projection`) and pass that key union as the second type argument of `staging<Doc, Keys>`. The rest of the pipeline then only offers those fields.
+- Intersect your document type with `Model` at the collection boundary: `Collection<Order & Model>`.
+- Narrow the view with `OPick<Doc, '_id' | 'accountId'>` (or a projection `as const` and `keyof typeof projection`) and pass that key union as the second type argument of `staging<Doc, Keys>`. The rest of the pipeline then only offers those fields.
 - Use `O<{ ... }>` for the object types you pass to `root<T>()` and to `$merge<O<{ ... }>>()`. `O` marks the type as a document the type-level machinery can pick apart.
 - Use `Arr<T>` and `Rec<K, V>` from `@omegup/msync` in types that flow into expressions and accumulators. They are the aliases the signatures expect.
 - Pair every derived field with a leading `_` unless you have a reason to list it in `needs`.
-- Keep one stream responsible for a given derived field. Two streams writing `_rowName` will fight, and teardown of either one will unset it.
+- Keep one stream responsible for a given derived field. Two streams writing `_accountName` will overwrite each other, and teardown of either one will unset it.
