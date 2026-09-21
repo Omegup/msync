@@ -1,4 +1,17 @@
-import type { App, ConstHKT, HKT, I, IdHKT, O, RORec, StrKey, U, Undef, rawItem } from '../../types'
+import type {
+  App,
+  ConstHKT,
+  HKT,
+  I,
+  IdHKT,
+  N,
+  O,
+  RORec,
+  StrKey,
+  U,
+  Undef,
+  rawItem,
+} from '../../types'
 import type { Field } from '../field'
 import type { Expr } from '../types'
 import {
@@ -13,11 +26,54 @@ import {
 import { asExpr, asExprRaw } from './expr-base'
 import { val } from './val'
 
-export const concat = <D, C>(...expr: Expr<string, D, C>[]) =>
+export const concat: {
+  <D, C>(...expr: Expr<string, D, C>[]): Expr<string, D, C>
+  <D, C>(...expr: Expr<string | N, D, C>[]): Expr<string | N, D, C>
+} = <D, C>(...expr: Expr<string | N, D, C>[]) =>
   asExpr<string, D, C>({
     raw: f => asExprRaw({ $concat: expr.map(e => e.raw(f).get()) }),
   })
 
+export const $substr = <D, C>(
+  expr: Expr<string, D, C>,
+  start: Expr<number, D, C>,
+  length: Expr<number, D, C>,
+) =>
+  asExpr<string, D, C>({
+    raw: f =>
+      asExprRaw({
+        $substrCP: [expr.raw(f).get(), start.raw(f).get(), length.raw(f).get()],
+      }),
+  })
+export const padLeft = <D, C>(expr: Expr<string, D, C>, pad: string) =>
+  asExpr<string, D, C>({
+    raw: f =>
+      asExprRaw({
+        $let: {
+          vars: {
+            x: {
+              $concat: [{ $literal: pad }, expr.raw(f).get()],
+            },
+          },
+          in: { $substrCP: ['$$x', { $subtract: [{ $strLenCP: '$$x' }, pad.length] }, pad.length] },
+        },
+      }),
+  })
+export const regex = <D, C>(
+  expr: Expr<string, D, C>,
+  regex: Expr<string, D, C>,
+  options?: Expr<string, D, C>,
+) =>
+  asExpr<boolean, D, C>({
+    raw: f =>
+      asExprRaw({
+        $regexMatch: {
+          input: expr.raw(f).get(),
+          regex: regex.raw(f).get(),
+          options: options?.raw(f).get(),
+        },
+      }),
+  })
 export const str = <D, C>(expr: Expr<unknown, D, C>) =>
   asExpr<string, D, C>({
     raw: f => asExprRaw({ $toString: expr.raw(f).get() }),
@@ -39,13 +95,12 @@ export const fieldM = <
   m: Pick<M, Dom>,
 ) =>
   asExpr<O<{ readonly [K in Dom]: T[M[K]] }>, D, C>({
-    raw: <DeltaD extends O, I extends U>(f: Field<DeltaD, D | Undef<I>>) =>
+    raw: <DeltaD extends O, I extends U, Ctx>(f: Field<DeltaD, D | Undef<I>, Ctx>) =>
       asExprRaw<O<{ readonly [K in Dom]: T[M[K]] }>, DeltaD, C>(
         Object.fromEntries(
-          Object.entries(m).map(<K extends Dom>([dom, ref]: readonly [K, M[K]]) => [
-            dom,
-            expr[ref].raw(f).get(),
-          ]),
+          Object.entries(m).flatMap(<K extends Dom>([dom, ref]: readonly [K, M[K]]) =>
+            expr[ref] ? [[dom, expr[ref].raw(f).get()]] : [],
+          ),
         ),
       ),
   })

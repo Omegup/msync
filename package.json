@@ -1,19 +1,25 @@
 {
     "name": "@omegup/msync",
+    "type": "module",
     "module": "index.ts",
     "scripts": {
-        "tsc": "tsc"
+        "tsc": "tsc",
+        "build": "rollup -c"
     },
     "devDependencies": {
-        "@types/bun": "latest"
-    },
-    "peerDependencies": {
-        "typescript": "^5.6.3"
+        "@rollup/plugin-typescript": "^12.3.0",
+        "@types/node": "^25.6.0",
+        "prettier": "^3.3.3",
+        "rollup": "^4.59.0",
+        "rollup-plugin-dts": "^6.3.0",
+        "tslib": "^2.8.1",
+        "typescript": "^5.7.3"
     },
     "dependencies": {
-        "mongodb": "^6.8.0",
-        "prettier": "^3.3.3",
         "dayjs": "^1.11.9",
-        "dotenv": "^16.3.1"
+        "dotenv": "^16.3.1",
+        "json-canonicalize": "^2.0.0",
+        "mongodb": "^6.8.0",
+        "synchronous-promise": "^2.0.17"
     }
 }

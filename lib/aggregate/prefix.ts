@@ -40,7 +40,7 @@ export const concatDelta = <Q extends O, T extends Q, V extends Q, W extends Q>(
   raw: f => concatStages(part1.raw(f), part2.raw(f)),
 })
 
-type Concat<out Q, in T extends Q, out V extends Q, in out C, in out M extends n = n> = {
+export type Concat<out Q, in T extends Q, out V extends Q, in out C, in out M extends n = n> = {
   with: <Q2, W extends Q2>(extra: RawStages<Q | Q2, V, W, C, M>) => Concat<Q | Q2, T, W, C, M>
   stages: RawStages<Q, T, V, C, M>
 }

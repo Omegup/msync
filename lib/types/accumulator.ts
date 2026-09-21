@@ -1,17 +1,5 @@
-import type { Expr } from '.'
-import type {
-  HKT,
-  I,
-  N,
-  O,
-  RORec,
-  RawObj,
-  Rec,
-  Type,
-  U,
-  Undef,
-  jsonItem
-} from '../../types'
+import type { Expr } from './expr'
+import type { HKT, I, N, O, RORec, RawObj, Rec, Type, U, Undef, jsonItem } from '../../types'
 import type { Field } from '../field'
 import type { Exact } from '../utils/map-object'
 
@@ -50,7 +38,7 @@ export type Accumulator<in Doc, out T, in Ctx = unknown> = {
     ): AccumulatorRaw<T | I, DeltaD, Ctx>
   }
 }
-export type Part<Doc> = Rec<'v', Doc> & RORec<'old', boolean>
+export type Part<Doc> = Rec<'v', Doc> & RORec<'old', boolean> & { readonly deleted?: true | N }
 
 export type DeltaAccumulator<in out Doc, in out T, in out Ctx = unknown> = {
   group: Accumulator<Part<Doc>, T, Ctx>

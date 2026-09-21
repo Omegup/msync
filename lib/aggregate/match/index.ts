@@ -1,2 +1,2 @@
-export { $matchDelta } from './$match-delta'
+export { $matchDelta, matchDelta } from './$match-delta'
 export { $match } from './$match'

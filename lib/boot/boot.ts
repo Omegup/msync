@@ -1,30 +1,42 @@
 import crypto from 'crypto'
-import { UUID, type ChangeStream, type Timestamp, Collection } from 'mongodb'
-import type { N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
-import type { HKT, I, IdHKT } from '../../types/hkt'
-import { $match_, $project_, $replaceWith_ } from '../aggregate/mongo-stages'
+import { Collection, UUID, type ChangeStream, type Timestamp } from 'mongodb'
+import type { N, O, O2, O3, RORec, StrKey, UpdateFilter, View } from '../../types'
+import type { HKT, I } from '../../types/hkt'
+import { $match_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
 import { concatDelta, emptyDelta, link, pipe, type DeltaPipe } from '../aggregate/prefix'
+import { mergeObjects } from '../expression'
 import { field } from '../expression/concat'
-import { $ifNull, and, eq, ite, ne } from '../expression/logic'
+import { $ifNull, and, eq, ite } from '../expression/logic'
 import { nil, val } from '../expression/val'
-import { root } from '../field'
-import { $eq, $gteTs, $ne } from '../predicate'
-import { $expr } from '../predicate/$expr'
-import { $and } from '../query/logic'
+import { ctx, root } from '../field'
+import { $eq, $ne } from '../predicate'
 import { aggregate } from '../stream/aggregate'
 import type { AggregateCommand, Before, Expr, SnapshotStreamExecutionResult } from '../types'
 import type { Frame, HasJob, Iterator, Runner } from '../types/machine'
-import type { After, D, Del, Delta, DeltaStages, Model, RawStages, UDelta } from '../types/stream'
+import type {
+  Actions,
+  After,
+  D,
+  Delta,
+  DeltaStages,
+  Model,
+  RawStages,
+  StreamRunnerParam,
+  TeardownRecord,
+  UDelta,
+} from '../types/stream'
+import { noop } from '../utils'
 import { asBefore } from '../utils/before'
+import { createIndex, ensureCollection, indexMap } from '../utils/db-indexes'
 import { log } from '../utils/log'
-import { spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
-import { createIndex } from '../utils/db-indexes'
-
-type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
-type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
+import type { Allowed, AllowedPick, Last, Teardown, TsData } from './boot-utils'
+import { actions } from './boot-utils'
+import { getFirstStages } from './first-stages'
+import { set, to } from '../update'
+import type { Updater } from '../update/updater';
 
 export const streamNames: Record<string, string> = {}
 const executes = <
@@ -36,169 +48,325 @@ const executes = <
   view: View<V, Allowed<KK>>,
   input: DeltaStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result>,
   streamName: string,
+  skip = false,
+  after?: () => Promise<void>,
+  needs: Partial<Record<KK, 0 | 1>> = {},
 ): SnapshotStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
+  type T = AllowedPick<V, KK>
+
+  const { collection, projection, match } = view
+
+  const { firstStages, hardMatch } = getFirstStages(view, needs)
+
+  const db = collection.s.db,
+    coll = collection.collectionName
+
   const hash = crypto
     .createHash('md5')
     .update(new Error().stack + '')
     .digest('base64url')
   if (!streamNames[streamName]) streamNames[streamName] = hash
   else if (streamNames[streamName] != hash) throw new Error(`streamName ${streamName} already used`)
-  type T = AllowedPick<V, KK>
-  type K = Allowed<KK>
-  const { collection, projection, hardMatch, match } = view
-  const job = {}
-  const db = collection.s.db,
-    coll = collection.collectionName
-  db.command({
-    collMod: coll,
-    changeStreamPreAndPostImages: { enabled: true },
-  })
-  createIndex(
-    collection,
-    { touchedAt: 1 },
-    hardMatch
-      ? {
-          partialFilterExpression: hardMatch,
-          name: 'touchedAt_hard_' + new UUID().toString('base64'),
-        }
-      : {},
-  ).catch(e => e.code == 86 || Promise.reject(e))
 
-  const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
+  const last = db.collection<Last>('__last')
   const snapshotCollection = db.collection<UDelta<T>>(coll + '_' + streamName + '_snapshot')
 
-  createIndex(
-    snapshotCollection,
-    { updated: 1 },
-    {
-      partialFilterExpression: { updated: true },
-      name: 'updated_' + new UUID().toString('base64'),
-    },
-  )
-
-  createIndex(
-    snapshotCollection,
-    { updated: 1 },
-    {
-      partialFilterExpression: { updated: true, after: null, before: null },
-      name: 'updated_nulls_' + new UUID().toString('base64'),
-    },
-  )
-  type WithDel = 'deletedAt' | '_id' | Exclude<K, 'deletedAt' | '_id'>
-  const projectInput = $project_<V, WithDel>(
-    spread<RORec<K, 1>, RORec<'deletedAt' | '_id', 1>, IdHKT>(projection, {
-      deletedAt: ['deletedAt', 1],
-      _id: ['_id', 1],
-    }),
-  )
-
+  const job = {}
   const run = <Result2>(
-    finalInput: RawStages<unknown, Delta<Result>, Result2>,
+    finalInput: StreamRunnerParam<Delta<Result>, Result2>,
+    setup?: () => Promise<void>,
   ): Runner<readonly Result2[], HasJob> => {
     type W = HasJob & { debug: string }
     type It = Iterator<readonly Result2[], W>
     type FrameD = Frame<readonly Result2[], W>
     type Next = Promise<FrameD>
-    const clear = async () => {}
-    const withStop = (next: () => Next, tr?: () => void): It => {
+    const dropSnapshot = async () => {
+      await snapshotCollection.drop().catch(noop)
+      log(
+        'snapshot collection dropped',
+        streamName,
+        `db['${snapshotCollection.collectionName}'].drop()`,
+      )
+      log(
+        'with',
+        [...(indexMap.get(snapshotCollection.collectionName)?.keys() ?? [])],
+        'indexes in map before deletion',
+      )
+      indexMap.delete(snapshotCollection.collectionName)
+    }
+    const clear = async () => Promise.all([dropSnapshot(), last.deleteOne({ _id: streamName })])
+
+    const withStop = (next: () => PromiseLike<FrameD>, tr?: () => Promise<void>): It => {
       return addTeardown(() => ({ stop, next: next(), clear }), tr)
     }
-    const next = (next: () => Next, debug: string, tr?: () => void): FrameD => ({
-      cont: withStop(next, tr),
-      data: [],
-      info: { job, debug },
-    })
+    const nextData =
+      (data: readonly Result2[], job?: object) =>
+      (next: () => Next, debug: string, tr?: () => Promise<void>): FrameD => ({
+        cont: withStop(next, tr),
+        data,
+        info: { job, debug: `${streamName} on ${collection.collectionName}: ${debug}` },
+      })
+    const next = nextData([], job)
+
+    const data: TsData = {
+      input: input.delta,
+      finalInputFirst: finalInput.raw(true),
+      finalInput: finalInput.raw(false),
+      match: view.match?.raw(root()).get(),
+      project: projection,
+      teardown: finalInput.teardown(
+        (x): Teardown => ({
+          collection: x.collection.collectionName,
+          method: x.method,
+          params: x.params,
+        }),
+      ),
+    }
 
     // Step 0 : declare we are starting a job
-    const step0 = (): Next => Promise.resolve(next(step1, 'empty new collection'))
+    const step0 = () => Promise.resolve(next(step1, 'empty new collection'))
     const stop: It = withStop(step0)
 
     // Step 1 : empty new collection
     const step1 = async (): Next => {
+      log(
+        'reset collection',
+        streamName,
+        `db['${snapshotCollection.collectionName}'].updateMany( updated: true }, { $set: { updated: false, after: null } })`,
+      )
       await snapshotCollection.updateMany(
         { updated: true },
         { $set: { updated: false, after: null } },
       )
+      log('reset collection done', streamName)
       // we don't need to remove null before because they will be reinserted anyway in step 3
       return next(step2, 'get last update')
     }
     // Step 2 : get last update
     const step2 = (): Next =>
-      last.findOne({ _id: streamName }).then(ts => next(step3(ts), 'clone into new collection'))
+      Promise.all([
+        last.findOne({ _id: streamName, data, job: null }),
+        last.findOne({ _id: streamName }),
+      ]).then(ts =>
+        next(
+          step2_5(ts),
+          ts[0]
+            ? `no teardown to handle, starting at ${ts[0].ts}`
+            : ts[1]
+              ? 'handle teardown'
+              : 'start fresh',
+        ),
+      )
+    const step2_5 =
+      ([same, exists]: [Last | null, Last | null]) =>
+      async (): Next => {
+        const handleTeardown = async <W extends Document, M extends keyof Actions<unknown>>(
+          last: Pick<Last, 'data'>,
+        ) => {
+          if (!last.data) return
+          const { collection: c, method: m, params: p } = last.data.teardown
+          const { collection, method, params } = {
+            collection: db.collection<W>(c),
+            method: m as M,
+            params: p as TeardownRecord<W, M>['params'],
+          }
+          const [action, out] = actions[method](collection, params)
+          log('teardown', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
+          await Promise.all([dropSnapshot(), action])
+          log('teardown done', `db['${snapshotCollection.collectionName}'].drop()`, ...out)
+        }
+        if (!same) {
+          log('not same, new data', streamName, data)
+          await handleTeardown(exists ?? { data })
+        }
+        log('creating indexes')
+
+        await createIndex(
+          snapshotCollection,
+          { before: 1 },
+          {
+            partialFilterExpression: { before: null },
+            name: 'before_' + new UUID().toString('base64'),
+          },
+        )
+
+        await createIndex(
+          snapshotCollection,
+          { updated: 1 },
+          {
+            partialFilterExpression: { updated: true },
+            name: 'updated_' + new UUID().toString('base64'),
+          },
+        )
+
+        await createIndex(
+          snapshotCollection,
+          { updated: 1, after: 1, before: 1 },
+          {
+            partialFilterExpression: { updated: true, after: null, before: null },
+            name: 'updated_nulls_' + new UUID().toString('base64'),
+          },
+        )
+
+        await createIndex(
+          snapshotCollection,
+          { updated: 1, after: 1 },
+          {
+            partialFilterExpression: { updated: true, after: null },
+            name: 'updated_no_after_' + new UUID().toString('base64'),
+          },
+        )
+
+        await createIndex(
+          snapshotCollection,
+          { updated: 1 },
+          {
+            partialFilterExpression: { updated: true, after: null, before: null },
+            name: 'updated_nulls_' + new UUID().toString('base64'),
+          },
+        )
+        await ensureCollection(db, coll)
+        await db.command({
+          collMod: coll,
+          changeStreamPreAndPostImages: { enabled: true },
+        })
+        await createIndex(
+          collection,
+          { touchedAt: 1 },
+          hardMatch
+            ? {
+                partialFilterExpression: hardMatch.raw(root()),
+                name: 'touchedAt_hard_' + new UUID().toString('base64'),
+              }
+            : {},
+        )
+        await setup?.()
+
+        await after?.()
+        return nextData([])(async () => {
+          // @TODO: use a proper way to execute teardowns before streams
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          return next(step3(same), 'clone into new collection')
+        }, 'wait for clone into new collection')
+      }
 
     // Step 3 : clone into new collection
     const step3 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
-      const hardQuery = $and(
-        lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
-        hardMatch,
-      )
       const notDeleted: Expr<boolean, T, unknown> = eq(
         $ifNull(root<D>().of('deletedAt').expr(), nil),
       )(nil)
       const query = match ? and<T & D>(notDeleted, match) : notDeleted
-      const replaceRaw: RawStages<O, T & D, After<T> & { updated: true; _id: string }> =
-        $replaceWith_(
-          field<After<T> & { updated: true; _id: string }, T & D>({
-            after: ['after', ite(query, root<T>().expr(), nil)],
-            updated: ['updated', val(true)],
-            _id: ['_id', root<T & D>().of('_id').expr()],
-          }),
-        )
-      const cloneIntoNew = link<V | Del>()
-        .with($match_(hardQuery) as RawStages<O, V | Del, V>)
-        .with(projectInput)
+      type ToMerge = UDelta<T> & After<T> & { updated: true; _id: string }
+      const replaceRaw: RawStages<O, T & D, ToMerge> = $replaceWith_(
+        field<ToMerge, T & D>({
+          after: ['after', lastTS ? ite(query, root<T>().expr(), nil) : root<T>().expr()],
+          updated: ['updated', val(true)],
+          _id: ['_id', root<T & D>().of('_id').expr()],
+        }),
+      )
+
+      const cloneIntoNew = firstStages(lastTS)
         .with(replaceRaw)
         .with(
-          $merge_({
+          $merge_<ToMerge, UDelta<T>, { new: ToMerge }>({
             into: snapshotCollection,
             on: root<UDelta<T>>().of('_id'),
-            whenMatched: 'merge',
+            stages: 'ctx',
+            vars: {
+              new: ['new', root<ToMerge>().expr()],
+            },
+            whenMatched: link<UDelta<T>, { new: ToMerge }>().with(
+              $replaceWith_(
+                ite(
+                  eq<T | N, UDelta<T>, { new: ToMerge }>(root<UDelta<T>>().of('before').expr())(
+                    ctx<ToMerge>()('new').of('after').expr(),
+                  ),
+                  root<UDelta<T>>().expr(),
+                  mergeObjects(root<UDelta<T>>().expr(), ctx<ToMerge>()('new').expr()),
+                ),
+              ),
+            ).stages,
             whenNotMatched: 'insert',
           }),
         ).stages
 
-      const r = await aggregate<'out'>(c => c({ coll: collection, input: cloneIntoNew }))
-      await snapshotCollection.deleteMany({ updated: true, after: null, before: null })
-      return next(step4(r), 'run the aggregation')
-    }
+      const stream = await makeStream()
 
-    type C = Pick<ChangeStream, 'close' | 'tryNext'>
-
-    // Step 4 : run the aggregation // idempotent
-    const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt)
-    const step4 = (result: AggregateCommand<'out'>) => async (): Next => {
-      const start = Date.now()
-      await snapshotCollection.updateMany({ before: null }, { $set: { before: null } })
-      const aggResult = await aggregate<Result2>(
-        c =>
-          c<UDelta<T>, UDelta<T> & Delta<T>>({
-            coll: snapshotCollection as Collection<UDelta<T> & Delta<T>>,
-            input: link<UDelta<T> & Delta<T>>()
-              .with($match_(root<UDelta<T> & Delta<T>>().of('updated').has($eq<boolean>(true))))
-              .with(
-                $match_(
-                  $expr(
-                    ne(root<UDelta<T> & Delta<T>>().of('after').expr())(
-                      root<UDelta<T> & Delta<T>>().of('before').expr(),
-                    ),
-                  ),
-                ),
-              )
-              .with(input.delta)
-              .with(finalInput).stages,
-          }),
-        false,
-        start,
+      const r = await aggregate<'out'>(db, streamName, c =>
+        c({ coll: collection, input: cloneIntoNew }),
       )
-      const stream = makeStream(result.cursor.atClusterTime)
-      return next(step5({ result, aggResult, stream }), 'remove handled deleted updated', () =>
+      const start = Date.now()
+      const res = await snapshotCollection.deleteMany({ updated: true, after: null, before: null })
+      log(
+        'deleting from cloned into new collection',
+        Date.now() - start,
+        res,
+        `db['${snapshotCollection.collectionName}'].deleteMany({ updated: true, after: null, before: null })`,
+      )
+      return next(step4({ result: r, ts: lastTS?.ts, stream }), 'run the aggregation', () =>
         stream.close(),
       )
     }
 
+    type Res = {}
+    type C = Pick<ChangeStream<{}, Res>, 'close' | 'tryNext'>
+
+    // Step 4 : run the aggregation // idempotent
+    const makeStream = (): Promise<C> => makeWatchStream(view, streamName)
+    const step4 =
+      ({ result, ts, stream }: { result: AggregateCommand<'out'>; ts?: Timestamp; stream: C }) =>
+      async (): Next => {
+        const start = Date.now()
+        // await snapshotCollection.updateMany({ before: null }, { $set: { before: null } })
+        log('snapshot', streamName, 'ensure before null', Date.now() - start)
+        const first = ts === undefined
+        const stages = finalInput.raw(first)
+        await last.updateOne({ _id: streamName }, { $set: { job: 1 } }, { upsert: true })
+        // log('updated docs', await snapshotCollection.find({ updated: true }).toArray())
+        const nextRes = stream.tryNext()
+        const aggResult = await aggregate<Result2>(
+          db,
+          streamName,
+          c =>
+            c<UDelta<T>, UDelta<T> & Delta<T>>({
+              coll: snapshotCollection as Collection<UDelta<T> & Delta<T>>,
+              input: link<UDelta<T> & Delta<T>>()
+                .with($match_(root<UDelta<T> & Delta<T>>().of('updated').has($eq<boolean>(true))))
+                .with<Delta<T>, Delta<T>>(
+                  $set_(
+                    set<RORec<'before', T | null>>()({
+                      before: [
+                        'before',
+                        to($ifNull(root<UDelta<T> & Delta<T>>().of('before').expr(), nil)),
+                      ],
+                    }) as Updater<Delta<T>, Delta<T>, Delta<T>>,
+                  ),
+                )
+                .with(input.delta)
+                .with(stages).stages,
+            }),
+          false,
+          start,
+        )
+        const intoColl = (stages.at(-1) as any).$merge.into.coll
+        const startx = Date.now()
+        if (false) {
+          await db
+            .collection(intoColl)
+            .find({ touchedAt: { $gte: result.cursor.atClusterTime } })
+            .toArray()
+            .then(docs => log(`documents updated ${intoColl}`, docs, 'took', Date.now() - startx))
+        }
+        return next(
+          step5({ ts: result.cursor.atClusterTime, aggResult, stream, nextRes, first }),
+          'remove handled deleted updated',
+        )
+      }
+
     // Step 5 : remove handled deleted updated
     const step5 = (l: L) => async (): Next => {
       log(
+        streamName,
         `remove handled deleted updated db['${snapshotCollection.collectionName}'].deleteMany({ updated: true, after: null })`,
       )
       await snapshotCollection.deleteMany({ updated: true, after: null })
@@ -207,8 +375,10 @@ const executes = <
     }
     type L = {
       aggResult: AggregateCommand<Result2>
-      result: AggregateCommand<'out'>
+      ts: Timestamp
       stream: C
+      nextRes: Promise<Res | null>
+      first: boolean
     }
 
     // Step 6 : commit changes on snapshot
@@ -217,6 +387,7 @@ const executes = <
         'update snapshot aggregation',
         `db['${snapshotCollection.collectionName}'].updateMany({ updated: true }, [ { $set: { updated: false, after: null, before: '$after' } } ])`,
       )
+      const start = Date.now()
       await snapshotCollection.updateMany({ updated: true }, [
         {
           $set: {
@@ -226,37 +397,52 @@ const executes = <
           },
         },
       ])
-      log('updated snapshot aggregation')
+      log('updated snapshot aggregation', Date.now() - start)
       return next(step7(l), 'update __last')
     }
 
     // Step 7 : update __last
     const step7 = (l: L) => async (): Next => {
-      await last.updateOne(
-        { _id: streamName },
-        { $set: { ts: l.result.cursor.atClusterTime } },
-        { upsert: true },
+      const start = Date.now()
+      const patch: UpdateFilter<Last> = {
+        $set: {
+          ts: l.ts,
+          job: null,
+        },
+      }
+      if (l.first) patch.$set = { ...patch.$set, data }
+      await last.updateOne({ _id: streamName }, patch, { upsert: true })
+      log(
+        'updated __last',
+        Date.now() - start,
+        `db['${last.collectionName}'].updateOne({ _id: '${streamName}' }, `,
+        patch,
+        `, { upsert: true })`,
       )
       return step8(l)
     }
     // Step 8 : wait for change
     const step8 = (l: L): FrameD => {
-      return {
-        data: l.aggResult.cursor.firstBatch,
-        info: { job: undefined, debug: 'wait for change' },
-        cont: withStop(() =>
-          l.stream.tryNext().then(doc => (doc ? next(step2, 'restart') : step8(l))),
-        ),
-      }
+      return nextData(l.aggResult.cursor.firstBatch)(
+        () =>
+          l.nextRes.then(doc =>
+            doc
+              ? next(step3({ _id: streamName, ts: l.ts }), 'restart')
+              : step8({ ...l, nextRes: l.stream.tryNext() }),
+          ),
+        'wait for change',
+      )
     }
-    return stop
+    return skip
+      ? withStop(() => Promise.resolve(next(step3(null), 'clone into new collection')))
+      : stop
   }
   const hasBefore = root<UDelta<T>>().of('before').has($ne<T | N>(null))
   return {
     stages: c =>
       c<UDelta<T>, Before<T>>({
         coll: snapshotCollection,
-        input: $match_(hasBefore) as RawStages<unknown, UDelta<T>, Before<T>>,
+        input: $match_(hasBefore) as RawStages<unknown, UDelta<T>, Before<T> & UDelta<T>>,
         exec: asBefore(input.raw),
       }),
     out: run,
@@ -271,11 +457,15 @@ export interface DeltaHKT extends HKT<O3> {
 }
 
 export const staging = <V extends Model, KK extends StrKey<V>>(
-  view: View<V, Allowed<KK>>,
+  view: View<V, Allowed<KK>> & {
+    needs?: Partial<Record<KK, 0 | 1>>
+  },
   streamName: string,
+  skip = false,
+  after?: () => Promise<void>,
 ): DeltaPipe<AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT, DeltaHKT> =>
   pipe<AllowedPick<V, KK>, AllowedPick<V, KK>, AllowedPick<V, KK>, SnapshotStreamHKT, DeltaHKT>(
-    input => executes(view, input, streamName),
+    input => executes(view, input, streamName, skip, after, view.needs),
     emptyDelta(),
     concatDelta,
     emptyDelta,

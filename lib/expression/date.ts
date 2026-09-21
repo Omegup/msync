@@ -14,7 +14,14 @@ export const monthPart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> =>
   asExpr<string, D, C>({
     raw: f => asExprRaw({ $dateToString: { date: date.raw(f).get(), format: '%Y-%m' } }),
   })
-
+export const weekPart = <D, C>(date: Expr<Date, D, C>): Expr<string, D, C> =>
+  asExpr<string, D, C>({
+    raw: f => asExprRaw({ $dateToString: { date: date.raw(f).get(), format: '%Y-%U' } }),
+  })
+export const year = <D, C>(date: Expr<Date, D, C>): Expr<number, D, C> =>
+  asExpr<number, D, C>({
+    raw: f => asExprRaw({ $year: date.raw(f).get() }),
+  })
 export const dateAdd = <D, C>(
   date: Expr<Date, D, C>,
   amount: Expr<number, D, C>,
@@ -244,6 +251,41 @@ export const dateDiff = <D, C>({
                 },
               },
             },
+          },
+        },
+      }),
+  })
+
+export const mapFromPlainDateTime = <D, C>({
+  plainDate,
+  timezone,
+}: {
+  plainDate: Expr<Date, D, C>
+  timezone: Expr<string, D, C>
+}): Expr<Date, D, C> =>
+  asExpr<Date, D, C>({
+    raw: f =>
+      asExprRaw({
+        $dateFromString: {
+          dateString: {
+            $dateToString: { date: plainDate.raw(f).get(), timezone: 'GMT' },
+          },
+          timezone: timezone.raw(f).get(),
+        },
+      }),
+  })
+
+export const mapToPlainDateTime = <D, C>(
+  date: Expr<Date, D, C>,
+  timezone: Expr<string, D, C>,
+): Expr<Date, D, C> =>
+  asExpr<Date, D, C>({
+    raw: f =>
+      asExprRaw({
+        $dateFromString: {
+          $dateToString: {
+            date: date.raw(f).get(),
+            timezone: timezone.raw(f).get(),
           },
         },
       }),

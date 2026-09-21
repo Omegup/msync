@@ -1,9 +1,9 @@
 import type { ConstHKT, HKT, I, IdHKT, N, O, RORec, Rec, jsonItem } from '../../../types'
-import { eqTyped, ite } from '../../expression/logic'
+import { $ifNull, eqTyped, ite } from '../../expression/logic'
 import { nil } from '../../expression/val'
 import { root } from '../../field'
 import type { BA, Delta, Expr, FRawStages, RawStages } from '../../types'
-import { set, to, type Updater, type UpdaterHKT } from '../../update'
+import { set, to, type Updater, type UpdaterHKT } from '../../update/updater'
 import { mapExact1, type MapK } from '../../utils/map-object'
 import { $set1 } from '../mongo-stages'
 
@@ -18,7 +18,7 @@ const deltaExpr =
   <K extends BA>(field: K): Expr<V | null, Delta<T> & E> => {
     type F = ParDeltaHKT<K, T, E>
     return ite<V | null, null, T, F>(
-      eqTyped<null, T, F, unknown>(root<Delta<T>>().of(field).expr(), nil),
+      eqTyped<null, T, F, unknown>($ifNull(root<Delta<T>>().of(field).expr(), nil), nil),
       nil,
       expr(field),
     )
@@ -52,15 +52,25 @@ export const $setEach = <
 >(
   updater: (k: BA) => Updater<Delta<T> & E, T | N, V | null, C>,
   dict: MapK<BA2, ConstHKT<BA>>,
-): RawStages<unknown, Delta2<T, BA2> & E, Rec<BA2, V | null> & Omit<Delta<T> & E, BA2>, C, 1> =>
-  $setEach1<T, V, BA2, E, C>(updater, dict)<IdHKT<O>>(root)
+): RawStages<unknown, Delta<T> & E, Delta<T> & Rec<BA2, V | null> & Omit<E, BA2>, C, 1> =>
+  $setEach1<T, V, BA2, E, C>(updater, dict)<IdHKT<O>>(root) as RawStages<
+    unknown,
+    Delta<T> & E,
+    Delta<T> & Rec<BA2, V | null> & Omit<E, BA2>,
+    C,
+    1
+  >
 
-export const $replaceWithEach = <T extends O, V extends jsonItem, E>(
-  expr: <K extends BA>(field: K) => Expr<V | null, Rec<K, T> & Delta<T> & E>,
-): RawStages<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>> => {
-  const t = deltaExpr<T, V, E>(expr)
+export const $replaceWithEach1 = <T extends O, V extends jsonItem, E = unknown>(
+  t: <K extends BA>(field: K) => Expr<V | null, Delta<T> & E>,
+) => {
   return $setEach<T, V, BA, E>(k => to(t(k)), {
     after: ['after', 'after'],
     before: ['before', 'before'],
-  })
+  }) as RawStages<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>>
 }
+
+export const $replaceWithEach = <T extends O, V extends jsonItem, E = unknown>(
+  expr: <K extends BA>(field: K) => Expr<V | null, Rec<K, T> & Delta<T> & E>,
+): RawStages<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>> =>
+  $replaceWithEach1<T, V, E>(deltaExpr<T, V, E>(expr))

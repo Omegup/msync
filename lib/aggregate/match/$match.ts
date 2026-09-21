@@ -1,4 +1,4 @@
-import { $matchDelta } from '.'
+import { $matchDelta } from './$match-delta'
 import type { doc } from '../../../types'
 import { $expr } from '../../predicate/$expr'
 import type { DeltaStages, Expr } from '../../types'

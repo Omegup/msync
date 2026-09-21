@@ -4,7 +4,7 @@ import type { Field } from '../field'
 declare const Query: unique symbol
 declare const QueryRaw: unique symbol
 
-export type QueryRaw<T, C> = RawObj & {
+export type QueryRaw<T, C = unknown> = RawObj & {
   [Type]?(x: typeof QueryRaw, y: T, c: C): void
 }
 

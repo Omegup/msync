@@ -1,22 +1,33 @@
 import crypto from 'crypto'
 import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
 import type { N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
-import type { HKT, I, IdHKT } from '../../types/hkt'
+import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
 import { concatStages, link, pipe } from '../aggregate/prefix'
 import { root } from '../field'
-import { $eq, $gteTs } from '../predicate'
+import { $eq, $exists, $gteTs } from '../predicate'
 import { $expr } from '../predicate/$expr'
 import { $and } from '../query/logic'
 import { aggregate } from '../stream/aggregate'
 import type { Frame, HasJob, Iterator, Query, RawStages, Runner } from '../types'
 import type { AggregateCommand } from '../types/aggregate'
-import type { D, Del, Model, SimpleStreamExecutionResult } from '../types/stream'
-import { spread } from '../utils/map-object'
+import type {
+  Actions,
+  D,
+  Del,
+  Model,
+  SimpleStreamExecutionResult,
+  StreamRunnerParam,
+  TeardownRecord,
+} from '../types/stream'
+import { log } from '../utils'
+import { createIndex, ensureCollection } from '../utils/db-indexes'
+import { mapExactToObject, spread } from '../utils/map-object'
 import { addTeardown } from '../utils/tear-down'
 import { makeWatchStream } from '../watch'
 import { streamNames } from './boot'
-import { createIndex } from '../utils/db-indexes'
+import { actions, type Last, type Teardown, type TsData } from './boot-utils'
+import { previous } from './first-stages'
 
 type Allowed<K> = Exclude<K, 'deletedAt' | '_id'>
 type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -30,6 +41,7 @@ const executes = <
   view: View<V, Allowed<KK>>,
   input: RawStages<q | AllowedPick<V, KK>, AllowedPick<V, KK>, Result, unknown, 1>,
   streamName: string,
+  needs: Partial<Record<KK, 0 | 1>>,
 ): SimpleStreamExecutionResult<q | AllowedPick<V, KK>, Result> => {
   const hash = crypto
     .createHash('md5')
@@ -38,100 +50,180 @@ const executes = <
   if (!streamNames[streamName]) streamNames[streamName] = hash
   else if (streamNames[streamName] != hash) throw new Error('streamName already used')
   type K = Allowed<KK>
-  const { collection, projection, hardMatch, match } = view
+  const { collection, projection, hardMatch: pre, match } = view
+
+  const removeNotYetSynchronizedFields: null | readonly Query<V>[] =
+    projection &&
+    Object.values(
+      mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<Query<V> | null>>(projection, (_, k) =>
+        (needs[k] ?? k.startsWith('_')) ? root<V>().of(k).has($exists(true)) : null,
+      ),
+    )
+  const hardMatch = removeNotYetSynchronizedFields
+    ? $and(pre, ...removeNotYetSynchronizedFields)
+    : pre
+
   const job = {}
   const db = collection.s.db,
     coll = collection.collectionName
-  db.command({
-    collMod: coll,
-    changeStreamPreAndPostImages: { enabled: true },
-  })
-
-  createIndex(
-    collection,
-    { touchedAt: 1 },
-    {
-      partialFilterExpression: { deletedAt: { $eq: null } },
-      name: 'touchedAt_' + new UUID().toString('base64'),
-    },
-  )
-  const last = db.collection<{ _id: string; ts: Timestamp }>('__last')
+  const last = db.collection<Last>('__last')
   type D_ID = 'deletedAt' | '_id'
   // TODO create indexes (if snapshot is in sources)
   type WithDel = D_ID | Exclude<K, D_ID>
-  const projectInput = $project_<V, WithDel>(
-    spread<RORec<K, 1>, RORec<D_ID, 1>, IdHKT>(projection, {
-      deletedAt: ['deletedAt', 1],
-      _id: ['_id', 1],
-    }),
-  )
+  const projectInput =
+    projection &&
+    $project_<V, WithDel>(
+      spread<RORec<K, 1>, RORec<D_ID, 1>, IdHKT>(projection, {
+        deletedAt: ['deletedAt', 1],
+        _id: ['_id', 1],
+      }),
+    )
   const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
 
+  const stages = (lastTS: { _id: string; ts: Timestamp } | null) => {
+    const hardQuery: Query<V> | undefined = $and(
+      lastTS && root<Model>().of('touchedAt').has($gteTs(previous(lastTS.ts))),
+      hardMatch,
+      notDeleted,
+      match && $expr(match),
+    )
+    const ln = link<V | Del>().with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
+    return (projectInput ? ln.with(projectInput) : ln).with<unknown, Result>(input)
+  }
+
   const run = <Result2>(
-    finalInput: RawStages<unknown, Result, Result2>,
+    finalInput: StreamRunnerParam<Result, Result2>,
   ): Runner<readonly Result2[], HasJob> => {
     type W = HasJob & { debug: string }
     type It = Iterator<readonly Result2[], W>
     type FrameD = Frame<readonly Result2[], W>
     type Next = Promise<FrameD>
     const clear = async () => {}
-    const withStop = (next: () => Next, tr?: () => void): It => {
+    const withStop = (next: () => PromiseLike<FrameD>, tr?: () => Promise<void>): It => {
       return addTeardown(() => ({ stop, next: next(), clear }), tr)
     }
-    const next = (next: () => Next, debug: string, tr?: () => void): FrameD => ({
+    const next = (next: () => Next, debug: string, tr?: () => Promise<void>): FrameD => ({
       cont: withStop(next, tr),
       data: [],
       info: { job, debug },
     })
 
+    const data: TsData = {
+      input: input,
+      finalInputFirst: finalInput.raw(true),
+      finalInput: finalInput.raw(false),
+      match: view.match?.raw(root()).get(),
+      project: projection,
+      teardown: finalInput.teardown(
+        (x): Teardown => ({
+          collection: x.collection.collectionName,
+          method: x.method,
+          params: x.params,
+        }),
+      ),
+    }
+
     // Step 0 : declare we are starting a job
-    const step0 = (): Next => Promise.resolve(next(step1, 'get last update'))
+    const step0 = () => Promise.resolve(next(step1, 'get last update'))
     const stop: It = withStop(step0)
 
     // Step 1 : get last update
-    const step1 = (): Next =>
-      last.findOne({ _id: streamName }).then(ts => next(step4(ts), 'clone into new collection'))
+    const step1 = async (): Next => {
+      log('creating indexes')
+      await ensureCollection(db, coll)
+      await db.command({
+        collMod: coll,
+        changeStreamPreAndPostImages: { enabled: true },
+      })
 
-    type C = Pick<ChangeStream, 'close' | 'tryNext'>
-    // Step 4 : run the aggregation // idempotent
-    const makeStream = (startAt: Timestamp): C => makeWatchStream(db, view, startAt)
-    const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
-      const hardQuery: Query<V> | undefined = $and(
-        lastTS && root<Model>().of('touchedAt').has($gteTs(lastTS.ts)),
-        hardMatch,
-        notDeleted,
-        match && $expr(match),
+      await createIndex(
+        collection,
+        { touchedAt: 1 },
+        {
+          partialFilterExpression: { deletedAt: { $eq: null } },
+          name: 'touchedAt_' + new UUID().toString('base64'),
+        },
       )
-      const aggResult = await aggregate<Result2>(c =>
+
+      log('stream started', { streamName, data })
+      const ts = await Promise.all([
+        last.findOne({ _id: streamName, data }),
+        last.findOne({ _id: streamName }),
+      ])
+      log('got last update', { streamName, ts })
+      return next(step2_5(ts), 'handle teardown')
+    }
+    const step2_5 =
+      ([same, exists]: [Last | null, Last | null]) =>
+      async (): Next => {
+        const handleTeardown = async <W extends Document, M extends keyof Actions<unknown>>(
+          last: Last,
+        ) => {
+          if (!last.data) return
+          const { collection: c, method: m, params: p } = last.data.teardown
+          const { collection, method, params } = {
+            collection: db.collection<W>(c),
+            method: m as M,
+            params: p as TeardownRecord<W, M>['params'],
+          }
+          const [action, out] = actions[method](collection, params)
+          log('teardown', ...out)
+          await action
+          log('teardown done', ...out)
+        }
+        if (exists && !same) await handleTeardown(exists)
+        return {
+          cont: withStop(async () => {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            return next(step4(same), 'clone into new collection')
+          }),
+          data: [],
+          info: { debug: 'wait for clone into new collection', job: undefined },
+        }
+      }
+
+    type C = Pick<ChangeStream<{}, {}>, 'close' | 'tryNext'>
+    // Step 4 : run the aggregation // idempotent
+    const makeStream = (): Promise<C> => makeWatchStream(view, streamName)
+    const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {
+      const raw = stages(lastTS).with(finalInput.raw(lastTS === null)).stages
+      const stream = await makeStream()
+      // const currTime = await getCurrentTimestamp(db)
+      const nextRes = stream.tryNext()
+      const aggResult = await aggregate<Result2>(db, streamName, c =>
         c<V | Del, V | Del>({
           coll: collection,
-          input: link<V | Del>()
-            .with($match_(hardQuery) as RawStages<unknown, V | Del, V>)
-            .with(projectInput)
-            .with<unknown, Result>(input)
-            .with(finalInput).stages,
+          input: raw,
         }),
       )
 
-      const stream = makeStream(aggResult.cursor.atClusterTime)
-      return next(step7({ aggResult, result: aggResult, stream }), 'update __last', () =>
-        stream.close(),
+
+      if (false) {
+        const intoColl = (raw.at(-1) as any).$merge.into.coll
+        await db
+          .collection(intoColl)
+          .find({ touchedAt: { $gte: null /* currTime */ } })
+          .toArray()
+          .then(docs => log(`documents updated ${intoColl}`, docs))
+      }
+
+      return next(
+        step7({ aggResult, ts: aggResult.cursor.atClusterTime, stream, nextRes }),
+        'update __last',
+        () => stream.close(),
       )
     }
 
     type L = {
       aggResult: AggregateCommand<Result2>
-      result: AggregateCommand<Result2>
+      ts: Timestamp
       stream: C
+      nextRes: Promise<{} | null>
     }
 
     // Step 7 : update __last
     const step7 = (l: L) => async (): Next => {
-      await last.updateOne(
-        { _id: streamName },
-        { $set: { ts: l.result.cursor.atClusterTime } },
-        { upsert: true },
-      )
+      await last.updateOne({ _id: streamName }, { $set: { ts: l.ts, data } }, { upsert: true })
       return step8(l)
     }
     // Step 8 : wait for change
@@ -140,7 +232,11 @@ const executes = <
         data: l.aggResult.cursor.firstBatch,
         info: { job: undefined, debug: 'wait for change' },
         cont: withStop(() =>
-          l.stream.tryNext().then(doc => (doc ? next(step1, 'restart') : step8(l))),
+          l.nextRes.then(doc =>
+            doc
+              ? next(step4({ _id: streamName, ts: l.ts }), 'restart')
+              : step8({ ...l, nextRes: l.stream.tryNext() }),
+          ),
         ),
       }
     }
@@ -161,9 +257,10 @@ const emptyLin = <V>() => ({ lin: link<V, unknown, 1>().stages })
 export const from = <V extends Model, KK extends StrKey<V>>(
   view: View<V, Allowed<KK>>,
   streamName: string,
+  needs: Partial<Record<KK, 0 | 1>> = {},
 ) =>
   pipe<AllowedPick<V, KK>, AllowedPick<V, KK>, AllowedPick<V, KK>, StreamRunnerHKT, StagesHKT>(
-    input => executes(view, input.lin, streamName),
+    input => executes(view, input.lin, streamName, needs),
     { lin: link<AllowedPick<V, KK>, unknown, 1>().stages },
     ({ lin: a }, { lin: b }) => ({ lin: concatStages(a, b) }),
     emptyLin,

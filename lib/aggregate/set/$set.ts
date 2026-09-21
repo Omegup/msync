@@ -1,6 +1,6 @@
 import type { O, Replace } from '../../../types'
 import type { DeltaStages, Expr, LinStages } from '../../types'
-import { set, type Updater, type UpdaterHKT } from '../../update'
+import { set, type Updater, type UpdaterHKT } from '../../update/updater'
 import type { MapO } from '../../utils/map-object'
 import { $replaceWith1, $replaceWith_, $set1, $set_ } from '../mongo-stages'
 import { $replaceWithDelta, $setDelta } from './$set-delta'

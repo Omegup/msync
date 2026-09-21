@@ -22,7 +22,7 @@ import type {
   Query,
   RawStages,
 } from '../types'
-import type { Updater } from '../update'
+import type { Updater } from '../update/updater'
 import { id } from '../utils/json'
 import { mapExactToObject, type ExactKeys } from '../utils/map-object'
 import { asStages } from './prefix'
@@ -70,9 +70,16 @@ export const $replaceWith1 =
   }
 
 export const $unwind1 =
-  <T extends O, K extends s, R>(k: K): FRawStages<T, T & Rec<K, Arr<R>>, T & Rec<K, R>> =>
-  f =>
-    asStages([{ $unwind: `$${f<Rec<K, Arr<R>>>().of(k).str()}` }])
+  <T extends O, K extends s, R, Null extends null = never>(
+    k: K,
+    includeNull?: Null,
+  ): FRawStages<T, T & Rec<K, Arr<R>>, T & Rec<K, R | Null>> =>
+  f => {
+    const path = `$${f<Rec<K, Arr<R>>>().of(k).str()}`
+    return asStages([
+      { $unwind: includeNull === null ? { path, preserveNullAndEmptyArrays: true } : path },
+    ])
+  }
 
 export const $group1 =
   <T extends O, ID, V extends O, C>(id: Expr<ID, T, C>, args: Accumulators<T, V, C>) =>
@@ -106,6 +113,7 @@ export const $simpleLookup1 =
   ): FRawStages<T, T, T & Rec<K, Arr<U>>, C, 1> =>
   f => {
     const { coll, k, vars, fields, ...etc } = args
+    const letVars = rawVars(vars, f<T>())
     return asStages([
       {
         $lookup: {
@@ -115,7 +123,7 @@ export const $simpleLookup1 =
             foreignField: root<R & O>().with(fields.foreign).str(),
           }),
           as: f<Rec<K, Arr<U>>>().of(k).str(),
-          let: rawVars(vars, f<T>()),
+          ...(Object.keys(letVars).length > 0 && { let: letVars }),
           ...etc,
         },
       },

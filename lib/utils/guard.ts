@@ -1,4 +1,4 @@
-import type { App, HKT, jsonItem, Literal, Par, Rec, RORec } from '../../types'
+import type { App, AsLiteral, HKT, jsonItem, N, Par, Rec, RORec } from '../../types'
 
 export type Equal<Dom, T extends Dom, V extends Dom> = {
   forward: <F extends HKT<Dom>>(x: App<F, T>) => App<F, V>
@@ -20,6 +20,8 @@ const assertEqual = <Dom, T extends Dom, V extends Dom>() =>
     forward1: id,
     backward1: id,
   }) as Equal<Dom, T, V>
+
+export const literalsEqaul = <T extends keyof any | boolean | N, V extends T>(_: AsLiteral<T> & V) => assertEqual<T, T, V>()
 
 export const omitRORec = <
   K extends string,
@@ -45,11 +47,13 @@ export const omitExclude = <
 >() => assertEqual<unknown, Omit<T, E & Exclude<K, keyof T>>, Omit<Pick<T, Exclude<K, E | R>>, R>>()
 export const renamedFields = <K extends s, F extends HKT<K, s>, G extends HKT<App<F, K>>>() =>
   assertEqual<s, keyof { [P in K as App<F, P>]: App<G, P> }, App<F, K>>()
-export const doubleExclude = <
+
+export const translateOmit = <
+  T,
   K extends string,
-  E extends s,
-  R extends s,
->() => assertEqual<K, K, Exclude<K, E & Exclude<Literal<R>, K>>>()
+  Q extends string,
+  P extends string,
+>() => assertEqual<unknown, Omit<Omit<T, K | Q>, P>, Omit<Omit<T, K | Q>, P | Q>>()
 
 export const excludeIdem = <
   K extends s,

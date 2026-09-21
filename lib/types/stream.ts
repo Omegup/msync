@@ -1,5 +1,15 @@
-import type { Timestamp } from 'mongodb'
-import type { App, HKT, ID, O, RawObj, ReadonlyCollection, Rec, Type } from '../../types'
+import type { BSON, Filter, Timestamp, UpdateFilter } from 'mongodb'
+import type {
+  App,
+  HKT,
+  ID,
+  O,
+  RawObj,
+  ReadonlyCollection,
+  Rec,
+  Type,
+  WriteonlyCollection,
+} from '../../types'
 import type { Field } from '../field'
 import type { HasJob, Runner } from './machine'
 
@@ -36,16 +46,33 @@ export type TStages<
   M extends number = number,
 > = {
   coll: ReadonlyCollection<S>
-  input: RawStages<unknown, S, B, unknown, M>
+  input: RawStages<unknown, S, S & B, unknown, M>
   exec: RawStages<Q, B, R, unknown, M>
 }
 export type Stages<out Q, out R extends Q, out SDom> = <E>(
   consume: <S extends SDom, B extends Q>(value: TStages<S, Q, B, R>) => E,
 ) => E
 
+export type Actions<W> = {
+  updateMany: [Filter<W>, UpdateFilter<W> | BSON.Document[]]
+  deleteMany: [Filter<W>]
+}
+
+export type TeardownRecord<W, M extends keyof Actions<W>> = {
+  collection: WriteonlyCollection<W>
+  method: M
+  params: Actions<W>[M]
+}
+
+export type StreamRunnerParam<in V, out Result> = {
+  raw: (first: boolean) => RawStages<unknown, V, Result>
+  teardown: <R>(consume: <W, M extends keyof Actions<W>>(x: TeardownRecord<W, M>) => R) => R
+}
+
 export type StreamRunner<out V> = <Result>(
   // this is the final input that should end with a merge stage
-  input: RawStages<unknown, V, Result>,
+  input: StreamRunnerParam<V, Result>,
+  setup?: () => Promise<void>,
 ) => Runner<readonly Result[], HasJob>
 
 export type SimpleStreamExecutionResult<out Q, out V extends Q> = {
@@ -67,8 +94,11 @@ export type Stream<
 ) => App<F, [Q | Q2, Result]>
 
 export type TS = { readonly touchedAt: Timestamp }
-export type Del = O<{ readonly deletedAt: Timestamp } & ID & TS>
-export type D = O<{ readonly deletedAt?: Timestamp | null | undefined } & ID>
+export type IsDeleted = { readonly deletedAt: Timestamp }
+export type DDel = IsDeleted & ID & TS
+export type Del = O<DDel>
+export type DeletedAt = { readonly deletedAt?: Timestamp | null | undefined }
+export type D = O<DeletedAt & ID>
 export type Model = D & TS
 
 export type OutInput<T, A = T | null> = ID & Rec<'after', A>
@@ -82,13 +112,13 @@ export type SimpleStream<in out Q extends O, out T extends Q> = <Q2 extends O, R
 
 export type BA = 'before' | 'after'
 export type PreDelta<T, K extends BA = BA, E = unknown> = Rec<K, T> & E
-export type Delta<T, K extends BA = BA, E = ID> = PreDelta<T | null, K, E>
+export type DeletedFlags = O<{ readonly before?: true; readonly after?: true }>
+export type Deleted = { readonly deleted?: DeletedFlags }
+export type Delta<T, K extends BA = BA, E = ID & Deleted> = PreDelta<T | null, K, E> & ({after: T} | {before: T})
 export type Before<T> = PreDelta<T, 'before'>
-export type After<T> = Delta<T, 'after'>
-export type UBefore<T> = O & Partial<Delta<T | null, 'before'>>
-export type UDelta<T, E = { readonly updated: boolean }> = Delta<T, 'after', ID> &
-  UBefore<T> &
-  E
+export type After<T> = PreDelta<T | null, 'after'>
+export type UBefore<T> = O & { readonly before?: T | null }
+export type UDelta<T, E = { readonly updated: boolean }> = Delta<T, 'after', ID> & UBefore<T> & E
 
 // this type of streams is based on the separation between
 // • last snapshot which is the last data successfully synced

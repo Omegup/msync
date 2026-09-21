@@ -1,5 +1,6 @@
 import type { Timestamp } from 'mongodb'
 import type { Type } from './class'
+export type { Type } from './class'
 
 export type U = undefined
 export type N = null | U
@@ -36,11 +37,9 @@ export type Replace<R, V> = Omit<R, StrKey<V>> & V & O
 
 // a generic type that restricts another type to be a literal
 // for exemple AsLiteral<'a'> is 'a' and AsLiteral<string> is never, AsLiteral<1> is 1 and AsLiteral<number> is never
-export type AsLiteral<T extends keyof any | boolean, V = NoUnion<T>> = T extends keyof any
+export type AsLiteral<T extends keyof any | boolean | N, V = NoUnion<T>> = T extends keyof any
   ? {} extends { [K in T]: 1 }
     ? never
     : V
   : V
-type NoUnion<T, V = T> = T extends unknown ? ([V] extends [T] ? T : never) : never
-export type Literal<K> = string extends K ? never : K
-export type RemoveSignature<T> = { [K in keyof T as Literal<K>]: T[K] }
+type NoUnion<T, V = T> = T extends T ? ([V] extends [T] ? T : never) : never

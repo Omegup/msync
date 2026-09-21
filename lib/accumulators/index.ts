@@ -8,7 +8,7 @@ import type { Accumulator, AccumulatorRaw, DeltaAccumulator, Expr, Part } from '
 
 const asAccumulator = <T, V, C = unknown>(x: RawObj) => x as AccumulatorRaw<T, V, C>
 
-export const $sum_ = <D extends O, C = unknown>(
+const $sum_ = <D extends O, C = unknown>(
   expr: Expr<number | N, D, C>,
 ): Accumulator<D, number, C> => ({ raw: f => asAccumulator({ $sum: expr.raw(f).get() }) })
 export const $sum = <D extends O, C = unknown>(
@@ -16,15 +16,19 @@ export const $sum = <D extends O, C = unknown>(
 ): DeltaAccumulator<D, number, C> => ({
   group: $sum_(
     ite(
-      root<Part<D>>().of('old').expr(),
-      subtract(val(0), $ifNull(sub(expr, root<Part<D>>().of('v')), val(0))),
-      sub(expr, root<Part<D>>().of('v')),
+      root<Part<D>>().of('deleted').expr(),
+      val(0),
+      ite(
+        root<Part<D>>().of('old').expr(),
+        subtract(val(0), $ifNull(sub(expr, root<Part<D>>().of('v')), val(0))),
+        sub(expr, root<Part<D>>().of('v')),
+      ),
     ),
   ),
   merge: (x, y) => add($ifNull(x, val(0)), y),
 })
 
-export const $accumulator_ = <D, T, Ctx, A extends readonly unknown[]>(
+const $accumulator_ = <D, T, Ctx, A extends readonly unknown[]>(
   init: () => RONoRaw<T>,
   accumulateArgs: AppMap<ExprHKT<D, Ctx>, A>,
   accumulate: (a: NoRaw<T>, ...args: NoRaw<A>) => RONoRaw<T>,
@@ -58,23 +62,50 @@ export const $accumulator = <D, T, Ctx, A extends readonly unknown[]>(
     func<T, [T | N, T], D, C>(merge, a, b),
 })
 
-export const $push_ = <D extends O, T, C = unknown>(
-  expr: Expr<T, D, C>,
-): Accumulator<D, Arr<T>, C> => ({
-  raw: f => asAccumulator({ $push: expr.raw(f).get() }),
-})
-
 export const $countDict = <D extends O, C = unknown>(
   expr: Expr<string, D, C>,
 ): DeltaAccumulator<D, Rec<string, number>, C> =>
-  $accumulator<D, Rec<string, number>, C, [string, boolean]>(
+  $accumulator<D, Rec<string, number>, C, [string, boolean, true | N]>(
     function () {
       return {}
     },
-    [sub(expr, root<Part<D>>().of('v')), root<Part<D>>().of('old').expr()],
-    function (a, k, old) {
+    [
+      sub(expr, root<Part<D>>().of('v')),
+      root<Part<D>>().of('old').expr(),
+      root<Part<D>>().of('deleted').expr(),
+    ],
+    function (a, k, old, deleted) {
+      if (deleted) return a
       let y = (a[k] || 0) + (old ? -1 : 1)
       return y ? (a[k] = y) : delete a[k], a
+    },
+    function (a, b) {
+      return Object.keys(b).reduce((a, k) => {
+        let y = (a[k] || 0) + b[k]
+        return y ? (a[k] = y) : delete a[k], a
+      }, a || {})
+    },
+  )
+export const $countDictArray = <D extends O, C = unknown>(
+  expr: Expr<Arr<string>, D, C>,
+): DeltaAccumulator<D, Rec<string, number>, C> =>
+  $accumulator<D, Rec<string, number>, C, [Arr<string>, boolean, true | N]>(
+    function () {
+      return {}
+    },
+    [
+      sub(expr, root<Part<D>>().of('v')),
+      root<Part<D>>().of('old').expr(),
+      root<Part<D>>().of('deleted').expr(),
+    ],
+    function (a, keys, old, deleted) {
+      if (deleted) return a
+      keys.forEach(k => {
+        const y = (a[k] || 0) + (old ? -1 : 1)
+        if (y) a[k] = y
+        else delete a[k]
+      })
+      return a
     },
     function (a, b) {
       return Object.keys(b).reduce((a, k) => {
@@ -88,7 +119,7 @@ export const $pushDict = <D extends O, V, C = unknown>(
   value: Expr<V, D, C>,
 ) =>
   // '1' => 'old'
-  $accumulator<D, Rec<string, Rec<'1' | '0', Arr<V>>>, C, [string, V, boolean]>(
+  $accumulator<D, Rec<string, Rec<'1' | '0', Arr<V>>>, C, [string, V, boolean, true | N]>(
     function () {
       return {}
     },
@@ -96,12 +127,16 @@ export const $pushDict = <D extends O, V, C = unknown>(
       sub(key, root<Part<D>>().of('v')),
       sub(value, root<Part<D>>().of('v')),
       root<Part<D>>().of('old').expr(),
+      root<Part<D>>().of('deleted').expr(),
     ],
-    function (ra, k, v, old) {
+    function (ra, k, v, old, deleted) {
+      if (deleted) return ra
       let a = { ...ra }
       //@ts-ignore
       const equal = (a, b) => {
-        if ([a, b].some(a => !a || typeof a != 'object')) return a === b
+        if (!a || !b) return a === b
+        if (a instanceof Date) return b instanceof Date && a.getTime() === b.getTime()
+        if ([a, b].some(a => Object.getPrototypeOf(a) != Object.prototype)) return a.valueOf() === b.valueOf()
         const keys = Object.keys(a)
         //@ts-ignore
         return keys.length === Object.keys(b).length && keys.every(k => equal(a[k], b[k]))
@@ -149,7 +184,7 @@ export const $keys = <D extends O, C = unknown>(
 
 export const $entries = <D extends O, V, C = unknown>(
   expr: Expr<Rec<string, Rec<'1' | '0', Arr<V>>>, D, C>,
-) =>
+): Expr<Arr<Rec<'k', string> & Rec<'v', V>>, D, C> =>
   func<Arr<Rec<'k', string> & Rec<'v', V>>, [Rec<string, Rec<'1' | '0', Arr<V>>>], D, C>(function (
     obj,
   ) {

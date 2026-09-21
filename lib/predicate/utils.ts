@@ -1,27 +1,18 @@
-import type { App, HKT, O, rawItem } from '../../types'
-import { asExpr, asExprRaw } from '../expression/expr-base'
-import { $ifNull } from '../expression/logic'
-import { nil } from '../expression/val'
-import type { Field } from '../field'
+import type { App, HKT, rawItem } from '../../types'
 import type { Predicate } from '../types'
 
-type Operators = '$eq' | '$ne' | '$gt' | '$gte' | '$lt' | '$lte' | '$in' | '$nin'
+type Operators = '$eq' | '$ne' | '$gt' | '$gte' | '$lt' | '$lte' | '$in' | '$nin' | '$type' | '$exists'
 export const operator =
   <
     K extends Operators,
-    F extends HKT<Dom, HKT<Dom, Dom>>,
-    Dom extends unknown,
-    Default extends Dom = Dom,
-    G extends HKT<Dom, HKT<Dom, Dom>> = F,
+    F extends HKT<Dom2, HKT<Dom1, unknown>>,
+    Dom1,
+    Dom2 = Dom1,
+    G extends HKT<Dom2, HKT<Dom1, unknown>> = F,
   >() =>
-  <D2 extends Dom = Default>(op: K) =>
-  <T extends D2>(operand: rawItem & App<App<F, D2>, T>): Predicate<App<App<G, D2>, T>> => {
-    type V = App<App<G, D2>, T>
+  <D2 extends Dom2 = Dom2>(op: K) =>
+  <T extends Dom1>(operand: rawItem & App<App<F, D2>, T>): Predicate<App<App<G, D2>, T>> => {
     return {
       raw: { [op]: operand },
-      expr: <D extends O, C>(field: Field<D, V, C>) =>
-        asExpr<boolean, D, C>({
-          raw: f => asExprRaw({ [op]: [$ifNull(field.expr(), nil).raw(f).get(), operand] }),
-        }),
     }
   }

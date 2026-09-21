@@ -9,13 +9,13 @@ export const val = <T extends rawItem>(val: T): Expr<T, unknown> =>
   asExpr({
     raw: () =>
       asExprRaw<T, unknown, unknown>(
-        (val && typeof val === 'object') || (typeof val === 'string' && val[0] === '$')
+        (val && typeof val === 'object' && !(val instanceof Date) ) || (typeof val === 'string' && val[0] === '$')
           ? { $literal: val }
           : val,
       ),
   })
 
-export const now: Expr<Timestamp, unknown> = asExpr({
+export const current: Expr<Timestamp, unknown> = asExpr({
   raw: () => asExprRaw<Timestamp, unknown, unknown>('$$CLUSTER_TIME'),
 })
 export const $let = <T, D, C, V extends RORec<string, jsonItem>>(

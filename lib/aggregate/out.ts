@@ -7,7 +7,7 @@ import { asStages } from './prefix'
 import { rawVars } from './raws'
 
 export type MergeInto<T extends O, Out extends O, E = unknown> =
-  | { whenNotMatched: 'insert'; into: RWCollection<T, Out> }
+  | { whenNotMatched: 'insert'; into: RWCollection<T, Out> & E }
   | { whenNotMatched: 'discard' | 'fail'; into: ReadonlyCollection<Out> & E }
 
 // whenNotMatched == 'insert' || whenMatched == 'replace'  => Out extends T
@@ -17,7 +17,7 @@ export type MergeArgs<T extends O, Out extends O, Ctx, In extends O> = {
   on: Field<T, jsonItem> & Field<Out, jsonItem>
 } & MergeInto<T, Out> &
   (
-    | ({ stages?: undefined } & (
+    | ({ stages?: never } & (
         | { whenMatched: 'keepExisting' | 'fail' }
         | {
             whenMatched: 'replace'
@@ -31,7 +31,7 @@ export type MergeArgs<T extends O, Out extends O, Ctx, In extends O> = {
     | {
         stages: true
         into: RWCollection<In, Out>
-        whenMatched: RawStages<unknown, Out, In>
+        whenMatched: RawStages<unknown, Out, In, { new: T }>
       }
     | {
         stages: 'ctx'
@@ -60,3 +60,6 @@ export const $merge_ = <T extends O, Out extends O = T, Ctx = unknown, In extend
       },
     },
   ])
+export const $merge2 = <T extends O, Out extends O = T, Ctx = unknown, In extends O = Out>(
+  args: MergeArgs<T, Out, Ctx, In>,
+) => $merge_<T, Out, Ctx, In>(args)

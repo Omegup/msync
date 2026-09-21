@@ -1,7 +1,9 @@
 import type { Arr, HKT, I, N, O, StrKey, Type, notArr, rawItem } from '../../types'
-import { Field, type Path } from '../field'
+import { Field } from '../field'
 import type { Expr } from '../types'
 import { mapExactToObject0, type MapO } from '../utils/map-object'
+
+type Omit<T, K extends keyof any> = T extends T ? Pick<T, Exclude<keyof T, K>> : never;
 
 declare const Updater: unique symbol
 export type Updater<in R, in T, out V, in C = unknown> = {
@@ -11,7 +13,7 @@ export type Updater<in R, in T, out V, in C = unknown> = {
 
 export const subUpdater = <P extends O, D, T, V, Ctx>(
   a: Updater<D, T, V, Ctx>,
-  f: Path<P, D>,
+  f: Field<P, D>,
 ): Updater<P, T, V, Ctx> => ({ raw: <R extends O>(g: Field<R, P | N>) => a.raw(g.with(f)) })
 
 export interface UpdaterHKT<R, Old, V, C, K extends keyof Old = keyof Old, V2 extends V = V> extends HKT<StrKey<V>> {
