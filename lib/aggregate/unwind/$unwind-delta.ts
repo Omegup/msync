@@ -1,33 +1,14 @@
-import type { App, Arr, AsLiteral, HKT, I, ID, Rec, RORec, doc, O } from '../../../types'
-import {
-  $ifNull,
-  $map0,
-  $map1,
-  and,
-  array,
-  concat,
-  concatArray,
-  eq,
-  eqTyped,
-  field,
-  filter,
-  first,
-  inArray,
-  ite,
-  mergeObjects,
-  ne,
-  nil,
-  not,
-  or,
-  val,
-} from '../../expression'
+import type { App, Arr, AsLiteral, doc, HKT, I, ID, O, Rec, RORec } from '../../../types'
+import { $map0, $map1, concat, field, nil, val } from '../../expression'
+import { array, concatArray, filter, first, inArray, mergeObjects } from '../../expression/array'
+import { $ifNull, and, eq, eqTyped, ite, not, or } from '../../expression/logic'
 import { ctx, Field, root } from '../../field'
-import { $expr } from '../../predicate'
 import type { BA, Deleted, DeletedFlags, Delta, Expr, PreDelta, RawStages } from '../../types'
-import { $match_, $replaceWith_, $unwind_ } from '../mongo-stages'
-import { link } from '../prefix'
-import { map1 } from '../../utils/json'
 import { literalsEqaul } from '../../utils/guard'
+import { map1 } from '../../utils/json'
+import { matchDelta } from '../match'
+import { $replaceWith_, $unwind_ } from '../mongo-stages'
+import { link } from '../prefix'
 
 type s = string
 
@@ -169,17 +150,20 @@ export const $unwindDelta = <
 
   // `k === k1`: one row per parent. Pair the (at most one) k2 on each side;
   // do not match by k2 `_id` or a pointer change becomes delete+insert of `k1._id`.
-  const k1Slot = <X>(
-    fill: Expr<U | X | null, In>,
-  ): Expr<Arr<PreDelta<U | X | null>>, In> =>
+  const k1Slot = <X>(fill: Expr<U | X | null, In>): Expr<Arr<PreDelta<U | X | null>>, In> =>
     array<PreDelta<U | X | null>, In>(
       field<PreDelta<U | X | null>, In>({
-        before: ['before', $ifNull<U | X | null, In, unknown>(first<U, In, unknown>(beforeItems), fill)],
-        after: ['after', $ifNull<U | X | null, In, unknown>(first<U, In, unknown>(afterItems), fill)],
+        before: [
+          'before',
+          $ifNull<U | X | null, In, unknown>(first<U, In, unknown>(beforeItems), fill),
+        ],
+        after: [
+          'after',
+          $ifNull<U | X | null, In, unknown>(first<U, In, unknown>(afterItems), fill),
+        ],
       }),
     )
-  const kept: Expr<Arr<PreDelta<U | null>>, In> =
-    k === k1 ? k1Slot<never>(nil) : oldByK2Id
+  const kept: Expr<Arr<PreDelta<U | null>>, In> = k === k1 ? k1Slot<never>(nil) : oldByK2Id
   const added: Expr<Arr<U>, In> = k === k1 ? emptyArr : newByK2Id
 
   const k1Delta: Expr<K1Delta, In> = field<K1Delta, In>({
@@ -272,7 +256,8 @@ export const $unwindDelta = <
     const docK2Null: Field<K2UNull, K2UNull> = root<K2UNull>()
     const k2Keep = (side: BA): Expr<U | null, K2UNull> =>
       docK2Null.of<K2UNull, K2>(k2).of<PreDelta<U | null>, BA>(side).expr()
-    const k2At = (side: BA): Expr<U | null, Doc> => padToNull<UnwoundK2<Pad>>(k2Raw(side), k2Keep(side))
+    const k2At = (side: BA): Expr<U | null, Doc> =>
+      padToNull<UnwoundK2<Pad>>(k2Raw(side), k2Keep(side))
 
     const rowOf = <A, B, D>(id: Expr<s, D>, a: Expr<A, D>, b: Expr<B, D>): Expr<Row<A, B>, D> =>
       mergeObjects<ID & Rec<K1, A>, Rec<K2, B>, D>(
@@ -325,8 +310,6 @@ export const $unwindDelta = <
     const rowK1K2 = (side: BA): Expr<Row<T, U>, Both> =>
       rowOf<T, U, Both>(completeId(side), k1AtK1K2(side), k2AtK1K2(side))
 
-    const outJoin = (side: BA): Expr<Join | null, Delta<Join>> =>
-      root<Delta<Join>>().of<Delta<Join>, BA, null>(side).expr()
 
     // Composite `_id` lives on the join row; copy it up to the delta document.
     const liftRowId: RawStages<unknown, Delta<Join>, Delta<Join>> = $replaceWith_<
@@ -355,32 +338,34 @@ export const $unwindDelta = <
     )
 
     const padded = (side: BA): Expr<boolean, Doc> => isPad<UnwoundK2<Pad>>(k2Raw(side))
-    const emptyObj: Expr<O<{}>, Doc> = field<{}, Doc>({})
+    const emptyObj: Expr<O, Doc> = field<{}, Doc>({})
     const deletedFlags: Expr<DeletedFlags, Doc> = mergeObjects<
-      Rec<'before', true> | O<{}>,
-      Rec<'after', true> | O<{}>,
+      Rec<'before', true> | O,
+      Rec<'after', true> | O,
       Doc
     >(
-      ite<Rec<'before', true> | O<{}>, Doc>(
+      ite<Rec<'before', true> | O, Doc>(
         padded('before'),
         field<RORec<'before', true>, Doc>({ before: ['before', val<true>(true)] }),
         emptyObj,
       ),
-      ite<Rec<'after', true> | O<{}>, Doc>(
+      ite<Rec<'after', true> | O, Doc>(
         padded('after'),
         field<RORec<'after', true>, Doc>({ after: ['after', val<true>(true)] }),
         emptyObj,
       ),
     )
     type JoinCore = Rec<BA, Join | null> & ID
-    const joinDelta = (joinAt: (side: BA) => Expr<Join | null, Doc>): Expr<Delta<Join>, Doc> =>
-      mergeObjects<JoinCore, Deleted | O<{}>, Doc>(
+    const joinDelta = (
+      joinAt: (side: BA) => Expr<Join | null, Doc>,
+    ): Expr<Delta<Join | null>, Doc> =>
+      mergeObjects<JoinCore, Deleted | O, Doc>(
         field<JoinCore, Doc>({
           _id: ['_id', parentId],
           before: ['before', joinAt('before')],
           after: ['after', joinAt('after')],
         }),
-        ite<Deleted | O<{}>, Doc>(
+        ite<Deleted | O, Doc>(
           or<Doc>(padded('before'), padded('after')),
           field<Deleted, Doc>({ deleted: ['deleted', deletedFlags] }),
           emptyObj,
@@ -393,15 +378,9 @@ export const $unwindDelta = <
           $replaceWith_<In, PreUnwind>(mergeObjects<In, Deltas, In>(src.expr(), deltas)),
         )
         .with<unknown, Doc>($unwind_<In & Rec<K1, K1Delta>, K2, Delta2>(k2))
-        .with<unknown, Delta<Join>>($replaceWith_<Doc, Delta<Join>>(joinDelta(joinAt)))
-        .with<unknown, Delta<Join>>(liftRowId)
-        .with<unknown, Delta<Join>>(
-          $match_<O, Delta<Join>>(
-            $expr<Delta<Join>, unknown>(
-              ne<Join | null, Delta<Join>, unknown>(outJoin('before'))(outJoin('after')),
-            ),
-          ),
-        ).stages
+        .with<unknown, Delta<Join | null>>($replaceWith_(joinDelta(joinAt)))
+        .with<unknown, Delta<Join>>(matchDelta())
+        .with<unknown, Delta<Join>>(liftRowId).stages
 
     return pipeline(
       (side: BA): Expr<Join | null, Doc> =>
@@ -429,7 +408,7 @@ export const $unwindDelta = <
   ): Expr<boolean, App<F, U | null>> => val(false)
 
   if (includeNull2 === null) {
-    const padObj: Expr<O<{}>, In> = field<{}, In>({})
+    const padObj: Expr<O, In> = field<{}, In>({})
     const padDelta = (after: Expr<O | null, In>): Expr<PreDelta<U | O | null>, In> =>
       field<PreDelta<U | O | null>, In>({
         before: ['before', padObj],
@@ -563,11 +542,11 @@ export const $unwindDelta = <
   }
 
   return unwindJoin<never>({
-      kept,
-      added,
-      padToNull: noPadToNull,
-      isPad: neverPad,
-      join: ({ k1, k2KeepK1K2, rowK1K2 }): Expr<Join | null, Unwound<never>> =>
+    kept,
+    added,
+    padToNull: noPadToNull,
+    isPad: neverPad,
+    join: ({ k1, k2KeepK1K2, rowK1K2 }): Expr<Join | null, Unwound<never>> =>
       orNil<T, Join | null, UnwoundK1<never>>(
         k1,
         orNil<U, Join, UnwoundK1K2<never>>(k2KeepK1K2, rowK1K2),

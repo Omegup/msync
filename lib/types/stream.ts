@@ -114,10 +114,10 @@ export type BA = 'before' | 'after'
 export type PreDelta<T, K extends BA = BA, E = unknown> = Rec<K, T> & E
 export type DeletedFlags = O<{ readonly before?: true; readonly after?: true }>
 export type Deleted = { readonly deleted?: DeletedFlags }
-export type Delta<T, K extends BA = BA, E = ID & Deleted> = PreDelta<T | null, K, E>
+export type Delta<T, K extends BA = BA, E = ID & Deleted> = PreDelta<T | null, K, E> & ({after: T} | {before: T})
 export type Before<T> = PreDelta<T, 'before'>
-export type After<T> = Delta<T, 'after'>
-export type UBefore<T> = O & Partial<Delta<T | null, 'before'>>
+export type After<T> = PreDelta<T | null, 'after'>
+export type UBefore<T> = O & { readonly before?: T | null }
 export type UDelta<T, E = { readonly updated: boolean }> = Delta<T, 'after', ID> & UBefore<T> & E
 
 // this type of streams is based on the separation between

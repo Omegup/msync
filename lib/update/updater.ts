@@ -3,6 +3,8 @@ import { Field } from '../field'
 import type { Expr } from '../types'
 import { mapExactToObject0, type MapO } from '../utils/map-object'
 
+type Omit<T, K extends keyof any> = T extends T ? Pick<T, Exclude<keyof T, K>> : never;
+
 declare const Updater: unique symbol
 export type Updater<in R, in T, out V, in C = unknown> = {
   [Type]?(x: typeof Updater, r: R, t: T, c: C): V

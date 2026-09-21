@@ -57,14 +57,14 @@ export const $setEach = <
 
 export const $replaceWithEach1 = <T extends O, V extends jsonItem, E = unknown>(
   t: <K extends BA>(field: K) => Expr<V | null, Delta<T> & E>,
-): RawStages<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>> => {
+) => {
   return $setEach<T, V, BA, E>(k => to(t(k)), {
     after: ['after', 'after'],
     before: ['before', 'before'],
-  })
+  }) as RawStages<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>>
 }
 
 export const $replaceWithEach = <T extends O, V extends jsonItem, E = unknown>(
   expr: <K extends BA>(field: K) => Expr<V | null, Rec<K, T> & Delta<T> & E>,
 ): RawStages<unknown, Delta<T> & E, Delta<V> & Omit<E, BA>> =>
-  $replaceWithEach1(deltaExpr<T, V, E>(expr))
+  $replaceWithEach1<T, V, E>(deltaExpr<T, V, E>(expr))

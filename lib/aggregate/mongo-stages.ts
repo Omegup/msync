@@ -16,7 +16,7 @@ export * from './raws'
 
 type s = string
 
-export const $match_ = <Q, T extends Q & O, C = unknown>(
+export const $match_ = <T extends O, C = unknown>(
   query?: Query<T, C>,
 ): RawStages<O<T>, T, T, C> => $match1(query)<IdHKT<O>>(root)
 

@@ -45,7 +45,7 @@ export const $lookupDelta = <
   k:
     | ([N1] extends [never] ? K1 : never)
     | ([N2] extends [never] ? Exclude<KK2, BA | K1> : never)
-    | Exclude<JoinId<K1, Exclude<KK2, BA | K1>>, K1 | Exclude<KK2, BA | K1>>,
+    | JoinId<K1, Exclude<KK2, BA | K1>>,
   includeNull1?: N1,
   includeNull2?: N2,
 ): RawStages<unknown, Delta<LE>, Both<K1, LE, KK2, RE, N1, N2>> => {
@@ -55,7 +55,7 @@ export const $lookupDelta = <
   const hash = crypto.createHash('md5').update(coll.collectionName+str(input)+str(exec)).digest('base64url')
 
   type ABIds = Rec<'aId' | 'bId', S | Arr<S>>
-  const ss = (f: BA) =>
+  const normForeignKey = (f: BA) =>
     to($ifNull(root<Delta<Rec<K1, LE>>>().of(f).of(k1).with(field1).expr(), val<S | S>(hash as S)))
   return link<Delta<LE>>()
     .with<unknown, Delta<Rec<K1, LE>>>(
@@ -63,7 +63,7 @@ export const $lookupDelta = <
     )
     .with<unknown, Delta<Rec<K1, LE>> & ABIds>(
       $set_<O, Delta<Rec<K1, LE>>, Delta<Rec<K1, LE>> & ABIds>(
-        set<ABIds>()({ bId: ['bId', ss('before')], aId: ['aId', ss('after')] }),
+        set<ABIds>()({ bId: ['bId', normForeignKey('before')], aId: ['aId', normForeignKey('after')] }),
       ),
     )
     .with<unknown, Delta<Rec<K1, LE>> & Rec<'a', Arr<BU>> & ABIds>(

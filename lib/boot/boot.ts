@@ -36,6 +36,7 @@ import type { Allowed, AllowedPick, Last, Teardown, TsData } from './boot-utils'
 import { actions } from './boot-utils'
 import { getFirstStages } from './first-stages'
 import { set, to } from '../update'
+import type { Updater } from '../update/updater';
 
 export const streamNames: Record<string, string> = {}
 const executes = <
@@ -255,7 +256,7 @@ const executes = <
         $ifNull(root<D>().of('deletedAt').expr(), nil),
       )(nil)
       const query = match ? and<T & D>(notDeleted, match) : notDeleted
-      type ToMerge = After<T> & { updated: true; _id: string }
+      type ToMerge = UDelta<T> & After<T> & { updated: true; _id: string }
       const replaceRaw: RawStages<O, T & D, ToMerge> = $replaceWith_(
         field<ToMerge, T & D>({
           after: ['after', lastTS ? ite(query, root<T>().expr(), nil) : root<T>().expr()],
@@ -331,14 +332,14 @@ const executes = <
               coll: snapshotCollection as Collection<UDelta<T> & Delta<T>>,
               input: link<UDelta<T> & Delta<T>>()
                 .with($match_(root<UDelta<T> & Delta<T>>().of('updated').has($eq<boolean>(true))))
-                .with(
+                .with<Delta<T>, Delta<T>>(
                   $set_(
                     set<RORec<'before', T | null>>()({
                       before: [
                         'before',
                         to($ifNull(root<UDelta<T> & Delta<T>>().of('before').expr(), nil)),
                       ],
-                    }),
+                    }) as Updater<Delta<T>, Delta<T>, Delta<T>>,
                   ),
                 )
                 .with(input.delta)
