@@ -59,7 +59,7 @@ const join = <
   Result extends Q2,
   Null extends null = never,
 >(
-  { lField, rField, left, right, as }: LookupParams<As, LQ, LE, RQ, RE, S>,
+  { lField, rField, left, right, as, toMany }: LookupParams<As, LQ, LE, RQ, RE, S>,
   leftSnapshot: TStages<LS, Before<LQ>, BLB, Before<LE>>,
   rightSnapshot: TStages<RS, Before<RQ>, BRB, Before<RE>>,
   stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE | Null>, Result>,
@@ -70,7 +70,9 @@ const join = <
   type R = 'right'
   const rightJoinField = { field1: lField, field2: rField }
   const joinId: JoinId<L, R> =
-    rField.str() === '_id' ? 'left' : (['left', middle, 'right'] as const)
+    rField.str() === '_id' && toMany !== true
+      ? 'left'
+      : (['left', middle, 'right'] as const)
   type Joined = Rec<L, LE> & Rec<R, RE | Null> & ID
   const joinR_Snapshot: RawStages<
     Before<LQ | Q2>,
@@ -159,11 +161,13 @@ const join = <
 }
 
 type Params<As extends string, LQ extends O, RQ extends O, RE extends RQ, S extends notArr> = {
-  localField: Field<LQ, S | Arr<S>>
   foreignField: Field<RQ, S | Arr<S>>
   from: SnapshotStreamExecutionResult<RQ, RE>
   as: AsLiteral<As>
-}
+} & (
+  | { localField: Field<LQ, S>; toMany?: never }
+  | { localField: Field<LQ, Arr<S>>; toMany: true }
+)
 type LookupParams<
   As extends string,
   LQ extends O,
@@ -177,6 +181,7 @@ type LookupParams<
   right: SnapshotStreamExecutionResult<RQ, RE>
   as: AsLiteral<As>
   left: SnapshotStreamExecutionResult<LQ, LE>
+  toMany?: true
 }
 
 const $lookup1 =
@@ -223,6 +228,7 @@ export const $lookup =
       lField: p.localField,
       rField: p.foreignField,
       left: l(emptyDelta()),
+      toMany: p.toMany,
     })
 
 export const $outerLookup =
@@ -237,6 +243,7 @@ export const $outerLookup =
         lField: p.localField,
         rField: p.foreignField,
         left: l(emptyDelta()),
+        toMany: p.toMany,
       },
       null,
     )
