@@ -63,7 +63,7 @@ export const fillDataNotification = (
           'invoice-payment-notif',
         ).get(),
         as: 'user',
-        foreignField: root<USer>().of('_id'),
+        to: 'one',
         localField: root<NOtif>().of('userId'),
       }),
     )
@@ -154,7 +154,7 @@ export const fillDataNotification2 = (
           'invoice-payment-notif',
         ).get(),
         as: 'user',
-        foreignField: root<USer>().of('_id'),
+        to: 'one',
         localField: root<NOtif>().of('userId'),
       }),
     )

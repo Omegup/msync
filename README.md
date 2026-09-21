@@ -108,8 +108,8 @@ A field expression is a pair too, `[fieldName, expr]`, inside `field({ ... })` a
 
 ```ts
 root<Account>().of('createdAt').expr()   // this document's field
-val('-')                                  // a literal
-concat(accountId, val('-'), planId)       // an expression
+val(' ')                                  // a literal
+concat(first, val(' '), last)             // an expression
 ```
 
 `root<T>()` is the current document, typed as `T`. `.of('key')` steps into a field. `.expr()` turns the path into a value you can pass to `concat`, `$sum`, `$merge`, and the rest.
@@ -188,6 +188,7 @@ export const makeOrderAccountNameStream = (
     .with(
       $lookup({
         as: 'account',
+        to: 'one',
         from: staging(
           {
             collection: accounts,
@@ -196,7 +197,6 @@ export const makeOrderAccountNameStream = (
           'accounts-for-orders',
         ).get(),
         localField: root<OrderView>().of('accountId'),
-        foreignField: root<AccountView>().of('_id'),
       }),
     )
     .get()
@@ -209,7 +209,9 @@ export const makeOrderAccountNameStream = (
 
 The inner `staging(...).get()` is a stream of its own, with its own snapshot. `$merge` patches `_accountName` back onto the order. A later stream that projects `_accountName` waits until this one has written it.
 
-`$lookup` keeps documents that match. `$outerLookup` keeps the left document when the right side is missing, and types the joined field as `T | null`. A joined array is unwound into one row per match. Pass `toMany: true` when `localField` is an array and each match must keep its own id. Leave it off when the foreign field is `_id` and you want every match to keep the left `_id`, which is what a later `$groupId` folds on.
+`$lookup` keeps documents that match. `$outerLookup` keeps the left document when the right side is missing, and types the joined field as `T | null`.
+
+A lookup says where it points with `to`. `to: 'one'` means `localField` points at the right document's `_id`, so there is no `foreignField`. Each left row matches one right row, and the result keeps the left `_id`. `to: 'many'` is several matches per left row, or a join on some other field: pass `middle` and both fields. The lookup writes each row's `_id` as the left id, that string, and the right id. You do not build that id again afterwards.
 
 ### 3. Keep a total on the parent
 
@@ -267,11 +269,11 @@ When the thing you are counting is a set of strings rather than a number, use `$
 
 Plans are sold per region. Every account in a region is entitled to every plan in that region. Each pair is its own document in `entitlements`, with `_id` of `accountId-planId`, so other streams can aggregate entitlements directly. When the plan's price changes, the entitlement updates. When the account or the plan goes away, the entitlement is soft-deleted.
 
-`$replaceWith` builds the new document. `$insert` upserts it by `_id`, and on a deleted input it sets `deletedAt` on that `_id`.
+Several plans can share a region, so this lookup is `to: 'many'`. `middle: '-'` is required, and the lookup sets each row's `_id` to the account id, that hyphen, and the plan id. Copy `accountId` off `_id` before the join, because the composite id replaces it. `$replaceWith` keeps the id the lookup already assigned. `$insert` upserts by that `_id`, and on a deleted input it sets `deletedAt`.
 
 ```ts
 import type { Collection, ID, Model, O, OPick } from '@omegup/msync'
-import { $insert, $lookup, $replaceWith, concat, field, root, staging, val } from '@omegup/msync'
+import { $insert, $lookup, $replaceWith, $set, field, root, staging, to } from '@omegup/msync'
 
 type Account = O<{ _id: string; regionId: string }>
 type Plan = O<{ _id: string; regionId: string; price: number }>
@@ -289,7 +291,8 @@ export const makeEntitlementStream = (
 ) => {
   type AccountView = OPick<Account & Model, keyof ID | 'regionId'>
   type PlanView = OPick<Plan & Model, keyof ID | 'regionId' | 'price'>
-  type Joined = AccountView & { readonly plan: PlanView }
+  type WithAccountId = AccountView & O<{ accountId: string }>
+  type Joined = WithAccountId & { readonly plan: PlanView }
 
   return staging<Account & Model, keyof AccountView>(
     {
@@ -298,9 +301,16 @@ export const makeEntitlementStream = (
     },
     'entitlements-from-accounts',
   )
+    .then(
+      $set<O<{ accountId: string }>>()({
+        accountId: ['accountId', to(root<AccountView>().of('_id').expr())],
+      }),
+    )
     .with(
       $lookup({
         as: 'plan',
+        to: 'many',
+        middle: '-',
         from: staging(
           {
             collection: plans,
@@ -311,22 +321,15 @@ export const makeEntitlementStream = (
           },
           'plans-for-entitlements',
         ).get(),
-        localField: root<AccountView>().of('regionId'),
+        localField: root<WithAccountId>().of('regionId'),
         foreignField: root<PlanView>().of('regionId'),
       }),
     )
     .then(
       $replaceWith(
         field<Entitlement, Joined>({
-          _id: [
-            '_id',
-            concat(
-              root<Joined>().of('_id').expr(),
-              val('-'),
-              root<Joined>().of('plan').of('_id').expr(),
-            ),
-          ],
-          accountId: ['accountId', root<Joined>().of('_id').expr()],
+          _id: ['_id', root<Joined>().of('_id').expr()],
+          accountId: ['accountId', root<Joined>().of('accountId').expr()],
           planId: ['planId', root<Joined>().of('plan').of('_id').expr()],
           price: ['price', root<Joined>().of('plan').of('price').expr()],
         }),
@@ -337,7 +340,7 @@ export const makeEntitlementStream = (
 }
 ```
 
-Give inserted documents a deterministic `_id`. That id is how the next run finds the same row to update or retire. Joining on `regionId` (a field that is not `_id` on either side) yields one row per matching plan, and `$replaceWith` assigns the pair id before the insert.
+The same account and the same plan always produce the same `_id`, because `middle` is part of the lookup. That is how the next run finds the row to update or retire.
 
 ## Run them together
 

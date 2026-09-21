@@ -59,20 +59,18 @@ const join = <
   Result extends Q2,
   Null extends null = never,
 >(
-  { lField, rField, left, right, as, toMany }: LookupParams<As, LQ, LE, RQ, RE, S>,
+  params: LookupParams<As, LQ, LE, RQ, RE, S>,
   leftSnapshot: TStages<LS, Before<LQ>, BLB, Before<LE>>,
   rightSnapshot: TStages<RS, Before<RQ>, BRB, Before<RE>>,
   stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE | Null>, Result>,
   outerLeft?: Null,
-  middle = '.',
 ): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
   type L = 'left'
   type R = 'right'
+  const { lField, rField, left, right, as } = params
   const rightJoinField = { field1: lField, field2: rField }
-  const joinId: JoinId<L, R> =
-    rField.str() === '_id' && toMany !== true
-      ? 'left'
-      : (['left', middle, 'right'] as const)
+  // `to: 'one'` keeps the left `_id`. `to: 'many'` writes `middle` between the two ids.
+  const joinId: JoinId<L, R> = params.to === 'one' ? 'left' : ['left', params.middle, 'right']
   type Joined = Rec<L, LE> & Rec<R, RE | Null> & ID
   const joinR_Snapshot: RawStages<
     Before<LQ | Q2>,
@@ -161,12 +159,21 @@ const join = <
 }
 
 type Params<As extends string, LQ extends O, RQ extends O, RE extends RQ, S extends notArr> = {
-  foreignField: Field<RQ, S | Arr<S>>
   from: SnapshotStreamExecutionResult<RQ, RE>
   as: AsLiteral<As>
 } & (
-  | { localField: Field<LQ, S>; toMany?: never }
-  | { localField: Field<LQ, Arr<S>>; toMany: true }
+  | {
+      to: 'one'
+      localField: Field<LQ, string>
+      foreignField?: never
+      middle?: never
+    }
+  | {
+      to: 'many'
+      middle: string
+      localField: Field<LQ, S | Arr<S>>
+      foreignField: Field<RQ, S | Arr<S>>
+    }
 )
 type LookupParams<
   As extends string,
@@ -181,8 +188,10 @@ type LookupParams<
   right: SnapshotStreamExecutionResult<RQ, RE>
   as: AsLiteral<As>
   left: SnapshotStreamExecutionResult<LQ, LE>
-  toMany?: true
-}
+} & (
+  | { to: 'one'; middle?: never }
+  | { to: 'many'; middle: string }
+)
 
 const $lookup1 =
   <
@@ -218,32 +227,55 @@ const $lookup1 =
         ),
     )
 export const $lookup =
-  <As extends string, LQ extends doc, RQ extends O, RE extends RQ & doc, S extends notArr>(
+  <As extends string, LQ extends doc, RQ extends doc, RE extends RQ & doc, S extends notArr>(
     p: Params<As, LQ, RQ, RE, S>,
   ) =>
   <LE extends LQ>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE>> =>
-    $lookup1<As, LQ, LE, RQ, RE, S>({
-      right: p.from,
-      as: p.as,
-      lField: p.localField,
-      rField: p.foreignField,
-      left: l(emptyDelta()),
-      toMany: p.toMany,
-    })
+    p.to === 'one'
+      ? $lookup1<As, LQ, LE, RQ, RE, string>({
+          right: p.from,
+          as: p.as,
+          lField: p.localField,
+          rField: root<doc>().of('_id'),
+          left: l(emptyDelta()),
+          to: 'one',
+        })
+      : $lookup1<As, LQ, LE, RQ, RE, S>({
+          to: 'many',
+          right: p.from,
+          as: p.as,
+          lField: p.localField,
+          rField: p.foreignField,
+          left: l(emptyDelta()),
+          middle: p.middle,
+        })
 
 export const $outerLookup =
-  <As extends string, LQ extends doc, RQ extends O, RE extends RQ & doc, S extends notArr>(
+  <As extends string, LQ extends doc, RQ extends doc, RE extends RQ & doc, S extends notArr>(
     p: Params<As, LQ, RQ, RE, S>,
   ) =>
   <LE extends LQ>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE | null>> =>
-    $lookup1<As, LQ, LE, RQ, RE, S, null>(
-      {
-        right: p.from,
-        as: p.as,
-        lField: p.localField,
-        rField: p.foreignField,
-        left: l(emptyDelta()),
-        toMany: p.toMany,
-      },
-      null,
-    )
+    p.to === 'one'
+      ? $lookup1<As, LQ, LE, RQ, RE, string, null>(
+          {
+            right: p.from,
+            as: p.as,
+            lField: p.localField,
+            rField: root<RQ>().of('_id'),
+            left: l(emptyDelta()),
+            to: 'one',
+          },
+          null,
+        )
+      : $lookup1<As, LQ, LE, RQ, RE, S, null>(
+          {
+            to: 'many',
+            right: p.from,
+            as: p.as,
+            lField: p.localField,
+            rField: p.foreignField,
+            left: l(emptyDelta()),
+            middle: p.middle,
+          },
+          null,
+        )

@@ -158,9 +158,9 @@ Drops documents for which the expression is false. On a delta, a document that s
 ```ts
 $lookup({
   as: 'account',
+  to: 'one',
   from: accountsStage, // a staging(...).get()
   localField: root<Order>().of('accountId'),
-  foreignField: root<Account>().of('_id'),
 })
 ```
 
@@ -170,9 +170,29 @@ $lookup({
 
 The join watches both sides. A change to the account updates every order that points at it, and a change to `accountId` re-runs the join from the order. `msync` indexes `before.<join field>` on both snapshot collections to make that lookup cheap.
 
-Join identity depends on `toMany`. When `foreignField` is `_id` and `toMany` is omitted, every match keeps the left `_id`. Use that when a later `$groupId` folds those rows back onto the left document. Pass `toMany: true` when `localField` is an array and each match must stay a distinct document; the row `_id` becomes the left id, a separator, and the right id. The type of `$lookup` asks for `toMany: true` whenever `localField` is an array. Omit it only when you intentionally keep the left `_id` and group on it immediately.
+The arguments are a union:
 
-Joining on a field that is not `_id`, the way accounts and plans join on `regionId`, also produces one row per match, with a composite id for the duration of the pipeline. `$replaceWith` then assigns the id you actually want to store.
+| | `to: 'one'` | `to: 'many'` |
+|---|---|---|
+| When | `localField` is the other collection's `_id` | Several right rows per left row, or the join key is not `_id` |
+| Fields | `localField` only. The foreign field is `_id` | `localField` and `foreignField` |
+| Row `_id` | The left `_id` | `left._id + middle + right._id` |
+| `middle` | Forbidden | Required |
+
+```ts
+$lookup({
+  as: 'plan',
+  to: 'many',
+  middle: '-',
+  from: plansStage,
+  localField: root<Account>().of('regionId'),
+  foreignField: root<Plan>().of('regionId'),
+})
+```
+
+That row's `_id` is already `accountId-planId`. Later stages copy `root().of('_id')`. They do not concatenate the two ids again. If you still need the original left `_id` as its own field, copy it with `$set` before the lookup, because the composite id replaces `_id`.
+
+An array `localField` is `to: 'many'`: one left document matches many right documents, so those rows cannot share the left `_id`. Pass `middle`.
 
 ### `$unwind`
 
@@ -261,7 +281,7 @@ $groupId<
 
 The document in the pipeline must already have the stored shape, including `_id`. Build it with `$replaceWith(field({...}))`. `$insert` sets `deletedAt: null` and `touchedAt` to the cluster time on insert, and sets `deletedAt` when the delta's `after` is null.
 
-Choose `_id` so that the same logical row always maps to the same id (`accountId + '-' + planId`). A random id would insert a new row on every pass.
+The `_id` you insert is the one the lookup wrote from `middle`. The same account and the same plan always map to the same id. A random id would insert a new row on every pass.
 
 ## Accumulators
 
