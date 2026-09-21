@@ -178,9 +178,9 @@ export const $unwindDelta = <
         after: ['after', $ifNull<U | X | null, In, unknown>(first<U, In, unknown>(afterItems), fill)],
       }),
     )
-  const oldDeltas: Expr<Arr<PreDelta<U | null>>, In> =
+  const kept: Expr<Arr<PreDelta<U | null>>, In> =
     k === k1 ? k1Slot<never>(nil) : oldByK2Id
-  const newItems: Expr<Arr<U>, In> = k === k1 ? emptyArr : newByK2Id
+  const added: Expr<Arr<U>, In> = k === k1 ? emptyArr : newByK2Id
 
   const k1Delta: Expr<K1Delta, In> = field<K1Delta, In>({
     before: [
@@ -200,21 +200,26 @@ export const $unwindDelta = <
   })
 
   const unwindJoin = <Pad>({
-    oldDeltas,
-    newItems,
-    unpad,
+    kept,
+    added,
+    padToNull,
     isPad,
     join,
   }: {
-    oldDeltas: Expr<Arr<K2Delta<Pad>>, In>
-    newItems: Expr<Arr<U | Pad>, In>
-    unpad: <F extends HKT<U | Pad | null>>(
+    /** k2 deltas that have a before: id-matched items, or the single k1 slot. */
+    kept: Expr<Arr<K2Delta<Pad>>, In>
+    /** k2 values that exist only in after (inserts, or a `{}` when after became []). */
+    added: Expr<Arr<U | Pad>, In>
+    /** `{}` → null; a real item (or null) is left as-is. */
+    padToNull: <F extends HKT<U | Pad | null>>(
       k2: Expr<U | Pad | null, App<F, U | Pad | null>>,
       keep: Expr<U | null, App<F, U | null>>,
     ) => Expr<U | null, App<F, U | Pad | null>>
+    /** True when this unwound k2 is the `{}` sentinel. */
     isPad: <F extends HKT<U | Pad | null>>(
       k2: Expr<U | Pad | null, App<F, U | Pad | null>>,
     ) => Expr<boolean, App<F, U | Pad | null>>
+    /** This before/after as a join row, or null to omit the side. */
     join: (parts: {
       k1: Expr<T | null, Unwound<Pad>>
       k2: Expr<U | null, Unwound<Pad>>
@@ -243,7 +248,7 @@ export const $unwindDelta = <
     type K1Null_K2U = In & Pair<PreDelta<null>, PreDelta<U>>
 
     const newDeltas: Expr<Arr<Delta2>, In> = $map0<'a', U | Pad, Delta2, In, unknown>({
-      input: newItems,
+      input: added,
       as: 'a',
       expr: field<Delta2, In, RORec<'a', U | Pad>>({
         before: ['before', nil],
@@ -254,7 +259,7 @@ export const $unwindDelta = <
     const deltas: Expr<Deltas, In> = mergeObjects<Rec<K1, K1Delta>, Rec<K2, Arr<Delta2>>, In>(
       field<RORec<K1, K1Delta>, In>(map1(k1, k1Delta)),
       field<RORec<K2, Arr<Delta2>>, In>(
-        map1(k2, concatArray<Delta2, In, unknown>(oldDeltas, newDeltas)),
+        map1(k2, concatArray<Delta2, In, unknown>(kept, newDeltas)),
       ),
     )
 
@@ -267,7 +272,7 @@ export const $unwindDelta = <
     const docK2Null: Field<K2UNull, K2UNull> = root<K2UNull>()
     const k2Keep = (side: BA): Expr<U | null, K2UNull> =>
       docK2Null.of<K2UNull, K2>(k2).of<PreDelta<U | null>, BA>(side).expr()
-    const k2At = (side: BA): Expr<U | null, Doc> => unpad<UnwoundK2<Pad>>(k2Raw(side), k2Keep(side))
+    const k2At = (side: BA): Expr<U | null, Doc> => padToNull<UnwoundK2<Pad>>(k2Raw(side), k2Keep(side))
 
     const rowOf = <A, B, D>(id: Expr<s, D>, a: Expr<A, D>, b: Expr<B, D>): Expr<Row<A, B>, D> =>
       mergeObjects<ID & Rec<K1, A>, Rec<K2, B>, D>(
@@ -416,10 +421,10 @@ export const $unwindDelta = <
     )
   }
 
-  const noUnpad = <F extends HKT<U | null>>(
+  const noPadToNull = <F extends HKT<U | null>>(
     k2: Expr<U | null, App<F, U | null>>,
   ): Expr<U | null, App<F, U | null>> => k2
-  const noPad = <F extends HKT<U | null>>(
+  const neverPad = <F extends HKT<U | null>>(
     _k2: Expr<U | null, App<F, U | null>>,
   ): Expr<boolean, App<F, U | null>> => val(false)
 
@@ -435,7 +440,7 @@ export const $unwindDelta = <
     // [] → items:  disappearing empty row {before:{}, after:null}, plus new items
     // items → []:  matched {before:item, after:null}, plus appearing empty row `{}`
     const padded = {
-      oldDeltas:
+      kept:
         k === k1
           ? k1Slot<O>(padObj)
           : ite<Arr<PreDelta<U | O | null>>, In>(
@@ -445,17 +450,17 @@ export const $unwindDelta = <
                 array<PreDelta<U | O | null>, In>(padDelta(padObj)),
                 array<PreDelta<U | O | null>, In>(padDelta(nil)),
               ),
-              oldDeltas,
+              kept,
             ),
-      newItems:
+      added:
         k === k1
           ? array<U | O, In>()
           : ite<Arr<U | O>, In>(
               and<In>(not<In>(k2Empty('before')), k2Empty('after')),
               array<U | O, In>(padObj),
-              newItems,
+              added,
             ),
-      unpad: <F extends HKT<U | O | null>>(
+      padToNull: <F extends HKT<U | O | null>>(
         k2: Expr<U | O | null, App<F, U | O | null>>,
         keep: Expr<U | null, App<F, U | null>>,
       ): Expr<U | null, App<F, U | O | null>> =>
@@ -534,10 +539,10 @@ export const $unwindDelta = <
   if (includeNull1 === null) {
     const eq1 = literalsEqaul<null, N1>(includeNull1)
     return unwindJoin<never>({
-      oldDeltas,
-      newItems,
-      unpad: noUnpad,
-      isPad: noPad,
+      kept,
+      added,
+      padToNull: noPadToNull,
+      isPad: neverPad,
       join: ({ k2, rowK1K2, k1AtK2, k1PadRow }): Expr<Join | null, Unwound<never>> => {
         interface CompleteN1HKT extends HKT<null> {
           readonly out: Expr<Row<T | I<null, this>, U>, In & Pair<PreDelta<T>, PreDelta<U>>>
@@ -558,11 +563,11 @@ export const $unwindDelta = <
   }
 
   return unwindJoin<never>({
-    oldDeltas,
-    newItems,
-    unpad: noUnpad,
-    isPad: noPad,
-    join: ({ k1, k2KeepK1K2, rowK1K2 }): Expr<Join | null, Unwound<never>> =>
+      kept,
+      added,
+      padToNull: noPadToNull,
+      isPad: neverPad,
+      join: ({ k1, k2KeepK1K2, rowK1K2 }): Expr<Join | null, Unwound<never>> =>
       orNil<T, Join | null, UnwoundK1<never>>(
         k1,
         orNil<U, Join, UnwoundK1K2<never>>(k2KeepK1K2, rowK1K2),
