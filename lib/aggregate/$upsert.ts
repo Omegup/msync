@@ -51,7 +51,10 @@ export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, r
       c<Out, 'updateMany'>({
         collection: out,
         method: 'updateMany',
-        params: [filter as Filter<Out>, [{ $set: { deletedAt: '$$NOW', touchedAt: '$$CLUSTER_TIME' } }]],
+        params: [
+          filter as Filter<Out>,
+          [{ $set: { deletedAt: '$$NOW', touchedAt: '$$CLUSTER_TIME' } }],
+        ],
       }),
     raw: (): RawStages<unknown, D, 'out'> => {
       const replacer = map(
@@ -97,10 +100,10 @@ export const $insertPart = <T extends doc, EEE extends RORec<string, rawItem>>(
   )
   return $insertX<T, Delta<T>, EEE>(
     out,
-    assertNotNull(root<Delta<T>>().of('after').expr()),
+    assertNotNull<T, Delta<T>>(root<Delta<T>>().of('after').expr()),
     x =>
       ite<Merge<T, EEE>, Delta<T>>(
-        eq(root<Delta<T>>().of('after').expr())(nil),
+        eq<T | null, Delta<T>>(root<Delta<T>>().of('after').expr())(nil),
         field<DDel & Omit<SafeE<EEE>, keyof (ND & TS & ID)>, Delta<T>>(
           mergeExpr<SafeE<EEE>, DDel, Delta<T>>(
             translateOmit<EEE, `$${string}`, keyof ID, keyof (ND & TS)>().forward<
@@ -108,7 +111,10 @@ export const $insertPart = <T extends doc, EEE extends RORec<string, rawItem>>(
             >(extExpr),
             {
               deletedAt: ['deletedAt', current],
-              _id: ['_id', assertNotNull(root<Delta<doc>>().of('before').of('_id').expr())],
+              _id: [
+                '_id',
+                assertNotNull(root<Delta<T>>().of('before').of<T, '_id', null>('_id').expr()),
+              ],
               touchedAt: ['touchedAt', current],
             },
           ),
@@ -124,4 +130,4 @@ export const $insert = <T extends doc>(
   out: RWCollection<Merge<T, {}>>,
 ): StreamRunnerParam<Delta<T>, 'out'> => $insertPart(out, {})
 
-const assertNotNull = <T, D, C>(expr: Expr<T | N, D, C>) => expr as Expr<T, D, C>
+const assertNotNull = <T, D, C = unknown>(expr: Expr<T | N, D, C>) => expr as Expr<T, D, C>

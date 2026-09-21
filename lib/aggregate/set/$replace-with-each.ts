@@ -52,8 +52,14 @@ export const $setEach = <
 >(
   updater: (k: BA) => Updater<Delta<T> & E, T | N, V | null, C>,
   dict: MapK<BA2, ConstHKT<BA>>,
-): RawStages<unknown, Delta2<T, BA2> & E, Rec<BA2, V | null> & Omit<Delta<T> & E, BA2>, C, 1> =>
-  $setEach1<T, V, BA2, E, C>(updater, dict)<IdHKT<O>>(root)
+): RawStages<unknown, Delta<T> & E, Delta<T> & Rec<BA2, V | null> & Omit<E, BA2>, C, 1> =>
+  $setEach1<T, V, BA2, E, C>(updater, dict)<IdHKT<O>>(root) as RawStages<
+    unknown,
+    Delta<T> & E,
+    Delta<T> & Rec<BA2, V | null> & Omit<E, BA2>,
+    C,
+    1
+  >
 
 export const $replaceWithEach1 = <T extends O, V extends jsonItem, E = unknown>(
   t: <K extends BA>(field: K) => Expr<V | null, Delta<T> & E>,
