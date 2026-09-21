@@ -19,6 +19,19 @@ export type JoinId<K1 extends s, K2 extends s> =
   | readonly [K1, middle: s, K2]
   | readonly [K2, middle: s, K1]
 
+/** `_id` of a join row for `k`: `k1` / `k2` alone, or `concat` in tuple order. */
+export const joinIdOf = <K1 extends s, K2 extends s, D, C = unknown>(
+  k: JoinId<K1, K2>,
+  k1: K1,
+  k1Id: Expr<s, D, C>,
+  k2Id: Expr<s, D, C>,
+): Expr<s, D, C> => {
+  if (k === k1) return k1Id
+  if (typeof k === 'string') return k2Id
+  const idOf = (key: K1 | K2): Expr<s, D, C> => (key === k1 ? k1Id : k2Id)
+  return concat(idOf(k[0]), val<s>(k[1]), idOf(k[2]))
+}
+
 /**
  * If `probe` is null, the root is `App<F, null>` and the result is null.
  * Otherwise the root is `App<F, T>` and `keep` (typed at that root) is the result.
@@ -311,13 +324,8 @@ export const $unwindDelta = <
       docK1K2.of<Both, K1>(k1).of<PreDelta<T>, BA>(side).of<T, '_id'>('_id').expr()
     const k2IdK1K2 = (side: BA): Expr<s, Both> =>
       docK1K2.of<Both, K2>(k2).of<PreDelta<U>, BA>(side).of<U, '_id'>('_id').expr()
-    const idAtK1K2 = (key: K1 | K2, side: BA): Expr<s, Both> =>
-      key === k1 ? k1IdK1K2(side) : k2IdK1K2(side)
-    const completeId = (side: BA): Expr<s, Both> => {
-      if (k === k1) return k1IdK1K2(side)
-      if (typeof k === 'string') return k2IdK1K2(side)
-      return concat<Both, unknown>(idAtK1K2(k[0], side), val<s>(k[1]), idAtK1K2(k[2], side))
-    }
+    const completeId = (side: BA): Expr<s, Both> =>
+      joinIdOf(k, k1, k1IdK1K2(side), k2IdK1K2(side))
     const rowK1K2 = (side: BA): Expr<Row<T, U>, Both> =>
       rowOf<T, U, Both>(completeId(side), k1AtK1K2(side), k2AtK1K2(side))
 

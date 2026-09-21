@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { canonicalize as str } from 'json-canonicalize'
 import type { Arr, AsLiteral, ID, N, O, RORec, Rec, doc, rawItem } from '../../../types'
 import { field, mergeExpr, type ExprsExactHKT } from '../../expression/concat'
 import { $ifNull, eq, ite } from '../../expression/logic'
@@ -10,7 +11,6 @@ import { omitRORec } from '../../utils/guard'
 import { map1 } from '../../utils/json'
 import { $set_, $simpleLookup_ } from '../mongo-stages'
 import { link } from '../prefix'
-import { canonicalize as str } from 'json-canonicalize'
 import { $replaceWithEach, $replaceWithEach1 } from '../set/$replace-with-each'
 import { $replaceWithDelta } from '../set/$set-delta'
 import { $unwindDelta, type JoinId } from '../unwind'
@@ -42,17 +42,17 @@ export const $lookupDelta = <
   { coll, exec, input }: TStages<RS, UBefore<RQ>, BRB, Before<RE>>,
   k1: AsLiteral<K1>,
   k2: AsLiteral<Exclude<KK2, BA | K1>>,
-  k:
-    | ([N1] extends [never] ? K1 : never)
-    | ([N2] extends [never] ? Exclude<KK2, BA | K1> : never)
-    | JoinId<K1, Exclude<KK2, BA | K1>>,
+  k: JoinId<K1, Exclude<KK2, BA | K1>>,
   includeNull1?: N1,
   includeNull2?: N2,
 ): RawStages<unknown, Delta<LE>, Both<K1, LE, KK2, RE, N1, N2>> => {
   type K2 = Exclude<KK2, BA | K1>
   type BU = Before<RE>
   const omit = omitRORec<KK2, BA, K1, Arr<RE>>()
-  const hash = crypto.createHash('md5').update(coll.collectionName+str(input)+str(exec)).digest('base64url')
+  const hash = crypto
+    .createHash('md5')
+    .update(coll.collectionName + str(input) + str(exec))
+    .digest('base64url')
 
   type ABIds = Rec<'aId' | 'bId', S | Arr<S>>
   const normForeignKey = (f: BA) =>

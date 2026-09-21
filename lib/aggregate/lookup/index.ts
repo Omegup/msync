@@ -26,6 +26,7 @@ import { concatStages, concatTStages, emptyDelta } from '../prefix'
 import { $replaceWithDelta } from '../set/$set-delta'
 import { $lookupDelta } from './$lookup-delta'
 import { $lookupRaw } from './$lookup-raw'
+import { type JoinId } from '../unwind'
 
 import { asBefore } from '../../utils/before'
 import { createIndex } from '../../utils/db-indexes'
@@ -63,15 +64,19 @@ const join = <
   rightSnapshot: TStages<RS, Before<RQ>, BRB, Before<RE>>,
   stagesUntilNextLookup: DeltaStages<LQ | Q2, LE & RORec<As, RE | Null>, Result>,
   outerLeft?: Null,
-  middle = '.'
+  middle = '.',
 ): SnapshotStreamExecutionResult<LQ | Q2, Result> => {
+  type L = 'left'
+  type R = 'right'
   const rightJoinField = { field1: lField, field2: rField }
-  const joinId = rField.str() === '_id' ? 'left' : (['left', middle, 'right'] as const)
+  const joinId: JoinId<L, R> =
+    rField.str() === '_id' ? 'left' : (['left', middle, 'right'] as const)
+  type Joined = Rec<L, LE> & Rec<R, RE | Null> & ID
   const joinR_Snapshot: RawStages<
     Before<LQ | Q2>,
     Before<LE>,
     Before<LE & Rec<As, RE | Null> & ID>
-  > = asBefore($lookupRaw(rightJoinField, rightSnapshot, as, outerLeft, middle))
+  > = asBefore($lookupRaw(rightJoinField, rightSnapshot, as, joinId, outerLeft))
   const resultingSnapshot = concatTStages(leftSnapshot, joinR_Snapshot)
   const dict = { [as]: 'a' } as RORec<As, 'a'>
   const idB: RORec<'_id', 'b'> = { _id: 'b' }
@@ -83,12 +88,7 @@ const join = <
       finalInput: StreamRunnerParam<Delta<Result>, Final>,
     ): Runner<readonly Final[], HasJob> => {
       const leftJoinField = { field1: rField, field2: lField }
-      type L = 'left'
-      type R = 'right'
-      type LeftRight = Rec<L, LE> & Rec<R, RE | Null> & ID
-      type JoinStages<RR> = RawStages<unknown, Delta<RR>, Delta<LeftRight>>
-      const lookupLeft = $lookupDelta<RQ, RE, LQ, LE, BLB, LS, S, R, L, Null>
-      const joinL_Delta: JoinStages<RE> = lookupLeft(
+      const joinL_Delta = $lookupDelta<RQ, RE, LQ, LE, BLB, LS, S, R, L, Null>(
         leftJoinField,
         leftSnapshot,
         'right',
@@ -96,8 +96,7 @@ const join = <
         joinId,
         outerLeft,
       )
-      const lookupRight = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, L, R, never, Null>
-      const joinR_Delta: JoinStages<LE> = lookupRight(
+      const joinR_Delta = $lookupDelta<LQ, LE, RQ, RE, BRB, RS, S, L, R, never, Null>(
         rightJoinField,
         rightSnapshot,
         'left',
@@ -106,26 +105,21 @@ const join = <
         undefined,
         outerLeft,
       )
-
-      const mergeForeignIntoDoc = concatStages<
-        unknown,
-        Delta<LeftRight>,
-        Delta<LE & RORec<As, RE | Null>>,
-        Delta<Result>,
-        unknown
-      >(
-        $replaceWithDelta<LeftRight, LE & RORec<As, RE | Null>>(
-          mergeObjects<LE, ID & RORec<As, RE | Null>, LeftRight>(
-            root<LeftRight>().of('left').expr(),
-            fieldM<RORec<As, 'a'> & RORec<'_id', 'b'>, { a: RE | Null; b: string }, LeftRight>(
-              { a: root<LeftRight>().of('right').expr(), b: root<LeftRight>().of('_id').expr() },
+      const mergeForeignIntoDoc = concatStages(
+        $replaceWithDelta<Joined, LE & Rec<As, RE | Null>>(
+          mergeObjects<LE, ID & Rec<As, RE | Null>, Joined>(
+            root<Joined>().of('left').expr(),
+            fieldM<RORec<As, 'a'> & RORec<'_id', 'b'>, { a: RE | Null; b: string }, Joined>(
+              {
+                a: root<Joined>().of('right').expr(),
+                b: root<Joined>().of('_id').expr(),
+              },
               dictId,
             ),
           ),
         ),
         stagesUntilNextLookup.delta,
       )
-
       const lRunnerInput = concatStages(joinR_Delta, mergeForeignIntoDoc)
       const rRunnerInput = concatStages(joinL_Delta, mergeForeignIntoDoc)
       const getRunner = <Q, V extends Q, B, C>(
@@ -159,7 +153,6 @@ const join = <
         )
       const lRunner = getRunner(left, lRunnerInput, finalInput)
       const rRunner = getRunner(right, rRunnerInput, finalInput)
-
       return () => merge({ lsource: lRunner(), rsource: rRunner() })
     },
   }
