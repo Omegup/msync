@@ -1,11 +1,11 @@
-import type { O, Replace } from '../../../types'
+import type { O, ReplaceQ, StrKey } from '../../../types'
 import type { DeltaStages, Expr, LinStages } from '../../types'
-import { set, type Updater, type UpdaterHKT } from '../../update/updater'
+import { setQ, type Updater, type UpdaterQHKT } from '../../update/updater'
 import type { MapO } from '../../utils/map-object'
 import { $replaceWith1, $replaceWith_, $set1, $set_ } from '../mongo-stages'
 import { $replaceWithDelta, $setDelta } from './$set-delta'
 
-const $setCore = <Q, T extends Q & O, V extends Q & O, C = unknown>(
+const $setCore = <Q extends O, T extends Q, V extends Q, C = unknown>(
   updater: Updater<T, T, V, C>,
 ): DeltaStages<Q, T, V, C> & LinStages<Q, T, V, C> => ({
   delta: $setDelta(updater),
@@ -13,13 +13,17 @@ const $setCore = <Q, T extends Q & O, V extends Q & O, C = unknown>(
   lin: $set_(updater),
 })
 
-export const $set =
-  <V extends O>() =>
-  <R extends O, C = unknown>(
-    fields: MapO<V, UpdaterHKT<R, R, V, C>>,
-  ): DeltaStages<O, R, Replace<R, V>, C> & LinStages<O, R, Replace<R, V>, C> => {
-    return $setCore<O, R, Replace<R, V>, C>(set<V>()(fields))
-  }
+type V<VV, Q> = Exclude<StrKey<VV>, StrKey<Q>>
+export type $Set<VV extends O, Q extends O> = <R extends Q, C = unknown>(
+  fields: MapO<Omit<VV, StrKey<Q>>, UpdaterQHKT<R, R, VV, V<VV, Q>, C>, V<VV, Q>>,
+) => DeltaStages<Q, R, Q & ReplaceQ<R, VV, Q>, C> & LinStages<Q, R, Q & ReplaceQ<R, VV, Q>, C>
+
+export const $set: <VV extends O, Q extends O = O>() => $Set<VV, Q> =
+  <VV extends O, Q extends O = O>() =>
+  <R extends Q, C = unknown>(
+    fields: MapO<Omit<VV, StrKey<Q>>, UpdaterQHKT<R, R, VV, V<VV, Q>, C>, V<VV, Q>>,
+  ) =>
+    $setCore<Q, R, Q & ReplaceQ<R, VV, Q>, C>(setQ<VV, Q>()(fields))
 
 export const $replaceWith = <T extends O, V extends O>(
   expr: Expr<V, T>,

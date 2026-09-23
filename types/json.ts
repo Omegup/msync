@@ -34,6 +34,7 @@ export type raw = readonly rawItem[] | RawObj
 
 export type StrKey<T> = string & keyof T
 export type Replace<R, V> = Omit<R, StrKey<V>> & V & O
+export type ReplaceQ<R extends Q, VV, Q extends O> = Omit<R, StrKey<VV>> & Omit<VV, StrKey<Q>> & Q
 
 // a generic type that restricts another type to be a literal
 // for exemple AsLiteral<'a'> is 'a' and AsLiteral<string> is never, AsLiteral<1> is 1 and AsLiteral<number> is never
