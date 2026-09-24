@@ -1,5 +1,5 @@
 import type { Timestamp } from 'mongodb'
-import type { Arr, ConstHKT, N, O, RORec, StrKey, jsonItem, rawItem } from '../../types'
+import type { Arr, ConstHKT, N, O, RORec, StrKey, jsonItem, notObj, rawItem } from '../../types'
 import type { Expr } from '../types'
 import { asExpr, asExprRaw } from './expr-base'
 import type { ExprHKT, ExprsExact } from './concat'
@@ -9,7 +9,8 @@ export const val = <T extends rawItem>(val: T): Expr<T, unknown> =>
   asExpr({
     raw: () =>
       asExprRaw<T, unknown, unknown>(
-        (val && typeof val === 'object' && !(val instanceof Date) ) || (typeof val === 'string' && val[0] === '$')
+        (val && typeof val === 'object' && !(val instanceof Date)) ||
+          (typeof val === 'string' && val[0] === '$')
           ? { $literal: val }
           : val,
       ),
@@ -51,27 +52,13 @@ export const $getField: {
       }),
   })
 
-export type NoRaw<T> =
-  T extends Arr<infer U>
-    ? NoRaw<U>[]
-    : T extends readonly unknown[]
-      ? { [K in keyof T]: NoRaw<T[K]> }
-      : T extends O
-        ? { [K in StrKey<T>]: NoRaw<T[K]> }
-        : T
-export type RONoRaw<T> =
-  T extends Arr<infer U>
-    ? readonly RONoRaw<U>[]
-    : T extends readonly unknown[]
-      ? { readonly [K in keyof T]: RONoRaw<T[K]> }
-      : T extends O
-        ? { readonly [K in StrKey<T>]: RONoRaw<T[K]> }
-        : T
+export type AddO<T> = T extends notObj ? T : T extends Array<infer U> ? Arr<AddO<U>> : O<T> 
+
 export const func = <T extends jsonItem, A extends readonly jsonItem[], D, C = unknown>(
-  f: (...args: NoRaw<A>) => RONoRaw<T>,
-  ...args: { [X in keyof A]: Expr<A[X], D, C> }
+  f: (...args: A) => T,
+  ...args: { [X in keyof A]: Expr<AddO<A[X]>, D, C> }
 ) =>
-  asExpr<T, D, C>({
+  asExpr<AddO<T>, D, C>({
     raw: field =>
       asExprRaw({
         $function: {

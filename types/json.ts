@@ -21,6 +21,7 @@ export type Arr<T, N extends number = number> = A & { readonly [_ in N]: T }
 type Obj = { [Type]: typeof object }
 export type O<T = unknown> = Obj & T
 export type RORec<K extends keyof never, T = unknown> = { readonly [P in K]: T }
+export type PRRec<K extends keyof never, T = unknown> = { [P in K]?: T }
 export type Par<K extends string, V extends Rec<K, jsonItem>> = { readonly [k in K]?: V[k] | N }
 export type Rec<K extends string, T = unknown> = O<RORec<K, T>>
 export type O2 = readonly [O, O]
