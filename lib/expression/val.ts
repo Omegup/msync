@@ -52,7 +52,7 @@ export const $getField: {
       }),
   })
 
-export type AddO<T> = T extends notObj ? T : T extends Array<infer U> ? Arr<AddO<U>> : O<T> 
+export type AddO<T> = T extends notObj ? T : T extends Array<infer U> ? Arr<AddO<U>> : O<{[K in keyof T]: AddO<T[K]>}> 
 
 export const func = <T extends jsonItem, A extends readonly jsonItem[], D, C = unknown>(
   f: (...args: A) => T,

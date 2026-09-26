@@ -36,6 +36,23 @@ const addGrp =
   }
 type GI<GG> = Exclude<GG, keyof TS>
 
+export type GroupMergeOut<
+  Grp extends notArr,
+  V extends O,
+  GG extends string,
+  EE = {},
+  Out extends Loose<Grp, V, GG> = Loose<Grp, V, GG>,
+> = MergeInto<Strict<Grp, V, GG, EE>, Out, WriteonlyCollection<MergedInput<Out, V, Grp, GG, EE>>>
+
+export type GroupMergeCollection<
+  WhenNotMatched extends MergeInto<never, never>['whenNotMatched'],
+  Grp extends notArr,
+  V extends O,
+  GG extends string,
+  EE = {},
+  Out extends Loose<Grp, V, GG> = Loose<Grp, V, GG>,
+> = (GroupMergeOut<Grp, V, GG, EE, Out> & { whenNotMatched: WhenNotMatched })['into']
+
 export const $groupMerge = <
   T extends O,
   Grp extends notArr,
@@ -46,11 +63,7 @@ export const $groupMerge = <
 >(
   id: Expr<Grp, T>,
   args: DeltaAccumulators<T, O & Omit<V, Denied<GI<GG>>>>,
-  out: MergeInto<
-    Strict<Grp, V, GG, EE>,
-    Out,
-    WriteonlyCollection<MergedInput<Out, V, Grp, GG, EE>>
-  >,
+  out: GroupMergeOut<Grp, V, GG, EE, Out>,
   gid: AsLiteral<GI<GG>>,
   extra: ExprsExact<Extra<EE, V, GG>, V_Grp<V, GG, Grp>>,
   idPrefix = '',
@@ -92,6 +105,12 @@ export const $groupMerge = <
           },
     ),
 })
+
+export type GroupIdCollection<
+  V extends O,
+  EE = {},
+  Out extends Loose<string, V, '_id'> = Loose<string, V, '_id'>,
+> = RWCollection<MergedInput<Out, V, string, '_id', EE>, Out>
 export const $groupId = <
   T extends O,
   V extends O,
@@ -100,7 +119,7 @@ export const $groupId = <
 >(
   id: Expr<string, T>,
   args: DeltaAccumulators<T, O & Omit<V, Denied>>,
-  out: RWCollection<MergedInput<Out, V, string, '_id', EE>, Out>,
+  out: GroupIdCollection<V, EE, Out>,
   extra: ExprsExact<Omit<EE, IdAndTsKeys | keyof Omit<V, IdAndTsKeys>>, doc & Omit<V, IdAndTsKeys>>,
 ): StreamRunnerParam<Delta<T>, 'out'> =>
   $groupMerge<T, string, V, '_id', EE, Out>(
@@ -111,6 +130,12 @@ export const $groupId = <
     extra,
   )
 
+export type GroupCollection<
+  Grp extends notArr,
+  V extends O,
+  EE = {},
+  Out extends Loose<Grp, V, '_grp'> = Loose<Grp, V, '_grp'>,
+> = RWCollection<MergedInput<Out, V, Grp, '_grp', EE> | Strict<Grp, V, '_grp', EE>, Out>
 export const $group = <
   T extends O,
   Grp extends notArr,
@@ -120,7 +145,7 @@ export const $group = <
 >(
   id: Expr<Grp, T>,
   args: DeltaAccumulators<T, O & Omit<V, Denied<'_grp'>>>,
-  out: RWCollection<MergedInput<Out, V, Grp, '_grp', EE> | Strict<Grp, V, '_grp', EE>, Out>,
+  out: GroupCollection<Grp, V, EE, Out>,
   extra: ExprsExact<
     Omit<EE, IdAndTsKeys | '_grp' | Exclude<keyof V, IdAndTsKeys | '_grp'>>,
     Rec<'_grp', Grp> & Omit<V, IdAndTsKeys | '_grp'>
