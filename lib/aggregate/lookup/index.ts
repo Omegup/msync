@@ -8,6 +8,7 @@ import {
   type doc,
   type notArr,
   type Arr,
+  type N,
 } from '../../../types'
 import { mergeObjects } from '../../expression/array'
 import { fieldM } from '../../expression/concat'
@@ -164,7 +165,7 @@ type Params<As extends string, LQ extends O, RQ extends O, RE extends RQ, S exte
 } & (
   | {
       to: 'one'
-      localField: Field<LQ, string>
+      localField: Field<LQ, string | N>
       foreignField?: never
       middle?: never
     }
@@ -232,7 +233,7 @@ export const $lookup =
   ) =>
   <LE extends LQ>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE>> =>
     p.to === 'one'
-      ? $lookup1<As, LQ, LE, RQ, RE, string>({
+      ? $lookup1<As, LQ, LE, RQ, RE, string | N>({
           right: p.from,
           as: p.as,
           lField: p.localField,
@@ -256,7 +257,7 @@ export const $outerLookup =
   ) =>
   <LE extends LQ>(l: SnapshotStream<LQ, LE>): SnapshotStream<LQ, LE & RORec<As, RE | null>> =>
     p.to === 'one'
-      ? $lookup1<As, LQ, LE, RQ, RE, string, null>(
+      ? $lookup1<As, LQ, LE, RQ, RE, string | N, null>(
           {
             right: p.from,
             as: p.as,

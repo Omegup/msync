@@ -28,7 +28,7 @@ const addGrp =
   ): ExprsExact<Rec<GID, Grp> & Omit<V, Denied<GID>>, D> => {
     const omit = omitPick<keyof V, Denied<GID>, GID, V>()
     return omit.backward<ExprsExactHKT<Rec<GID, Grp>, D>>(
-      mergeExpr<Omit<V, Denied<GID>>, RORec<GID, Grp>, D, unknown, O>(
+      mergeExpr<Omit<V, Denied<GID>>, RORec<GID, Grp>, D, unknown, keyof O, O[keyof O]>(
         omit.forward<ExprsExactHKT<unknown, D>>(expr),
         map1(gid, root<D>().of('_id').expr()),
       ),

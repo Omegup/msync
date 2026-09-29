@@ -78,17 +78,3 @@ export const excludeIdem = <K extends s, E extends s, S extends E = E>() =>
 export const eqPar = <K extends string, T extends Rec<K, jsonItem>, K2 extends K>() =>
   assertEqual<unknown, Par<K2, T>, Par<K, T>>()
 
-export const notExtendExcluded = <
-  Key extends keyof any,
-  Others extends keyof any,
-  Source extends keyof any,
-  Denied extends keyof any,
-  F extends HKT<Others | Exclude<Source, Denied | Key>, Dom>,
-  Else extends Dom,
-  Dom = unknown,
->() =>
-  assertEqual<
-    Dom,
-    Key extends Others | Exclude<Source, Denied | Key> ? App<F, Key> : Else,
-    Key extends Others ? App<F, Key> : Else
-  >()

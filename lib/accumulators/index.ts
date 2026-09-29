@@ -135,7 +135,7 @@ export const $pushDict = <D extends O, V, C = unknown>(
     ],
     function (ra, k, v, old, deleted) {
       if (deleted) return ra
-      let a: PushDict<V> = { ...ra }
+      let a: PRRec<string, PushSides<V>> = { ...ra }
       //@ts-ignore
       const equal = (a, b) => {
         if (!a || !b) return a === b

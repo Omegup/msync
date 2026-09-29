@@ -1,3 +1,4 @@
+import type { N } from '../..';
 import type { Expr } from '../types'
 import { asExpr, asExprRaw } from './expr-base'
 
@@ -22,16 +23,16 @@ export const gt: {
   })
 
 export const lte: {
-  <D, C>(...expr: [Expr<Date, D, C>, Expr<Date, D, C>]): Expr<boolean, D, C>
-  <D, C>(...expr: [Expr<number, D, C>, Expr<number, D, C>]): Expr<boolean, D, C>
-} = <D, C>(...expr: [Expr<number | Date, D, C>, Expr<number | Date, D, C>]) =>
+  <D, C>(...expr: [Expr<Date | N, D, C>, Expr<Date | N, D, C>]): Expr<boolean, D, C>
+  <D, C>(...expr: [Expr<number | N, D, C>, Expr<number | N, D, C>]): Expr<boolean, D, C>
+} = <D, C>(...expr: [Expr<number | Date | N, D, C>, Expr<number | Date | N, D, C>]) =>
   asExpr<boolean, D, C>({
     raw: f => asExprRaw({ $lte: expr.map(e => e.raw(f).get()) }),
   })
 export const gte: {
-  <D, C>(...expr: [Expr<Date, D, C>, Expr<Date, D, C>]): Expr<boolean, D, C>
-  <D, C>(...expr: [Expr<number, D, C>, Expr<number, D, C>]): Expr<boolean, D, C>
-} = <D, C>(...expr: [Expr<number | Date, D, C>, Expr<number | Date, D, C>]) =>
+  <D, C>(...expr: [Expr<Date | N, D, C>, Expr<Date | N, D, C>]): Expr<boolean, D, C>
+  <D, C>(...expr: [Expr<number | N, D, C>, Expr<number | N, D, C>]): Expr<boolean, D, C>
+} = <D, C>(...expr: [Expr<number | Date | N, D, C>, Expr<number | Date | N, D, C>]) =>
   asExpr<boolean, D, C>({
     raw: f => asExprRaw({ $gte: expr.map(e => e.raw(f).get()) }),
   })

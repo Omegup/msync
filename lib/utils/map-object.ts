@@ -83,10 +83,10 @@ export const mapExact = <T, F extends HKT<T[StrKey<T>]>, G extends HKT<T[StrKey<
 ): Exact<T, G> => mapExactToObject<T, F, WithKey<T, G>>(x, (v, k) => [k, f(v, k)])
 
 type Dom<T, V> = HKT<T[StrKey<T>] | V[StrKey<V>]>
-export const spread = <T, V, F extends Dom<T, V>, E = unknown, No extends keyof V = never>(
+export const spread = <T, V, F extends Dom<T, V>, EK extends symbol = never, EE = unknown, No extends keyof V = never>(
   a: Exact<Omit<T, No>, F>,
   b: Exact<V, F>,
-) => ({ ...a, ...mapExact(b, id) }) as Exact<V & Omit<T, keyof V> & Pick<E, symbol & keyof E>, F>
+) => ({ ...a, ...mapExact(b, id) }) as Exact<V & Omit<T, keyof V> & Record<EK, EE>, F>
 
 export interface MergeHKT<T, V, F1 extends HKT<StrKey<Omit<T, No>>>, F2 extends HKT<StrKey<V>>, No extends keyof V = never,>
   extends HKT<StrKey<V & Omit<T, No>>> {

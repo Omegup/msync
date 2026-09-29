@@ -1,20 +1,32 @@
 import crypto from 'crypto'
 import { canonicalize as str } from 'json-canonicalize'
-import type { Arr, AsLiteral, ID, N, O, RORec, Rec, doc, rawItem } from '../../../types'
+import type {
+  App,
+  Arr,
+  AsLiteral,
+  HKT,
+  I,
+  ID,
+  N,
+  O,
+  RORec,
+  Rec,
+  doc,
+  rawItem,
+} from '../../../types'
 import { field, mergeExpr, type ExprsExactHKT } from '../../expression/concat'
-import { $ifNull, eq, ite } from '../../expression/logic'
+import { $ifNull, eqTyped, ite } from '../../expression/logic'
 import { nil, val } from '../../expression/val'
 import { Field, root } from '../../field'
 import type { BA, Before, Delta, Expr, RawStages, TStages, UBefore } from '../../types'
 import { set, to } from '../../update'
-import { omitRORec } from '../../utils/guard'
+import { literalsEqaul, omitRORec } from '../../utils/guard'
 import { map1 } from '../../utils/json'
 import { $set_, $simpleLookup_ } from '../mongo-stages'
 import { link } from '../prefix'
 import { $replaceWithEach, $replaceWithEach1 } from '../set/$replace-with-each'
 import { $replaceWithDelta } from '../set/$set-delta'
 import { $unwindDelta, type JoinId } from '../unwind'
-
 type s = string
 type Both<
   K1 extends s,
@@ -63,7 +75,10 @@ export const $lookupDelta = <
     )
     .with<unknown, Delta<Rec<K1, LE>> & ABIds>(
       $set_<O, Delta<Rec<K1, LE>>, Delta<Rec<K1, LE>> & ABIds>(
-        set<ABIds>()({ bId: ['bId', normForeignKey('before')], aId: ['aId', normForeignKey('after')] }),
+        set<ABIds>()({
+          bId: ['bId', normForeignKey('before')],
+          aId: ['aId', normForeignKey('after')],
+        }),
       ),
     )
     .with<unknown, Delta<Rec<K1, LE>> & Rec<'a', Arr<BU>> & ABIds>(
@@ -106,57 +121,91 @@ export const $lookupDelta = <
           (Rec<K1, LE> & Rec<K2, Arr<RE>>) | null,
           Delta<Rec<K1, LE>> & Rec<'a' | 'b', Arr<BU>>
         > => {
-          const f1 = f === 'after' ? 'a' : 'b'
           type R = Delta<Rec<K1, LE>> & Rec<'a' | 'b', Arr<BU>>
-          const a = root<R>().of(f1).of('before').expr()
-
-          const part: Field<Delta<Rec<K1, LE>>, Rec<K1, LE> | N> = root<Delta<Rec<K1, LE>>>().of(f)
-
-          return ite(
-            eq(root<R>().of(f).expr())(nil),
-            nil,
-            field<RORec<K1, LE> & RORec<K2, Arr<RE>>, R>(
-              omit.backward<ExprsExactHKT<RORec<K1, LE>, R>>(
-                mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, LE | N>, R>(
-                  omit.forward<ExprsExactHKT<{}, R>>(map1(k2, a)),
-                  map1(k1, part.of(k1).expr()),
+          type Side = Rec<K1, LE> | null
+          type Row = (Rec<K1, LE> & Rec<K2, Arr<RE>>) | null
+          const joined = <S extends 'before' | 'after', A extends 'a' | 'b'>(
+            side: S,
+            arr: A,
+          ): Expr<Row, Omit<R, S> & Rec<S, Side>> => {
+            type At<X extends Side> = Omit<R, S> & Rec<S, X>
+            interface AtF extends HKT<Side> {
+              readonly out: At<I<Side, this>>
+            }
+            type Present = At<Rec<K1, LE>>
+            const here = root<Present>()
+            return ite<Row, null, Rec<K1, LE>, AtF>(
+              eqTyped<null, Rec<K1, LE>, AtF, unknown, Side>(
+                root<App<AtF, Side>>().of<RORec<S, Side>, S, 1>(side).expr(),
+                nil,
+              ),
+              nil,
+              field<RORec<K1, LE> & RORec<K2, Arr<RE>>, Present>(
+                omit.backward<ExprsExactHKT<RORec<K1, LE>, Present>>(
+                  mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, LE>, Present>(
+                    omit.forward<ExprsExactHKT<{}, Present>>(
+                      map1(
+                        k2,
+                        here.of<RORec<A, Arr<BU>>, A, 1>(arr).of<BU, 'before'>('before').expr(),
+                      ),
+                    ),
+                    map1(
+                      k1,
+                      here
+                        .of<RORec<S, Rec<K1, LE>>, S, 1>(side)
+                        .of<RORec<K1, LE>, K1, 1>(k1)
+                        .expr(),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          )
+            )
+          }
+          return f === 'after' ? joined('after', 'a') : joined('before', 'b')
         },
       ),
     )
     .with<unknown, Delta<Rec<K1, LE | N1> & Rec<K2, Arr<RE>>>>(
       includeNull1 === null
         ? $replaceWithEach1<Rec<K1, LE> & Rec<K2, Arr<RE>>, Rec<K1, LE | N1> & Rec<K2, Arr<RE>>>(
-            <K extends BA>(
-              f: K,
+            <Part extends BA>(
+              part: Part,
             ): Expr<
               (Rec<K1, LE | N1> & Rec<K2, Arr<RE>>) | null,
               Delta<Rec<K1, LE> & Rec<K2, Arr<RE>>>
             > => {
-              type R = Delta<Rec<K1, LE | N1> & Rec<K2, Arr<RE>>>
-              type OtherField = Field<R, Exclude<R[BA], N>>
-              const otherField = root<R>().of(f === 'after' ? 'before' : 'after')
-              return $ifNull(
-                root<R>().of(f).expr(),
+              type R1 = Rec<K1, LE> & Rec<K2, Arr<RE>>
+              type R = Delta<R1>
+              const otherPart: Field<R, R1 | null> = root<R>().of(
+                part === 'after' ? 'before' : 'after',
+              )
+
+              interface NullK1 extends HKT<null> {
+                readonly out: Expr<I<null, this>, R>
+              }
+              const n1 = literalsEqaul<null, N1>(includeNull1).forward<NullK1>(nil)
+              const expr: Expr<
+                (Rec<K1, LE | N1> & Rec<K2, Arr<RE>>) | null,
+                Delta<Rec<K1, LE> & Rec<K2, Arr<RE>>>
+              > = $ifNull<Rec<K1, LE | N1> & Rec<K2, Arr<RE>>, R, unknown>(
+                root<R>().of(part).expr(),
                 field<RORec<K1, LE | N1> & RORec<K2, Arr<RE>>, R>(
-                  omit.backward<ExprsExactHKT<RORec<K1, LE | N1>, R>>(
-                    mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, LE | N>, R>(
+                  omit.backward<ExprsExactHKT<RORec<K1, N1>, R>>(
+                    mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, N1>, R>(
                       omit.forward<ExprsExactHKT<{}, R>>(
-                        map1(k2, (otherField as OtherField).of(k2).expr()),
+                        map1(k2, (otherPart as Field<R, R1>).of(k2).expr()),
                       ),
-                      map1(k1, nil),
+                      map1(k1, n1),
                     ),
                   ),
                 ),
               )
+              return expr
             },
           )
         : link<Delta<Rec<K1, LE> & Rec<K2, Arr<RE>>>>().stages,
     )
     .with<unknown, Delta<Rec<K1, LE | N1> & Rec<K2, RE | N2> & ID>>(
-      $unwindDelta<K1, LE, K2, RE, N1, N2>(k1, k2, k, includeNull1, includeNull2),
+      $unwindDelta<K1, LE, KK2, RE, N1, N2>(k1, k2, k, includeNull1, includeNull2),
     ).stages
 }

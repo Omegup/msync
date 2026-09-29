@@ -161,7 +161,9 @@ const $mergeX = <
     OPick<V, K>,
     ExprHKT<SourcePart>,
     ExprHKT<Intermediate>
-  >(keys, v => sub(v, f))
+  >(keys, <P extends StrKey<OPick<V, K>>>(v: Expr<OPick<V, K>[P], SourcePart>) => {
+    return $ifNull<OPick<V, K>[P], Intermediate, unknown>(sub(v, f), nil)
+  })
   interface EqHKT<Dom = unknown> extends HKT<Dom> {
     readonly out: Record<'$eq', I<Dom, this>>
   }
@@ -174,7 +176,7 @@ const $mergeX = <
   const replacer: Expr<Patch<V>, Source> = map(
     field<T & TS, Intermediate>(
       omitPick<KK, never, keyof (TS & ID), V>().backward<ExprsExactHKT<TS & doc, Intermediate>>(
-        spread<Pick<V, K>, ID & TS, ExprHKT<Intermediate>, O>(patch, {
+        spread<Pick<V, K>, ID & TS, ExprHKT<Intermediate>, keyof O, O[keyof O]>(patch, {
           _id: ['_id', f.of('_id').expr()],
           touchedAt: ['touchedAt', current],
         }),

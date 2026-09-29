@@ -112,10 +112,10 @@ type MergeExactArgs<T1, T2, F extends HKT<T1[StrKey<T1>] | T2[StrKey<T2>]>> = re
   Exact<Omit<T1, keyof T2>, F>,
   Exact<T2, F>,
 ]
-export const mergeExact = <T1, T2, F extends HKT<T1[StrKey<T1>] | T2[StrKey<T2>]>, E = unknown>(
+export const mergeExact = <T1, T2, F extends HKT<T1[StrKey<T1>] | T2[StrKey<T2>]>, EK extends symbol = never, EE = unknown>(
   ...[exprsExact1, exprsExact2]: MergeExactArgs<T1, T2, F>
-): Exact<T2 & Omit<T1, keyof T2> & Pick<E, symbol & keyof E>, F> =>
-  spread<T1, T2, F, E, keyof T2>(exprsExact1, exprsExact2)
+): Exact<T2 & Omit<T1, keyof T2> & Record<EK, EE>, F> =>
+  spread<T1, T2, F, EK, EE, keyof T2>(exprsExact1, exprsExact2)
 
 export type MergeMapOArgs<
   T1,
@@ -136,10 +136,10 @@ export const mergeExact0 = <
   MergeHKT<T1, T2, F1, F2, StrKey<T2>>
 > => spread0<T1, T2, F1, F2, E, StrKey<T2>>(exprsExact1, exprsExact2)
 
-export const mergeExpr = <T1, T2, D, C = unknown, E = unknown>(
+export const mergeExpr = <T1, T2, D, C = unknown, EK extends symbol = never, EE = unknown>(
   ...exprs: MergeExactArgs<T1, T2, ExprHKT<D, C>>
-): ExprsExact<T2 & Omit<T1, keyof T2> & Pick<E, symbol & keyof E>, D, C> =>
-  mergeExact<T1, T2, ExprHKT<D, C>, E>(...exprs)
+): ExprsExact<T2 & Omit<T1, keyof T2> & Record<EK, EE>, D, C> =>
+  mergeExact<T1, T2, ExprHKT<D, C>, EK, EE>(...exprs)
 
 export type ExprsPart<T, D, C> = ExactPart<T, ExprHKT<D, C>>
 export interface ExprHKT<D, C = unknown, F extends HKT = IdHKT> extends HKT<unknown> {
@@ -150,13 +150,6 @@ export type ExprsExact<T, D, C = unknown, F extends HKT = IdHKT> = Exact<T, Expr
 export interface ExprsExactHKT<E, D, C = unknown, F extends HKT = IdHKT> extends HKT {
   readonly out: ExprsExact<E & I<unknown, this>, D, C, F>
 }
-
-const asIntersect = <T, V, P extends keyof T & keyof V>(x: T[P] & V[P]) => x as (T & V)[P]
-export const pair = <T, D, C, P extends StrKey<T>>(
-  k: P,
-  v: Expr<T[P], D, C>,
-): ExprsExact<T, D, C>[P] =>
-  asIntersect<ExprsPart<T, D, C>, RORec<string, readonly [StrKey<T>, unknown]>, P>([k, v])
 
 export const fieldF =
   <F extends HKT>() =>

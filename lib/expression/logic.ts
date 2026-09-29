@@ -81,10 +81,19 @@ export const ne =
       raw: f => asExprRaw({ $ne: [a.raw(f).get(), b.raw(f).get()] }),
     })
 
-export const notNull =
-<T, D, C>(a: Expr<T, D, C>) => ne($ifNull(a, nil))(nil)
+export const notNull = <T, D, C>(a: Expr<T, D, C>) => ne($ifNull(a, nil))(nil)
 
-export const $ifNull = <R, D, C>(...expr: [...Expr<R | null | undefined, D, C>[], Expr<R, D, C>]) =>
+export const $ifNull: {
+  <R, D, C = unknown>(
+    ...expr: [...Expr<R | null | undefined, D, C>[], Expr<R, D, C>]
+  ): Expr<R, D, C>
+  <R, D, C = unknown>(
+    ...expr: [Expr<R, D, C>, ...Expr<R | null | undefined, D, C>[]]
+  ): Expr<R, D, C>
+} = <R, D, C>(
+  ...expr:
+    | [...Expr<R | null | undefined, D, C>[]]
+) =>
   asExpr<R, D, C>({
     raw: f => asExprRaw({ $ifNull: expr.map(e => e.raw(f).get()) }),
   })
