@@ -1,12 +1,13 @@
 {
     "name": "@omegup/msync",
-    "version": "0.1.57",
+    "version": "0.1.58",
     "description": "Keeps derived MongoDB data in sync with the documents it comes from.",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/Omegup/msync.git"
     },
     "homepage": "https://omegup.github.io/msync/",
+    "license": "MIT",
     "bugs": {
         "url": "https://github.com/Omegup/msync/issues"
     },

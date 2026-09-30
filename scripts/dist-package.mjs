@@ -10,6 +10,7 @@ const published = {
   description: pkg.description,
   repository: pkg.repository,
   homepage: pkg.homepage,
+  license: pkg.license,
   bugs: pkg.bugs,
   main: 'index.js',
   module: 'index.esm.js',
@@ -23,3 +24,4 @@ const published = {
 }
 writeFileSync(join(root, 'dist/package.json'), JSON.stringify(published, null, 4) + '\n')
 copyFileSync(join(root, 'README.md'), join(root, 'dist/README.md'))
+copyFileSync(join(root, 'LICENSE'), join(root, 'dist/LICENSE'))
