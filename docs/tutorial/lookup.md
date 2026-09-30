@@ -52,6 +52,6 @@ The inner `staging(...).get()` is a stream of its own, with its own snapshot. `$
 
 `$lookup` keeps documents that match. `$outerLookup` keeps the left document when the right side is missing, and types the joined field as `T | null`.
 
-`to: 'one'` means `localField` points at the right document's `_id`, so there is no `foreignField`. Each left row matches one right row, and the result keeps the left `_id`. `to: 'many'` is several matches per left row, or a join on some other field. That case is the [entitlements](/tutorial/entitlements) stream.
+`to: 'one'` means `localField` points at the right document's `_id`, so there is no `foreignField`. Each left row matches one right row, and the result keeps the left `_id`. `to: 'many'` is several matches per left row, or a join on some other field. That case is the [entitlements](./entitlements.md) stream.
 
-Next: [keep a lifetime total on the account](/tutorial/group).
+Next: [keep a lifetime total on the account](./group.md).

@@ -87,4 +87,4 @@ await machine.start(info => {
 
 `.start` resolves only when it stops. Return `true` from the callback to stop after the current tick.
 
-Stream names are unique inside the process. Reusing a name throws. The [tutorial](/tutorial/) continues from here with a lookup, a sum, and a collection of pairs. The [guide](/guide) is the rest of the language.
+Stream names are unique inside the process. Reusing a name throws. The [tutorial](./tutorial/index.md) continues from here with a lookup, a sum, and a collection of pairs. The [guide](./guide.md) is the rest of the language.

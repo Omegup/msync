@@ -75,4 +75,4 @@ export const makeEntitlementStream = (
 
 The same account and the same plan always produce the same `_id`, because `middle` is part of the lookup. That is how the next run finds the row to update or retire.
 
-Next: [run every stream on one machine](/tutorial/run).
+Next: [run every stream on one machine](./run.md).

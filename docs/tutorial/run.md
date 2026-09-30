@@ -39,4 +39,4 @@ await machine.start(info => {
 })
 ```
 
-The [guide](/guide) is the rest of the language: expressions, predicates, accumulators, the write modes side by side, and what the process stores while it runs.
+The [guide](../guide.md) is the rest of the language: expressions, predicates, accumulators, the write modes side by side, and what the process stores while it runs.

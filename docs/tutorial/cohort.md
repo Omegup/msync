@@ -39,4 +39,4 @@ export const makeAccountCohortStream = (accounts: Collection<Account & Model>) =
 
 `root<T>()` is the current document, typed as `T`. `.of('key')` steps into a field. `.expr()` turns the path into a value you can pass to `monthPart`, `$sum`, `$merge`, and the rest.
 
-Next: [copy the account name onto each order](/tutorial/lookup).
+Next: [copy the account name onto each order](./lookup.md).

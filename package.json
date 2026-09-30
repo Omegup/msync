@@ -1,10 +1,20 @@
 {
     "name": "@omegup/msync",
+    "version": "0.1.56",
+    "description": "Keeps derived MongoDB data in sync with the documents it comes from.",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Omegup/msync.git"
+    },
+    "homepage": "https://omegup.github.io/msync/",
+    "bugs": {
+        "url": "https://github.com/Omegup/msync/issues"
+    },
     "type": "module",
     "module": "index.ts",
     "scripts": {
         "tsc": "tsc",
-        "build": "rollup -c",
+        "build": "rollup -c && node scripts/dist-package.mjs",
         "docs:dev": "vitepress dev docs",
         "docs:build": "vitepress build docs",
         "docs:preview": "vitepress preview docs"

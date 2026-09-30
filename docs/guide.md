@@ -1,6 +1,6 @@
 # Guide
 
-This is the reference for `@omegup/msync`. The [tutorial](/tutorial/) walks the four pipelines you will write most often, on accounts, orders, and plans. Here is how the pieces fit, and what the process stores while they run.
+This is the reference for `@omegup/msync`. The [tutorial](./tutorial/index.md) walks the four pipelines you will write most often, on accounts, orders, and plans. Here is how the pieces fit, and what the process stores while they run.
 
 ## Views
 

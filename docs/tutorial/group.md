@@ -48,6 +48,6 @@ Read `$groupId` as four arguments:
 
 `$group` is the same fold when the target document does not exist yet. It stores the key in `_grp` and inserts. Use it for a summary collection, such as revenue per month. Use `$groupId` to hang a summary on a document you already have, such as spend on an account.
 
-When the thing you are counting is a set of strings rather than a number, use `$countDict`. The [guide](/guide#accumulators) shows it next to `$sum`.
+When the thing you are counting is a set of strings rather than a number, use `$countDict`. The [guide](../guide.md#accumulators) shows it next to `$sum`.
 
-Next: [materialize one document per account and plan](/tutorial/entitlements).
+Next: [materialize one document per account and plan](./entitlements.md).
