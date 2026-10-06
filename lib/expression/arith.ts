@@ -6,7 +6,11 @@ export const max = <D, C>(...expr: Expr<number, D, C>[]) =>
   asExpr<number, D, C>({
     raw: f => asExprRaw({ $max: expr.map(e => e.raw(f).get()) }),
   })
-
+export const min = <D, C>(...expr: Expr<number, D, C>[]) =>
+  asExpr<number, D, C>({
+    raw: f => asExprRaw({ $min: expr.map(e => e.raw(f).get()) }),
+  })
+  
 export const lt: {
   <D, C>(...expr: [Expr<Date, D, C>, Expr<Date, D, C>]): Expr<boolean, D, C>
   <D, C>(...expr: [Expr<number, D, C>, Expr<number, D, C>]): Expr<boolean, D, C>
