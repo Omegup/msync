@@ -148,8 +148,9 @@ export const subMerge = <
   type In = OrReplace<ReadyForWhenMatched, ReadyForMerge>
 
   type WhenMatched = RawStages<O, Rec<'old' | 'merged', Out | Replace<Replace<Out, V>, Extra>>, In>
-  const whenMatched = getWhenMatched<Out, Replace<V, Extra> & Model, never>(
+  const whenMatched = getWhenMatched<Out, Replace<V, Extra> & Model>(
     out.whenNotMatched,
+    null,
   ) as WhenMatched
 
   return link<V_Grp>()

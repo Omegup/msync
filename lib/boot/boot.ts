@@ -348,15 +348,6 @@ const executes = <
           false,
           start,
         )
-        const intoColl = (stages.at(-1) as any).$merge.into.coll
-        const startx = Date.now()
-        if (false) {
-          await db
-            .collection(intoColl)
-            .find({ touchedAt: { $gte: result.cursor.atClusterTime } })
-            .toArray()
-            .then(docs => log(`documents updated ${intoColl}`, docs, 'took', Date.now() - startx))
-        }
         return next(
           step5({ ts: result.cursor.atClusterTime, aggResult, stream, nextRes, first }),
           'remove handled deleted updated',

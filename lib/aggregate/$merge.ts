@@ -10,10 +10,10 @@ import type {
   WriteonlyCollection,
 } from '../../types'
 import type { doc, ID, N, O, rawItem, Rec, Replace, RORec, StrKey } from '../../types/json'
-import { mergeObjects } from '../expression'
+import { mergeObjects, ne } from '../expression'
 import { field, type ExprHKT, type ExprsExact, type ExprsExactHKT } from '../expression/concat'
-import { $ifNull, eq, eqTyped, ite, sub } from '../expression/logic'
-import { current, nil } from '../expression/val'
+import { $ifNull, and, eq, eqTyped, ite, sub } from '../expression/logic'
+import { current, nil, val } from '../expression/val'
 import { ctx, Field, root } from '../field'
 import type {
   Before,
@@ -54,6 +54,31 @@ type Update<P, Out> = (...args: Args<P, Out>) => Result<P>
 type UpdateF<P, Out> = <K extends keyof IsDeleted>(
   ...args: Args<Replace<P, RORec<K, Timestamp>>, Out>
 ) => Result<Replace<P, RORec<K, Timestamp>>>
+
+export const getSubsetMatchForExt = <
+  Out extends Model,
+  P extends Model,
+  E extends Record<keyof E, rawItem>,
+>(
+  ext: Exact<E, IdHKT>,
+): null | Expr<boolean, Rec<'old' | 'merged', Out | Replace<Out, P>>> => {
+  type OldAndMerged = Rec<'old' | 'merged', Out | Replace<Out, P>>
+  const extObj: Record<StrKey<E>, Expr<boolean, OldAndMerged>> = mapExactToObject<
+    E,
+    IdHKT,
+    ConstHKT<Expr<boolean, OldAndMerged>>
+  >(ext, (v, k) => {
+    return eq<unknown, OldAndMerged>(
+      root<OldAndMerged>()
+        .of('old')
+        .of(k as never)
+        .expr() as Expr<unknown, OldAndMerged>,
+    )(val(v))
+  })
+  const checks = Object.values<Expr<boolean, OldAndMerged>>(extObj)
+  return checks.length ? (checks.length === 1 ? checks[0] : and(...checks)) : null
+}
+
 export const getWhenMatchedForMerge = <
   Out extends Model,
   P extends Model,
@@ -61,6 +86,7 @@ export const getWhenMatchedForMerge = <
 >(
   whenNotMatched: 'discard' | 'fail' | 'insert',
   update: Update<Replace<P, RORec<K, Timestamp>>, Out>,
+  canWrite: Expr<boolean, Rec<'old' | 'merged', Out | Replace<Out, P>>> | null,
 ): RawStages<O, Out, Out | Replace<Out, P>, RORec<'new', Replace<P, RORec<K, Timestamp>>>> => {
   const orNull = <T, C>(e: Expr<Timestamp | N, T, C>) =>
     whenNotMatched === 'discard' ? $ifNull(e, nil) : e
@@ -89,10 +115,11 @@ export const getWhenMatchedForMerge = <
         }),
       ),
     )
-    .with(getWhenMatched(whenNotMatched)).stages
+    .with(getWhenMatched(whenNotMatched, canWrite)).stages
 }
-export const getWhenMatched = <Out extends Model, P extends Model, K extends keyof IsDeleted>(
+export const getWhenMatched = <Out extends Model, P extends Model>(
   whenNotMatched: 'discard' | 'fail' | 'insert',
+  canWrite: Expr<boolean, Rec<'old' | 'merged', Out | Replace<Out, P>>> | null,
 ): RawStages<O, Rec<'old' | 'merged', Out | Replace<Out, P>>, Out | Replace<Out, P>> => {
   const orNull = <T, C>(e: Expr<Timestamp | N, T, C>) =>
     whenNotMatched === 'discard' ? $ifNull(e, nil) : e
@@ -111,11 +138,12 @@ export const getWhenMatched = <Out extends Model, P extends Model, K extends key
     }),
   )
 
-  const same = eq<Out | Merged, OldAndMerged>(preMergeOld)(root<OldAndMerged>().of('merged').expr())
+  const diff = ne<Out | Merged, OldAndMerged>(preMergeOld)(root<OldAndMerged>().of('merged').expr())
+  const useNew = canWrite ? and(diff, canWrite) : diff
 
   return link<OldAndMerged>().with(
     $replaceWith_<OldAndMerged, Out | Replace<Out, P>>(
-      ite(same, root<OldAndMerged>().of('old').expr(), root<OldAndMerged>().of('merged').expr()),
+      ite(useNew, root<OldAndMerged>().of('merged').expr(), root<OldAndMerged>().of('old').expr()),
     ),
   ).stages
 }
@@ -170,6 +198,7 @@ const $mergeX = <
   const filter: {
     readonly [K in StrKey<E>]: Record<'$eq', E[K]>
   } = mapExactToObject<E, IdHKT, MappedHKT<E, EqHKT>>(ext, v => ({ $eq: v }))
+  const sameSubset = getSubsetMatchForExt<Out, P, E>(ext)
 
   const setDeleted = out.whenNotMatched === 'discard'
 
@@ -202,6 +231,7 @@ const $mergeX = <
             whenMatched: getWhenMatchedForMerge<Out, P, keyof IsDeleted>(
               out.whenNotMatched,
               update,
+              sameSubset,
             ),
           }),
         ).stages
@@ -211,7 +241,11 @@ const $mergeX = <
           on: root<doc>().of('_id'),
           whenNotMatched: 'fail',
           stages: true,
-          whenMatched: getWhenMatchedForMerge<Out, P, never>(out.whenNotMatched, update),
+          whenMatched: getWhenMatchedForMerge<Out, P, never>(
+            out.whenNotMatched,
+            update,
+            sameSubset,
+          ),
         }),
       ).stages
 

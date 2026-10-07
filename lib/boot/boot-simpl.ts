@@ -197,16 +197,6 @@ const executes = <
         }),
       )
 
-
-      if (false) {
-        const intoColl = (raw.at(-1) as any).$merge.into.coll
-        await db
-          .collection(intoColl)
-          .find({ touchedAt: { $gte: null /* currTime */ } })
-          .toArray()
-          .then(docs => log(`documents updated ${intoColl}`, docs))
-      }
-
       return next(
         step7({ aggResult, ts: aggResult.cursor.atClusterTime, stream, nextRes }),
         'update __last',

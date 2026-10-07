@@ -15,7 +15,7 @@ import type { DDel, Del, Delta, Expr, RawStages, StreamRunnerParam, TS } from '.
 import { translateOmit } from '../utils/guard'
 import { id } from '../utils/json'
 import { mapExact, mapExactToObject, type Exact, type MappedHKT } from '../utils/map-object'
-import { getWhenMatchedForMerge } from './$merge'
+import { getSubsetMatchForExt, getWhenMatchedForMerge } from './$merge'
 import { $replaceWith_ } from './mongo-stages'
 import { $merge_ } from './out'
 import { link } from './prefix'
@@ -45,6 +45,7 @@ export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, r
   const filter: {
     readonly [K in StrKey<E>]: Record<'$eq', E[K]>
   } = mapExactToObject<E, IdHKT, MappedHKT<E, EqHKT>>(ext, v => ({ $eq: v }))
+  const sameSubset = getSubsetMatchForExt<Out, Out, E>(ext)
 
   return {
     teardown: c =>
@@ -76,7 +77,7 @@ export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, r
             into: out,
             on: root<O<ID>>().of('_id'),
             stages: true,
-            whenMatched: getWhenMatchedForMerge<Out, Out, never>('insert', update),
+            whenMatched: getWhenMatchedForMerge<Out, Out, never>('insert', update, sameSubset),
             whenNotMatched: 'insert',
           }),
         ).stages
