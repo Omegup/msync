@@ -84,9 +84,19 @@ export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, r
   }
 }
 
-export const $simpleInsert = <T extends doc>(
-  out: RWCollection<Merge<T, {}>>,
-): StreamRunnerParam<T, 'out'> => $insertX(out, root<T>().expr(), id, {}, {})
+export const $simpleInsert = <T extends doc, EEE extends RORec<string, rawItem>>(
+  out: RWCollection<Merge<T, EEE>>,
+  ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
+): StreamRunnerParam<T, 'out'> => {
+  type EE = SafeE<EEE>
+  type E = Omit<EE, keyof (ND & TS)>
+  const extExpr = mapExact<E, IdHKT, ExprHKT<unknown>>(
+    ext,
+    <P extends StrKey<E>>(v: E[P]): Expr<E[P], unknown> => val<E[P]>(v),
+  )
+
+  return $insertX<T, T, EEE>(out, root<T>().expr(), id, ext, extExpr)
+}
 
 export const $insertPart = <T extends doc, EEE extends RORec<string, rawItem>>(
   out: RWCollection<Merge<T, EEE>>,
