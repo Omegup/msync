@@ -16,7 +16,7 @@
     "scripts": {
         "tsc": "tsc",
         "build": "tsc --outDir .build && tsdown --config tsdown.config.ts && node scripts/dist-package.mjs",
-        "publish:dist": "pnpm build && pnpm --dir dist publish --access public",
+        "publish:dist": "pnpm build && pnpm --dir dist publish --access public --npmrc-auth-file ../.npmrc",
         "docs:dev": "vitepress dev docs",
         "docs:build": "vitepress build docs",
         "docs:preview": "vitepress preview docs"
