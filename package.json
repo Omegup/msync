@@ -15,12 +15,14 @@
     "module": "index.ts",
     "scripts": {
         "tsc": "tsc",
-        "build": "tsc && tsdown --config tsdown.config.ts && node scripts/dist-package.mjs",
+        "build": "tsc --outDir .build && tsdown --config tsdown.config.ts && node scripts/dist-package.mjs",
+        "publish:dist": "pnpm build && pnpm --dir dist publish --access public",
         "docs:dev": "vitepress dev docs",
         "docs:build": "vitepress build docs",
         "docs:preview": "vitepress preview docs"
     },
     "devDependencies": {
+        "@ampproject/remapping": "^2.3.0",
         "@omegup/typescript": "7.1.0-dev.2",
         "@types/node": "^25.6.0",
         "prettier": "^3.3.3",

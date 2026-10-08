@@ -1,12 +1,13 @@
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
-  entry: 'dist/index.js',
+  entry: './.build/index.js',
   format: ['cjs', 'esm'],
   outDir: 'dist',
-  clean: false,
+  clean: true,
   dts: false,
   tsconfig: false,
+  sourcemap: true,
   outExtensions: ({ format }) => ({
     js: format === 'es' ? '.esm.js' : '.js',
   }),
