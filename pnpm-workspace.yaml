@@ -1,2 +1,6 @@
 allowBuilds:
   esbuild: false
+minimumReleaseAgeExclude:
+  - '@omegup/typescript-linux-x64@7.1.0-dev || 7.1.0-dev.1 || 7.1.0-dev.2'
+  - '@omegup/typescript-win32-x64@7.1.0-dev || 7.1.0-dev.1 || 7.1.0-dev.2'
+  - '@omegup/typescript@7.1.0-dev || 7.1.0-dev.1 || 7.1.0-dev.2'
