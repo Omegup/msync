@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
-import type { N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
+import type { Exclude, N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
 import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
 import { concatStages, link, pipe } from '../aggregate/prefix'

@@ -1,5 +1,6 @@
 import type { Timestamp } from 'mongodb'
 import type { Type } from './class'
+import type { Omit } from './global'
 export type { Type } from './class'
 
 export type U = undefined

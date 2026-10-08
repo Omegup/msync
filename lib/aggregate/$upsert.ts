@@ -1,18 +1,11 @@
-import type { Filter, HKT, I, IdHKT, Replace, RWCollection } from '../../types'
-import type { ID, N, O, RORec, StrKey, doc, rawItem } from '../../types/json'
+import type { Filter, HKT, I, IdHKT, Omit, Replace, RWCollection } from '../../types'
+import type { ID, N, O, StrKey, doc, rawItem } from '../../types/json'
 import { mergeObjects } from '../expression/array'
-import {
-  field,
-  mergeExpr,
-  type ExprHKT,
-  type ExprsExact,
-  type ExprsExactHKT,
-} from '../expression/concat'
+import { field, mergeExpr, type ExprHKT, type ExprsExact } from '../expression/concat'
 import { eq, ite } from '../expression/logic'
 import { current, nil, val } from '../expression/val'
 import { root } from '../field'
 import type { DDel, Del, Delta, Expr, RawStages, StreamRunnerParam, TS } from '../types'
-import { translateOmit } from '../utils/guard'
 import { id } from '../utils/json'
 import { mapExact, mapExactToObject, type Exact, type MappedHKT } from '../utils/map-object'
 import { getSubsetMatchForExt, getWhenMatchedForMerge } from './$merge'
@@ -28,7 +21,7 @@ export type Merge<T extends doc, E> = Omit<SafeE<E>, keyof (ND & TS)> & ((T & ND
 type ExprP<P> = Expr<P, unknown, { new: P }>
 type Update<P, Out> = (added: ExprP<P>, old: Expr<Out, Out>) => ExprP<P>
 
-export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, rawItem>>(
+export const $insertX = <T extends doc, D extends O, EEE extends { [K in StrKey<EEE>]: rawItem }>(
   out: RWCollection<Merge<T, EEE>>,
   expr: Expr<T, D>,
   map: (x: Expr<T & ND & TS & Omit<SafeE<EEE>, keyof (ND & TS)>, D>) => Expr<Merge<T, EEE>, D>,
@@ -85,7 +78,7 @@ export const $insertX = <T extends doc, D extends O, EEE extends RORec<string, r
   }
 }
 
-export const $simpleInsert = <T extends doc, EEE extends RORec<string, rawItem>>(
+export const $simpleInsert = <T extends doc, EEE extends { [K in StrKey<EEE>]: rawItem }>(
   out: RWCollection<Merge<T, EEE>>,
   ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
 ): StreamRunnerParam<T, 'out'> => {
@@ -99,7 +92,7 @@ export const $simpleInsert = <T extends doc, EEE extends RORec<string, rawItem>>
   return $insertX<T, T, EEE>(out, root<T>().expr(), id, ext, extExpr)
 }
 
-export const $insertPart = <T extends doc, EEE extends RORec<string, rawItem>>(
+export const $insertPart = <T extends doc, EEE extends { [K in StrKey<EEE>]: rawItem }>(
   out: RWCollection<Merge<T, EEE>>,
   ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
 ): StreamRunnerParam<Delta<T>, 'out'> => {
@@ -116,19 +109,14 @@ export const $insertPart = <T extends doc, EEE extends RORec<string, rawItem>>(
       ite<Merge<T, EEE>, Delta<T>>(
         eq<T | null, Delta<T>>(root<Delta<T>>().of('after').expr())(nil),
         field<DDel & Omit<SafeE<EEE>, keyof (ND & TS & ID)>, Delta<T>>(
-          mergeExpr<SafeE<EEE>, DDel, Delta<T>>(
-            translateOmit<EEE, `$${string}`, keyof ID, keyof (ND & TS)>().forward<
-              ExprsExactHKT<unknown, unknown>
-            >(extExpr),
-            {
-              deletedAt: ['deletedAt', current],
-              _id: [
-                '_id',
-                assertNotNull(root<Delta<T>>().of('before').of<T, '_id', null>('_id').expr()),
-              ],
-              touchedAt: ['touchedAt', current],
-            },
-          ),
+          mergeExpr<SafeE<EEE>, DDel, Delta<T>>(extExpr, {
+            deletedAt: ['deletedAt', current],
+            _id: [
+              '_id',
+              assertNotNull(root<Delta<T>>().of('before').of<T, '_id', null>('_id').expr()),
+            ],
+            touchedAt: ['touchedAt', current],
+          }),
         ),
         x,
       ),

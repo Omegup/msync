@@ -1,6 +1,7 @@
-import type { App, HKT, O, U, Undef, jsonItem, rawItem } from '../../types'
+import type { App, HKT, O, RawObj, U, Undef, jsonItem, rawItem } from '../../types'
 import type { Field } from '../field'
 import type { BoolExpr, Expr } from '../types'
+import { safeNarrow } from '../utils/json'
 import { asBoolExpr, asExpr, asExprRaw } from './expr-base'
 import { nil, val } from './val'
 
@@ -90,10 +91,7 @@ export const $ifNull: {
   <R, D, C = unknown>(
     ...expr: [Expr<R, D, C>, ...Expr<R | null | undefined, D, C>[]]
   ): Expr<R, D, C>
-} = <R, D, C>(
-  ...expr:
-    | [...Expr<R | null | undefined, D, C>[]]
-) =>
+} = <R, D, C>(...expr: [...Expr<R | null | undefined, D, C>[]]) =>
   asExpr<R, D, C>({
     raw: f => asExprRaw({ $ifNull: expr.map(e => e.raw(f).get()) }),
   })
@@ -107,10 +105,12 @@ export const exprMapVal = <K extends string, T extends Partial<Record<K, rawItem
     raw: f =>
       asExprRaw({
         $switch: {
-          branches: Object.entries(map).map(([k, v]) => ({
-            case: { $eq: [expr.raw(f).get(), { $literal: k }] },
-            then: v.raw(f).get(),
-          })),
+          branches: Object.entries(map).map(([k, v]) =>
+            safeNarrow<RawObj>()({
+              case: { $eq: [expr.raw(f).get(), { $literal: k }] },
+              then: v.raw(f).get(),
+            }),
+          ),
           ...(or && { default: or.raw(f).get() }),
         },
       }),

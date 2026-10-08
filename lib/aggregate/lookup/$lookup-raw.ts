@@ -1,4 +1,4 @@
-import type { App, Arr, AsLiteral, HKT, ID, N, O, Rec, RORec, rawItem } from '../../../types'
+import type { App, Arr, AsLiteral, HKT, ID, N, O, Rec, RORec, notArr } from '../../../types'
 import { $ifNull, concat, val } from '../../expression'
 import { root, type Field } from '../../field'
 import type { Before, RawStages, TStages, UBefore } from '../../types'
@@ -17,7 +17,7 @@ export const $lookupRaw =
     RE extends RQ & ID,
     BRB extends Before<RQ>,
     RS extends UBefore<RQ>,
-    S extends rawItem,
+    S extends notArr,
     As extends s,
     Null extends null = never,
   >(

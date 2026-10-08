@@ -1,5 +1,8 @@
 import type { AsLiteral, Rec } from '../../types'
 
+export const safeNarrow = <V>() => {
+  return <T>(x: T & V) => x
+}
 export const id = <T>(x: T) => x
 export const defined = <T>(x: T | undefined | null): x is T => x != null
 // eslint-disable-next-line @typescript-eslint/no-empty-function

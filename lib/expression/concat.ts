@@ -6,6 +6,8 @@ import type {
   IdHKT,
   N,
   O,
+  Omit,
+  RawObj,
   RORec,
   StrKey,
   U,
@@ -14,6 +16,7 @@ import type {
 } from '../../types'
 import type { Field } from '../field'
 import type { Expr } from '../types'
+import { safeNarrow } from '../utils/json'
 import {
   mapExactToObject,
   spread,
@@ -161,7 +164,9 @@ export const fieldF =
               mapExactToObject<T, ExprHKT<D, C>, ConstHKT<rawItem>>(exprs, e => e.raw(f).get()),
             ),
         })
-      : val({} as O<{ [K in keyof T]: App<F, T[K]> }>)
+      : asExpr<O<{ [K in keyof T]: App<F, T[K]> }>, D, C>(
+          val(safeNarrow<RawObj>()({})),
+        )
 export const field: <T extends object, D, C = unknown>(
   exprs: ExprsExact<T, D, C>,
 ) => Expr<O<T>, D, C> = fieldF<IdHKT>()

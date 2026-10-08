@@ -14,7 +14,7 @@ export interface AccumulatorHKT<T, C = unknown> extends HKT<unknown> {
   readonly out: Accumulator<T, I<unknown, this>, C>
 }
 
-export type Accumulators<T, V extends RORec<string, jsonItem>, C = unknown> = Exact<
+export type Accumulators<T, V extends object, C = unknown> = Exact<
   V,
   AccumulatorHKT<T, C>
 >
@@ -22,7 +22,7 @@ export interface DeltaAccumulatorHKT<T, C = unknown> extends HKT<unknown> {
   readonly out: DeltaAccumulator<T, I<unknown, this>, C>
 }
 
-export type DeltaAccumulators<T, V extends RORec<string, jsonItem>, C = unknown> = Exact<
+export type DeltaAccumulators<T, V extends object, C = unknown> = Exact<
   V,
   DeltaAccumulatorHKT<T, C>
 >

@@ -4,23 +4,26 @@ import type {
   App,
   Arr,
   AsLiteral,
+  Exclude,
   HKT,
   I,
   ID,
   N,
   O,
+  Omit,
   RORec,
   Rec,
   doc,
-  rawItem,
+  notArr,
 } from '../../../types'
-import { field, mergeExpr, type ExprsExactHKT } from '../../expression/concat'
+import { field, mergeExpr } from '../../expression/concat'
+import { asExpr } from '../../expression/expr-base'
 import { $ifNull, eqTyped, ite } from '../../expression/logic'
 import { nil, val } from '../../expression/val'
 import { Field, root } from '../../field'
 import type { BA, Before, Delta, Expr, RawStages, TStages, UBefore } from '../../types'
 import { set, to } from '../../update'
-import { literalsEqaul, omitRORec } from '../../utils/guard'
+import { literalsEqaul } from '../../utils/guard'
 import { map1 } from '../../utils/json'
 import { $set_, $simpleLookup_ } from '../mongo-stages'
 import { link } from '../prefix'
@@ -44,7 +47,7 @@ export const $lookupDelta = <
   RE extends RQ & doc,
   BRB extends UBefore<RQ>,
   RS extends UBefore<RQ>,
-  S extends rawItem,
+  S extends notArr,
   K1 extends s,
   KK2 extends s,
   N1 extends null = never,
@@ -60,15 +63,20 @@ export const $lookupDelta = <
 ): RawStages<unknown, Delta<LE>, Both<K1, LE, KK2, RE, N1, N2>> => {
   type K2 = Exclude<KK2, BA | K1>
   type BU = Before<RE>
-  const omit = omitRORec<KK2, BA, K1, Arr<RE>>()
   const hash = crypto
     .createHash('md5')
     .update(coll.collectionName + str(input) + str(exec))
     .digest('base64url')
 
   type ABIds = Rec<'aId' | 'bId', S | Arr<S>>
+  type In = Delta<Rec<K1, LE>>
   const normForeignKey = (f: BA) =>
-    to($ifNull(root<Delta<Rec<K1, LE>>>().of(f).of(k1).with(field1).expr(), val<S | S>(hash as S)))
+    to(
+      $ifNull(
+        root<In>().of(f).of<Rec<K1, LE>, K1, null, 3>(k1).with(field1).expr(),
+        asExpr<S, unknown>(val(hash)),
+      ),
+    )
   return link<Delta<LE>>()
     .with<unknown, Delta<Rec<K1, LE>>>(
       $replaceWithDelta<LE, Rec<K1, LE>>(field<RORec<K1, LE>, LE>(map1(k1, root<LE>().expr()))),
@@ -141,21 +149,11 @@ export const $lookupDelta = <
               ),
               nil,
               field<RORec<K1, LE> & RORec<K2, Arr<RE>>, Present>(
-                omit.backward<ExprsExactHKT<RORec<K1, LE>, Present>>(
-                  mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, LE>, Present>(
-                    omit.forward<ExprsExactHKT<{}, Present>>(
-                      map1(
-                        k2,
-                        here.of<RORec<A, Arr<BU>>, A, 1>(arr).of<BU, 'before'>('before').expr(),
-                      ),
-                    ),
-                    map1(
-                      k1,
-                      here
-                        .of<RORec<S, Rec<K1, LE>>, S, 1>(side)
-                        .of<RORec<K1, LE>, K1, 1>(k1)
-                        .expr(),
-                    ),
+                mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, LE>, Present>(
+                  map1(k2, here.of<RORec<A, Arr<BU>>, A, 1>(arr).of<BU, 'before'>('before').expr()),
+                  map1(
+                    k1,
+                    here.of<RORec<S, Rec<K1, LE>>, S, 1>(side).of<RORec<K1, LE>, K1, 1>(k1).expr(),
                   ),
                 ),
               ),
@@ -190,13 +188,9 @@ export const $lookupDelta = <
               > = $ifNull<Rec<K1, LE | N1> & Rec<K2, Arr<RE>>, R, unknown>(
                 root<R>().of(part).expr(),
                 field<RORec<K1, LE | N1> & RORec<K2, Arr<RE>>, R>(
-                  omit.backward<ExprsExactHKT<RORec<K1, N1>, R>>(
-                    mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, N1>, R>(
-                      omit.forward<ExprsExactHKT<{}, R>>(
-                        map1(k2, (otherPart as Field<R, R1>).of(k2).expr()),
-                      ),
-                      map1(k1, n1),
-                    ),
+                  mergeExpr<RORec<K2, Arr<RE>>, RORec<K1, N1>, R>(
+                    map1(k2, (otherPart as Field<R, R1>).of(k2).expr()),
+                    map1(k1, n1),
                   ),
                 ),
               )

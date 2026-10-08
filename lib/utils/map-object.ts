@@ -1,4 +1,4 @@
-import type { App, HKT, I, IdHKT, RORec, StrKey } from '../../types'
+import type { App, HKT, I, IdHKT, Omit, RORec, StrKey } from '../../types'
 import { id } from './json'
 
 export const map = <T, K extends string & keyof T, V extends RORec<K, unknown>>(

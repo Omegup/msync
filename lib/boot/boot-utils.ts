@@ -1,5 +1,5 @@
 import { Collection, type Timestamp } from 'mongodb'
-import type { BSON, OPickD, rawItem, RawObj, StrKey } from '../../types'
+import type { BSON, Exclude, OPickD, rawItem, RawObj, StrKey } from '../../types'
 import type { Actions, Model } from '../types/stream'
 
 export type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>

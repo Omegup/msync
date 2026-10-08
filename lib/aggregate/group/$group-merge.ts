@@ -1,12 +1,10 @@
-import type { RWCollection, WriteonlyCollection } from '../../../types'
+import type { Exclude, Omit } from '../../../types'
 import type { AsLiteral, ID, O, RORec, Rec, doc, notArr } from '../../../types/json'
-import { mergeExpr, type ExprsExact, type ExprsExactHKT } from '../../expression/concat'
+import { mergeExpr, type ExprsExact } from '../../expression/concat'
 import { root } from '../../field'
 import type { Delta, DeltaAccumulators, Expr, StreamRunnerParam, TS } from '../../types'
-import { omitPick } from '../../utils/guard'
 import { map1 } from '../../utils/json'
 import { mapExactToObject } from '../../utils/map-object'
-import type { MergeInto } from '../out'
 import { link } from '../prefix'
 import { subGroup } from './utils/sub-group'
 import {
@@ -14,8 +12,7 @@ import {
   type Extra,
   type IdAndTsKeys,
   type Loose,
-  type MergedInput,
-  type Strict,
+  type SubMergeOut,
   type V_Grp,
 } from './utils/sub-merge'
 
@@ -26,12 +23,9 @@ const addGrp =
   <D extends Rec<'_id', Grp>>(
     expr: ExprsExact<O & Omit<V, Denied<GID>>, D>,
   ): ExprsExact<Rec<GID, Grp> & Omit<V, Denied<GID>>, D> => {
-    const omit = omitPick<keyof V, Denied<GID>, GID, V>()
-    return omit.backward<ExprsExactHKT<Rec<GID, Grp>, D>>(
-      mergeExpr<Omit<V, Denied<GID>>, RORec<GID, Grp>, D, unknown, keyof O, O[keyof O]>(
-        omit.forward<ExprsExactHKT<unknown, D>>(expr),
-        map1(gid, root<D>().of('_id').expr()),
-      ),
+    return mergeExpr<Omit<V, Denied<GID>>, RORec<GID, Grp>, D, unknown, keyof O, O[keyof O]>(
+      expr,
+      map1(gid, root<D>().of('_id').expr()),
     )
   }
 type GI<GG> = Exclude<GG, keyof TS>
@@ -42,10 +36,10 @@ export type GroupMergeOut<
   GG extends string,
   EE = {},
   Out extends Loose<Grp, V, GG> = Loose<Grp, V, GG>,
-> = MergeInto<Strict<Grp, V, GG, EE>, Out, WriteonlyCollection<MergedInput<Out, V, Grp, GG, EE>>>
+> = SubMergeOut<Grp, V, GG, EE, Out>
 
 export type GroupMergeCollection<
-  WhenNotMatched extends MergeInto<never, never>['whenNotMatched'],
+  WhenNotMatched extends GroupMergeOut<never, never, never>['whenNotMatched'],
   Grp extends notArr,
   V extends O,
   GG extends string,
@@ -81,36 +75,35 @@ export const $groupMerge = <
         subMerge<T, Grp, V, GG, EE, Out>(args, out, gid, extra, idPrefix, first),
       ).stages,
   teardown: c =>
-    c(
-      out.whenNotMatched === 'insert'
-        ? {
-            collection: out.into,
-            method: 'deleteMany',
-            params: [{}],
-          }
-        : {
-            collection: out.into,
-            method: 'updateMany',
-            params: [
-              {},
-              [
-                {
-                  $unset: Object.keys({
-                    ...mapExactToObject(extra, () => 1),
-                    ...mapExactToObject(args, () => 1),
-                  }),
-                },
-              ],
-            ],
+    c({
+      collection: out.into,
+      method: 'updateMany',
+      params: [
+        {},
+        [
+          {
+            $unset: Object.keys({
+              ...mapExactToObject(extra, () => 1),
+              ...mapExactToObject(args, () => 1),
+            }),
           },
-    ),
+          ...(out.whenNotMatched === 'insert'
+            ? [
+                {
+                  $set: { deletedAt: '$$NOW', touchedAt: '$$CLUSTER_TIME' },
+                },
+              ]
+            : []),
+        ],
+      ],
+    }),
 })
 
 export type GroupIdCollection<
   V extends O,
   EE = {},
   Out extends Loose<string, V, '_id'> = Loose<string, V, '_id'>,
-> = RWCollection<MergedInput<Out, V, string, '_id', EE>, Out>
+> = GroupMergeCollection<'fail', string, V, '_id', EE, Out>
 export const $groupId = <
   T extends O,
   V extends O,
@@ -135,7 +128,7 @@ export type GroupCollection<
   V extends O,
   EE = {},
   Out extends Loose<Grp, V, '_grp'> = Loose<Grp, V, '_grp'>,
-> = RWCollection<MergedInput<Out, V, Grp, '_grp', EE> | Strict<Grp, V, '_grp', EE>, Out>
+> = GroupMergeCollection<'insert', Grp, V, '_grp', EE, Out>
 export const $group = <
   T extends O,
   Grp extends notArr,

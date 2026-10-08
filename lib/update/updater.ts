@@ -1,4 +1,4 @@
-import type { Arr, HKT, I, N, O, StrKey, Type, notArr, rawItem } from '../../types'
+import type { Arr, Exclude, HKT, I, N, O, StrKey, Type, notArr, rawItem } from '../../types'
 import { Field } from '../field'
 import type { Expr } from '../types'
 import { mapExactToObject0, type MapO } from '../utils/map-object'

@@ -1,4 +1,4 @@
-import type { App, Arr, AsLiteral, doc, HKT, O, Rec, RORec } from '../../../types'
+import type { App, Arr, AsLiteral, doc, HKT, O, Omit, Rec, RORec } from '../../../types'
 import { mergeObjects } from '../../expression/array'
 import { field, fieldM } from '../../expression/concat'
 import { root, type Field } from '../../field'

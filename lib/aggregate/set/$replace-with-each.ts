@@ -1,10 +1,10 @@
-import type { ConstHKT, HKT, I, IdHKT, N, O, RORec, Rec, jsonItem } from '../../../types'
+import type { ConstHKT, HKT, I, IdHKT, N, O, Omit, RORec, Rec, jsonItem } from '../../../types'
 import { $ifNull, eqTyped, ite } from '../../expression/logic'
 import { nil } from '../../expression/val'
 import { root } from '../../field'
 import type { BA, Delta, Expr, FRawStages, RawStages } from '../../types'
 import { set, to, type Updater, type UpdaterHKT } from '../../update/updater'
-import { mapExact1, type MapK } from '../../utils/map-object'
+import { mapExact1, type MapOPart } from '../../utils/map-object'
 import { $set1 } from '../mongo-stages'
 
 export interface ParDeltaHKT<K extends BA, T extends jsonItem, E> extends HKT<jsonItem> {
@@ -24,7 +24,7 @@ const deltaExpr =
     )
   }
 
-type Delta2<T extends jsonItem, BA2 extends string> = Delta<T> & Partial<RORec<BA2, T | null>>
+type Delta2<T extends jsonItem, BA2 extends string> = Delta<T> & RORec<BA2, T | null>
 export const $setEach1 = <
   T extends jsonItem,
   V extends jsonItem,
@@ -32,17 +32,16 @@ export const $setEach1 = <
   E = unknown,
   C = unknown,
 >(
-  updater: (k: BA) => Updater<Delta<T> & Partial<RORec<BA2, T | null>> & E, T | N, V | null, C>,
-  dict: MapK<BA2, ConstHKT<BA>>,
+  updater: (k: BA) => Updater<Delta<T> & RORec<BA2, T | null> & E, T | N, V | null, C>,
+  dict: MapOPart<RORec<BA2>, ConstHKT<BA>>,
 ): FRawStages<unknown, Delta2<T, BA2> & E, Rec<BA2, V | null> & Omit<Delta<T> & E, BA2>, C, 1> => {
-  type R = Delta<T> & Partial<RORec<BA2, T | null>> & E
   type DV = RORec<BA2, V | null>
+  type R = Delta<T> & RORec<BA2, T | null> & E
   return $set1<unknown, R, Rec<BA2, V | null> & Omit<R, BA2>, C>(
-    set<DV>()<R, R, C, BA2>(
-      mapExact1<BA2, ConstHKT<BA>, UpdaterHKT<R, R, DV, C, BA2>>(dict, updater),
-    ),
+    set<DV>()(mapExact1<BA2, ConstHKT<BA>, UpdaterHKT<R, R, DV, C, BA2>>(dict, updater)),
   )
 }
+
 export const $setEach = <
   T extends O,
   V extends jsonItem,
@@ -51,7 +50,7 @@ export const $setEach = <
   C = unknown,
 >(
   updater: (k: BA) => Updater<Delta<T> & E, T | N, V | null, C>,
-  dict: MapK<BA2, ConstHKT<BA>>,
+  dict: MapOPart<RORec<BA2>, ConstHKT<BA>>,
 ): RawStages<unknown, Delta<T> & E, Delta<T> & Rec<BA2, V | null> & Omit<E, BA2>, C, 1> =>
   $setEach1<T, V, BA2, E, C>(updater, dict)<IdHKT<O>>(root) as RawStages<
     unknown,

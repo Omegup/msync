@@ -1,5 +1,5 @@
-import type { App, Arr, AsLiteral, doc, HKT, I, ID, N, O, Rec, RORec } from '../../../types'
-import { $let, $map0, concat, field, mergeExpr, nil, val, type ExprsExact } from '../../expression'
+import type { App, Arr, AsLiteral, doc, Exclude, HKT, I, ID, N, O, Rec, RORec } from '../../../types'
+import { $let, $map0, concat, field, mergeExpr, nil, val } from '../../expression'
 import { array, concatArray, filter, first, inArray, mergeObjects } from '../../expression/array'
 import { $ifNull, eq, eqTyped, ite, not } from '../../expression/logic'
 import { ctx, Field, root } from '../../field'
@@ -13,7 +13,7 @@ import type {
   PreDelta,
   RawStages,
 } from '../../types'
-import { excludeIdem, literalsEqaul, type Equal } from '../../utils/guard'
+import { literalsEqaul, type Equal } from '../../utils/guard'
 import { map1 } from '../../utils/json'
 import { matchDelta } from '../match'
 import { $replaceWith_, $unwind_ } from '../mongo-stages'
@@ -281,17 +281,11 @@ const slotsMany = <
     },
     concatArray<Slot<U | Pad | null>, In, Vars>(kept, added),
   )
-  const exclude = excludeIdem<KK2, K1 | BA, K1>()
-  interface ExprsExactF<T = {}> extends HKT<string> {
-    readonly out: ExprsExact<T & RORec<I<string, this>, Arr<K2Delta>>, In>
-  }
   return $replaceWith_<In, Deltas>(
     field<RORec<K1, K1Delta> & RORec<K2, Arr<K2Delta>>, In>(
-      exclude.backward<ExprsExactF<RORec<K1, K1Delta>>>(
-        mergeExpr<RORec<K2, Arr<K2Delta>>, RORec<K1, K1Delta>, In>(
-          exclude.forward<ExprsExactF>(map1(k2, slots)),
-          map1(k1, k1Delta),
-        ),
+      mergeExpr<RORec<K2, Arr<K2Delta>>, RORec<K1, K1Delta>, In>(
+        map1(k2, slots),
+        map1(k1, k1Delta),
       ),
     ),
   )
@@ -500,7 +494,7 @@ const joinMany = <
     ite(
       eq<U | O | null, Doc>(doc.of<Doc, K2>(k2).of<K2Delta, BA>(side).expr())(field<{}, Doc>({})),
       val(true),
-      doc.of(k1).of<K1Delta, 'deleted', 1>('deleted').of(side).expr(),
+      doc.of(k1).of<K1Delta, 'deleted', 1>('deleted').of<DeletedFlags, BA, N, 3>(side).expr(),
     )
   const joinDelta: Expr<Delta<Join | null>, Doc> = field<Rec<BA, Join | null> & Deleted & ID, Doc>({
     _id: ['_id', id()],
@@ -558,7 +552,9 @@ export const $unwindDelta = <
     type Unwound = Rec<K1, DDelta<T | null>> & Rec<K2, Slot<U | Pad | null>>
     return link<In>()
       .with<unknown, Slots>(slotsMany<K1, T, KK2, U, N1, Pad>(k1, k2, k, emptyOf))
-      .with<unknown, Unwound>($unwind_<Rec<K1, DDelta<T | null>>, K2, Slot<U | Pad | null>, never>(k2))
+      .with<unknown, Unwound>(
+        $unwind_<Rec<K1, DDelta<T | null>>, K2, Slot<U | Pad | null>, never>(k2),
+      )
       .with<unknown, Delta<Join | null>>(joinMany<K1, T, K2, U, N1, N2>(k1, k2, eq1, eq2))
       .with<unknown, Delta<Join>>(matchDelta<Join>()).stages
   }

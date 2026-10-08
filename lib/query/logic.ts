@@ -1,10 +1,10 @@
-import type { N, O, rawItem } from '../../types'
+import type { N, O, RawObj, rawItem } from '../../types'
 import type { Query } from '../types'
-import { defined } from '../utils/json'
+import { defined, safeNarrow } from '../utils/json'
 
 type Many<T> = readonly (T | N)[]
 type Operator = `$${string}`
-type Result<Dom> = Dom | { readonly [_ in Operator]: readonly Dom[] }
+type Result<Dom> = Dom | ({ readonly [_ in Operator]: readonly Dom[] } & RawObj)
 type Combiner = {
   <T extends O, C = unknown>(first: Query<T, C>, ...args: Many<Query<T, C>>): Query<T, C>
   <T extends O, C = unknown>(...args: Many<Query<T, C>>): Query<T, C> | undefined
@@ -27,7 +27,7 @@ const combine =
     return mapToItems! && { raw: field => mapToItems(x => x.raw(field)) }
   }
 const all: ApplyOpertorToPreItems = (op, x) =>
-  x.length === 0 ? undefined : f => ({ [op]: x.map(f) })
+  x.length === 0 ? undefined : f => safeNarrow<RawObj>()({ [op]: x.map(f) })
 const first: ApplyOpertorToPreItems = (op, x) => (x.length === 1 ? f => f(x[0]) : all(op, x))
 export const $and: Combiner = combine('$and', filterUndefined(first))
 export const $nor: Combiner = combine('$nor', filterUndefined(all))

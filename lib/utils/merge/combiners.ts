@@ -12,7 +12,9 @@ export const firstWorksMerge = <Result, Info extends HasJob>(
 ): Iterator<Result, { readonly key: string; readonly value: Info } & HasJob> => {
   const iterator = () => {
     const results = iters.map(iter => iter())
-    const sources: RORec<number, IteratorResult<Result, Info>> = { ...results }
+    const sources: Record<string, IteratorResult<Result, Info>> = Object.fromEntries(
+      results.map((result, index) => [String(index), result]),
+    )
     return mergeIterators<string, Result, RORec<string, Info>>({
       sources,
       // interrupt: key => key !== '0',

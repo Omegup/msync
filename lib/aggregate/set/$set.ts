@@ -1,4 +1,4 @@
-import type { O, ReplaceQ, StrKey } from '../../../types'
+import type { Exclude, O, Omit, ReplaceQ, StrKey } from '../../../types'
 import type { DeltaStages, Expr, LinStages } from '../../types'
 import { setQ, type Updater, type UpdaterQHKT } from '../../update/updater'
 import type { MapO } from '../../utils/map-object'

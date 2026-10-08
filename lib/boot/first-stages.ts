@@ -1,5 +1,5 @@
 import { Timestamp } from 'mongodb'
-import type { N, O, RORec, StrKey, View } from '../../types'
+import type { Exclude, N, O, RORec, StrKey, View } from '../../types'
 import type { ConstHKT, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
 import { link, type Concat } from '../aggregate/prefix'

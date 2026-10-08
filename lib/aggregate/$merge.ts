@@ -4,6 +4,8 @@ import type {
   HKT,
   I,
   IdHKT,
+  Omit,
+  Exclude,
   OPick,
   RWCollection,
   Timestamp,
@@ -11,7 +13,7 @@ import type {
 } from '../../types'
 import type { doc, ID, N, O, rawItem, Rec, Replace, RORec, StrKey } from '../../types/json'
 import { mergeObjects, ne } from '../expression'
-import { field, type ExprHKT, type ExprsExact, type ExprsExactHKT } from '../expression/concat'
+import { field, type ExprHKT, type ExprsExact } from '../expression/concat'
 import { $ifNull, and, eq, eqTyped, ite, sub } from '../expression/logic'
 import { current, nil, val } from '../expression/val'
 import { ctx, Field, root } from '../field'
@@ -28,7 +30,6 @@ import type {
   TS,
 } from '../types'
 import { set, to } from '../update'
-import { omitPick, omitRORec, type Equal } from '../utils/guard'
 import { id } from '../utils/json'
 import { mapExact, mapExactToObject, spread, type Exact, type MappedHKT } from '../utils/map-object'
 import { $replaceWith_, $set_ } from './mongo-stages'
@@ -167,7 +168,7 @@ const $mergeX = <
   Out extends Model,
   Source extends O,
   SourcePart extends doc,
-  EEE extends RORec<string, rawItem>,
+  EEE extends { [K in StrKey<EEE>]: rawItem },
   Intermediate extends O = Source,
 >(
   out: MergeCollection<V, Out>,
@@ -179,7 +180,6 @@ const $mergeX = <
 ): StreamRunnerParam<Source, 'out'> => {
   type EE = SafeE<EEE>
   type E = Omit<EE, keyof (ND & TS)>
-  type KK = StrKey<V>
   type K = Allowed<StrKey<V>>
   type T = OPick<V, K> & ID
   type P = (T | (Rec<K, N> & ID)) & TS
@@ -204,12 +204,10 @@ const $mergeX = <
 
   const replacer: Expr<Patch<V>, Source> = map(
     field<T & TS, Intermediate>(
-      omitPick<KK, never, keyof (TS & ID), V>().backward<ExprsExactHKT<TS & doc, Intermediate>>(
-        spread<Pick<V, K>, ID & TS, ExprHKT<Intermediate>, keyof O, O[keyof O]>(patch, {
-          _id: ['_id', f.of('_id').expr()],
-          touchedAt: ['touchedAt', current],
-        }),
-      ),
+      spread<Pick<V, K>, ID & TS, ExprHKT<Intermediate>, keyof O, O[keyof O]>(patch, {
+        _id: ['_id', f.of('_id').expr()],
+        touchedAt: ['touchedAt', current],
+      }),
     ),
   )
 
@@ -273,7 +271,12 @@ const $mergeX = <
 
 export const $mergeId =
   <V extends O>() =>
-  <SourcePart extends doc, Out extends Model, E = unknown, EEE extends RORec<string, rawItem> = {}>(
+  <
+    SourcePart extends doc,
+    Out extends Model,
+    E = unknown,
+    EEE extends { [K in StrKey<EEE>]: rawItem } = {},
+  >(
     out: MergeCollection<V, Out>,
     keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
     id: Expr<string, OutInputE<TakeDoc<V>, E, null>>,
@@ -292,15 +295,6 @@ export const $mergeId =
     type Source = OutInputE<SourcePart, E>
     type Intermediate = OutInputE<0, E, SourcePart>
 
-    const omRORec: Equal<unknown, RORec<K, N>, Omit<RORec<K, N>, keyof (TS & ID)>> = omitRORec<
-      KK,
-      never,
-      keyof (TS & ID),
-      N
-    >()
-
-    // Expr<Patch, ID & Obj & RORec<"after", T | null> & E & RORec<"after", Obj & Pick<V, Exclude<KK, "touchedAt" | "_id">> & ID>, unknown>
-
     return $mergeX<V, Out, Source, SourcePart, EEE, Intermediate>(
       out,
       keys,
@@ -312,17 +306,15 @@ export const $mergeId =
             nil,
           ),
           field<RORec<K, N> & ID & TS, OutInput<T, null>>(
-            omRORec.backward<ExprsExactHKT<ID & TS, OutInput<T, null>>>(
-              spread<RORec<K, N>, ID & TS, ExprHKT<OutInput<T, null>>>(
-                mapExact<OPick<V, Allowed<KK>>, IdHKT, ConstHKT<Expr<null, unknown>>>(
-                  keys,
-                  () => nil,
-                ),
-                {
-                  _id: ['_id', id],
-                  touchedAt: ['touchedAt', current],
-                },
+            spread<RORec<K, N>, ID & TS, ExprHKT<OutInput<T, null>>>(
+              mapExact<OPick<V, Allowed<KK>>, IdHKT, ConstHKT<Expr<null, unknown>>>(
+                keys,
+                () => nil,
               ),
+              {
+                _id: ['_id', id],
+                touchedAt: ['touchedAt', current],
+              },
             ),
           ),
           or,
@@ -335,7 +327,7 @@ export const $mergeId =
 
 export const $simpleMergePart =
   <V extends O>() =>
-  <Source extends doc, Out extends Model, EEE extends RORec<string, rawItem>>(
+  <Source extends doc, Out extends Model, EEE extends { [K in StrKey<EEE>]: rawItem }>(
     out: MergeCollection<V, Out>,
     keys: ExprsExact<TakeDoc<V, unknown>, Source>,
     ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
@@ -355,20 +347,23 @@ export const $simpleMerge =
 
 export const $mergePart =
   <V extends O>() =>
-  <Out extends Model, SourcePart extends doc, EEE extends RORec<string, rawItem>>(
+  <Out extends Model, SourcePart extends doc, EEE extends { [K in StrKey<EEE>]: rawItem }>(
     out: RWCollection<Out | Replace<Out, Patch<V>>, Out>,
     keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
     ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,
     update: MergeUpdate<V, Out> = x => x,
-  ): StreamRunnerParam<Delta<SourcePart>, 'out'> =>
-    $mergeId<V>()<SourcePart, Out, Before<SourcePart | null>, EEE>(
+  ): StreamRunnerParam<Delta<SourcePart>, 'out'> => {
+    type Doc = Rec<'before', (doc & SourcePart) | null>
+    return $mergeId<V>()<SourcePart, Out, Before<SourcePart | null>, EEE>(
       { coll: out, whenNotMatched: 'fail' },
       keys,
-      assertNotNull(root<Rec<'before', (doc & SourcePart) | null>>().of('before').of('_id').expr()),
+      assertNotNull(
+        root<Doc>().of<Doc, 'before', 1>('before').of<doc & SourcePart, '_id', null>('_id').expr(),
+      ),
       ext,
       update,
     )
-
+  }
 export const $merge =
   <V extends O>() =>
   <Out extends Model, SourcePart extends doc>(
