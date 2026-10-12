@@ -35,6 +35,7 @@ export type IndexSpecification = Document
 export type CreateIndexesOptions = Document & {
   name?: string
   partialFilterExpression?: Document
+  unique?: boolean
 }
 export type UpdateOptions = { upsert?: boolean }
 

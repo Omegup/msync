@@ -12,7 +12,7 @@ import type {
   WriteonlyCollection,
 } from '../../types'
 import type { doc, ID, N, O, rawItem, Rec, Replace, RORec, StrKey } from '../../types/json'
-import { mergeObjects, ne } from '../expression'
+import { mergeObjects, ne, notNull, or } from '../expression'
 import { field, type ExprHKT, type ExprsExact } from '../expression/concat'
 import { $ifNull, and, eq, eqTyped, ite, sub } from '../expression/logic'
 import { current, nil, val } from '../expression/val'
@@ -100,11 +100,7 @@ export const getWhenMatchedForMerge = <
   'insert'
     ? ctx<O<DeletedAt>>()('new')
     : root<O<DeletedAt>>()
-  const deletedAt = orNull(newOrOld.of('deletedAt').expr()) as Expr<
-    Timestamp | N,
-    Out,
-    { new: PP }
-  >
+  const deletedAt = orNull(newOrOld.of('deletedAt').expr()) as Expr<Timestamp | N, Out, { new: PP }>
   const merged = mergeObjects<Out, PP | O<DeletedAt>, Out, { new: PP }>(
     root<Out>().expr(),
     update(ctx<PP>()('new').expr(), root<Out>().expr()),
@@ -123,7 +119,7 @@ export const getWhenMatchedForMerge = <
     )
     .with(getWhenMatched<Out, P>(whenNotMatched, canWrite)).stages
 }
-  export const getWhenMatched = <Out extends Model, P extends O & ID & TS>(
+export const getWhenMatched = <Out extends Model, P extends O & ID & TS>(
   whenNotMatched: 'discard' | 'fail' | 'insert',
   canWrite: Expr<boolean, Rec<'old' | 'merged', Out | Replace<Out, P>>> | null,
 ): RawStages<O, Rec<'old' | 'merged', Out | Replace<Out, P>>, Out | Replace<Out, P>> => {
@@ -145,7 +141,9 @@ export const getWhenMatchedForMerge = <
   )
 
   const diff = ne<Out | Merged, OldAndMerged>(preMergeOld)(root<OldAndMerged>().of('merged').expr())
-  const useNew = canWrite ? and(diff, canWrite) : diff
+  const useNew = canWrite
+    ? and(diff, or(notNull(root<OldAndMerged>().of('old').of('deletedAt').expr()), canWrite))
+    : diff
 
   return link<OldAndMerged>().with(
     $replaceWith_<OldAndMerged, Out | Replace<Out, P>>(

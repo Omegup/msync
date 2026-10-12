@@ -1,6 +1,6 @@
 {
     "name": "@omegup/msync",
-    "version": "0.1.63",
+    "version": "0.1.64",
     "description": "Keeps derived MongoDB data in sync with the documents it comes from.",
     "repository": {
         "type": "git",
