@@ -31,7 +31,7 @@ import { val } from './val'
 
 export const concat: {
   <D, C>(...expr: Expr<string, D, C>[]): Expr<string, D, C>
-  <D, C>(...expr: Expr<string | N, D, C>[]): Expr<string | N, D, C>
+  <D, C>(...expr: Expr<string | N, D, C>[]): Expr<string | null, D, C>
 } = <D, C>(...expr: Expr<string | N, D, C>[]) =>
   asExpr<string, D, C>({
     raw: f => asExprRaw({ $concat: expr.map(e => e.raw(f).get()) }),
