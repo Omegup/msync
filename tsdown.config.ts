@@ -1,7 +1,10 @@
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
-  entry: './.build/index.js',
+  entry: {
+    index: './.build/index.js',
+    'adapters/mongodb': './.build/adapters/mongodb.js',
+  },
   format: ['cjs', 'esm'],
   outDir: 'dist',
   clean: true,

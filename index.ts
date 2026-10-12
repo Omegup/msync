@@ -11,4 +11,4 @@ export * from './lib/utils'
 export * from './lib/types/extern'
 export * from './types/extern'
 
-export { enablePreAndPostImages, prepare, makeCol } from './test/mongodb'
+export { useDriver, type Driver } from './lib/driver'

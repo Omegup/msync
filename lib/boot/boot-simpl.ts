@@ -1,6 +1,6 @@
 import crypto from 'crypto'
-import { UUID, type ChangeStream, type Timestamp } from 'mongodb'
-import type { Exclude, N, O, O2, O3, OPickD, RORec, StrKey, View } from '../../types'
+import type { Document, Exclude, N, O, O2, O3, OPickD, RORec, StrKey, Timestamp, View, WatchStream } from '../../types'
+import { driver } from '../driver'
 import type { ConstHKT, HKT, I, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
 import { concatStages, link, pipe } from '../aggregate/prefix'
@@ -141,7 +141,7 @@ const executes = <
         { touchedAt: 1 },
         {
           partialFilterExpression: { deletedAt: { $eq: null } },
-          name: 'touchedAt_' + new UUID().toString('base64'),
+          name: 'touchedAt_' + new (driver().UUID)().toString('base64'),
         },
       )
 
@@ -182,7 +182,7 @@ const executes = <
         }
       }
 
-    type C = Pick<ChangeStream<{}, {}>, 'close' | 'tryNext'>
+    type C = WatchStream<{}>
     // Step 4 : run the aggregation // idempotent
     const makeStream = (): Promise<C> => makeWatchStream(view, streamName)
     const step4 = (lastTS: { _id: string; ts: Timestamp } | null) => async (): Next => {

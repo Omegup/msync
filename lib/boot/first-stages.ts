@@ -1,5 +1,5 @@
-import { Timestamp } from 'mongodb'
-import type { Exclude, N, O, RORec, StrKey, View } from '../../types'
+import type { Exclude, N, O, RORec, StrKey, Timestamp, View } from '../../types'
+import { driver } from '../driver'
 import type { ConstHKT, IdHKT } from '../../types/hkt'
 import { $match_, $project_ } from '../aggregate/mongo-stages'
 import { link, type Concat } from '../aggregate/prefix'
@@ -12,7 +12,7 @@ import type { D, Del, Model, RawStages } from '../types/stream'
 import { mapExactToObject, spread } from '../utils/map-object'
 import type { Allowed } from './boot-utils'
 
-export const previous = (ts: Timestamp) => new Timestamp({t: ts.high - 60, i:0})
+export const previous = (ts: Timestamp) => new (driver().Timestamp)({ t: ts.high - 60, i: 0 })
 
 export const getFirstStages = <V extends Model, KK extends StrKey<V>>(
   view: View<V, Allowed<KK>>,

@@ -1,10 +1,10 @@
-import type { App, HKT, O2, O3, O, RawObj } from '../../types'
+import type { App, HKT, O2, O3, O } from '../../types'
 import type { Delta, DeltaStages, FRawStages, RawStages, Stream, TStages } from '../types'
 import type { Equal } from '../utils/guard'
 
 type n = number
 export const asStages = <Q, T extends Q, V extends Q, C = unknown, M extends n = n>(
-  x: readonly RawObj[],
+  x: RawStages<Q, T, V, C, M>,
 ): RawStages<Q, T, V, C, M> => x
 
 export const same = <

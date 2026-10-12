@@ -1,4 +1,4 @@
-import type { Collection, CreateIndexesOptions, Db, IndexSpecification } from 'mongodb'
+import type { Collection, CreateIndexesOptions, Db, IndexSpecification } from '../../types'
 import { type log as log1 } from './log'
 
 export const indexMap = new Map<string, Map<string, Promise<void>>>()

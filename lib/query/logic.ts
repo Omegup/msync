@@ -4,7 +4,9 @@ import { defined, safeNarrow } from '../utils/json'
 
 type Many<T> = readonly (T | N)[]
 type Operator = `$${string}`
-type Result<Dom> = Dom | ({ readonly [_ in Operator]: readonly Dom[] } & RawObj)
+type Result2<Dom> = { readonly [_ in Operator]?: readonly Dom[] }
+type Result1<Dom> = Result2<Dom> & RawObj
+type Result<Dom> = Dom | Result1<Dom> 
 type Combiner = {
   <T extends O, C = unknown>(first: Query<T, C>, ...args: Many<Query<T, C>>): Query<T, C>
   <T extends O, C = unknown>(...args: Many<Query<T, C>>): Query<T, C> | undefined
@@ -26,9 +28,11 @@ const combine =
     const mapToItems = applyOperatorToPreItems<Query<T, C>>(op, args)
     return mapToItems! && { raw: field => mapToItems(x => x.raw(field)) }
   }
-const all: ApplyOpertorToPreItems = (op, x) =>
-  x.length === 0 ? undefined : f => safeNarrow<RawObj>()({ [op]: x.map(f) })
-const first: ApplyOpertorToPreItems = (op, x) => (x.length === 1 ? f => f(x[0]) : all(op, x))
+const all: ApplyOpertorToPreItems = <T>(op: Operator, x: readonly T[]) =>
+  x.length === 0
+    ? undefined
+    : <Dom extends rawItem>(f: (x: T) => Dom): Result<Dom> => safeNarrow<RawObj>()({ [op]: x.map(f) })
+const first: ApplyOpertorToPreItems = (op, x) => (x.length === 1 ? f => f(x[0]!) : all(op, x))
 export const $and: Combiner = combine('$and', filterUndefined(first))
 export const $nor: Combiner = combine('$nor', filterUndefined(all))
 export const $or: Combiner = combine('$or', filterUndefined(first))

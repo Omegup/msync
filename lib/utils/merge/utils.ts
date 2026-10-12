@@ -1,5 +1,9 @@
-import { map } from '../map-object'
 import type { KEYS, RaceWinner, SourceIteratorResults } from './types'
+
+export const map = <T, K extends string & keyof T & keyof V, V>(
+  x: Pick<T, K>,
+  f: <P extends K>(v: Required<T>[P], k: P) => V[P],
+): V => Object.fromEntries<V, 0>(Object.entries(x).map<[K, V[K]]>(([k, v]) => [k, f(v, k)]))
 
 export const patch = <T, K extends keyof T>({ ...x }: T, k: K, v: T[K]): T => {
   delete x[k]
@@ -24,18 +28,19 @@ export const restart = <K extends KEYS, Result, Info extends Record<K, unknown>>
  */
 export const race = <W, K extends KEYS, Result, Info extends Record<K, W>>(
   sources: SourceIteratorResults<K, Result, Info>,
-) => {
+): Promise<RaceWinner<K, Result, Info>> => {
   type Winner = RaceWinner<K, Result, Info>
   type Sources = SourceIteratorResults<K, Result, Info>
   const promises: readonly PromiseLike<Winner | Error>[] = Object.values<
     PromiseLike<Winner | Error>
   >(
-    map<Sources, K, Record<K, PromiseLike<Winner | Error>>>(sources, ({ next }, key) =>
-      next.then(
+    map<Sources, K, Record<K, PromiseLike<Winner | Error>>>(sources, (p, key) => {
+      const s = p.next.then(
         frame => ({ key, frame }),
         error => new Error(error),
-      ),
-    ),
+      )
+      return s
+    }),
   )
   return Promise.any<readonly (Winner | Error)[], 0>(promises).then<Winner>(
     (result: Winner | Error) => {

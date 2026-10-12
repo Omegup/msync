@@ -40,8 +40,11 @@
     "noImplicitAny": true,
     "noImplicitThis": true,
     "strictIndexSignatures": true,
-    "alwaysStrict": true
+    "alwaysStrict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noTotalIndexSignatures": true
   },
-  "files": ["index.ts"],
+  "files": ["index.ts", "adapters/mongodb.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

@@ -1,5 +1,4 @@
-import { Collection, type Timestamp } from 'mongodb'
-import type { BSON, Exclude, OPickD, rawItem, RawObj, StrKey } from '../../types'
+import type { Collection, Document, Exclude, OPickD, rawItem, RawObj, StrKey, Timestamp } from '../../types'
 import type { Actions, Model } from '../types/stream'
 
 export type AllowedPick<V extends Model, K extends StrKey<V>> = OPickD<V, Allowed<K>>
@@ -21,7 +20,7 @@ export type Last = {
 }
 
 export const actions: {
-  [K in keyof Actions<unknown>]: <W extends BSON.Document>(
+  [K in keyof Actions<unknown>]: <W extends Document>(
     col: Collection<W>,
     x: Actions<W>[K],
   ) => [Promise<unknown>, unknown[]]

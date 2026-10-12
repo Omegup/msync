@@ -1,5 +1,5 @@
-import { type Db, Timestamp } from 'mongodb'
-import type { O, ReadonlyCollection, StrKey, View } from '../types'
+import type { Commander, ConstHKT, Db, Dict, Document, IdHKT, O, PRRec, ReadonlyCollection, RORec, StrKey, Timestamp, View } from '../types'
+import { driver } from './driver'
 import type { Field } from './field'
 import type { Del, Model, Query } from './types'
 import { log } from './utils'
@@ -9,25 +9,27 @@ export type OplogEntry = {
   ts: Timestamp // oplog timestamp
   ns: string // "db.collection"
   op: 'i' | 'u' | 'd' | 'c' | 'n'
-  o: Record<string, unknown> // operation object
+  o: Dict<unknown> // operation object
   o2?: { _id: string } // update query (for updates)
   wall?: Date
 } & Document
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
-const maxTimestamp = new Timestamp(0xffffffffffffffffn)
+const maxTimestamp = () => new (driver().Timestamp)(0xffffffffffffffffn)
 
 export const getCurrentTimestamp = async (db: Db): Promise<Timestamp> => {
   // Get the current timestamp from the server
   const adminDb = db.admin()
-  const serverStatus = await adminDb.command({ serverStatus: 1 })
-  return serverStatus['operationTime'] as Timestamp
+  const serverStatus = await adminDb.command<{ operationTime: Timestamp }>({ serverStatus: 1 })
+  return serverStatus.operationTime
 }
 
-async function getLastCommittedTs(adminDb: Db): Promise<Timestamp | null> {
-  const st: any = await adminDb.command({ replSetGetStatus: 1 })
-  return (st?.optimes?.lastCommittedOpTime?.ts as Timestamp) ?? null
+async function getLastCommittedTs(adminDb: Commander): Promise<Timestamp | null> {
+  const status = await adminDb.command<{
+    optimes?: { lastCommittedOpTime?: { ts?: Timestamp } }
+  }>({ replSetGetStatus: 1 })
+  return status.optimes?.lastCommittedOpTime?.ts ?? null
 }
 
 export async function waitUntilStablePast(
@@ -97,10 +99,10 @@ export async function* tailOplog(db: Db): AsyncGenerator<Event | null, never, vo
               throw new Error(`Expected update with $v: 2, got ${JSON.stringify(doc)}`)
             }
             const updatedFields = []
-            const diff = doc.o['diff'] as Record<string, unknown>
+            const diff = doc.o['diff'] as Dict<unknown>
             for (const updateOp in diff) {
               if ((['u', 'i', 'd'] as const).includes(updateOp)) {
-                updatedFields.push(...Object.keys(diff[updateOp] as Record<string, unknown>))
+                updatedFields.push(...Object.keys(diff[updateOp] as Dict<unknown>))
               } else if (updateOp.startsWith('s')) {
                 updatedFields.push(updateOp.slice(1))
               }
@@ -227,11 +229,11 @@ export const makeWatchStream = async <V extends Model, K extends StrKey<V>>(
       x =>
         void db
           .collection(x.name)
-          .updateMany({ touchedAt: maxTimestamp }, [{ $set: { touchedAt: '$$CLUSTER_TIME' } }]),
+          .updateMany({ touchedAt: maxTimestamp() }, [{ $set: { touchedAt: '$$CLUSTER_TIME' } }]),
     ),
   ).then(() => {}))
 
-  const projection = { ...(p ? mapExactToObject(p, v => v) : {}), deletedAt: 1 }
+  const projection: PRRec<K, 1> & {deletedAt: 1} = { ...(p ? mapExactToObject<RORec<K, 1>, IdHKT, ConstHKT<1>>(p, v => v) : {}), deletedAt: 1 }
 
   let notify = makePromise<OplogEntry | null>()
   register(collection, p ? Object.keys(projection) : null, m, doc => {

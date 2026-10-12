@@ -58,7 +58,7 @@ type UpdateF<P, Out> = <K extends keyof IsDeleted>(
 
 export const getSubsetMatchForExt = <
   Out extends Model,
-  P extends Model,
+  P extends O & ID & TS,
   E extends Record<keyof E, rawItem>,
 >(
   ext: Exact<E, IdHKT>,
@@ -77,12 +77,12 @@ export const getSubsetMatchForExt = <
     )(val(v))
   })
   const checks = Object.values<Expr<boolean, OldAndMerged>>(extObj)
-  return checks.length ? (checks.length === 1 ? checks[0] : and(...checks)) : null
+  return checks.length ? (checks.length === 1 ? checks[0]! : and(...checks)) : null
 }
 
 export const getWhenMatchedForMerge = <
   Out extends Model,
-  P extends Model,
+  P extends O & ID & TS,
   K extends keyof IsDeleted,
 >(
   whenNotMatched: 'discard' | 'fail' | 'insert',
@@ -100,11 +100,16 @@ export const getWhenMatchedForMerge = <
   'insert'
     ? ctx<O<DeletedAt>>()('new')
     : root<O<DeletedAt>>()
-  const merged = mergeObjects<Out | Merged, O<DeletedAt>, Out, { new: PP }>(
+  const deletedAt = orNull(newOrOld.of('deletedAt').expr()) as Expr<
+    Timestamp | N,
+    Out,
+    { new: PP }
+  >
+  const merged = mergeObjects<Out, PP | O<DeletedAt>, Out, { new: PP }>(
     root<Out>().expr(),
     update(ctx<PP>()('new').expr(), root<Out>().expr()),
     field<O<DeletedAt>, Out, { new: PP }>({
-      deletedAt: ['deletedAt', orNull(newOrOld.of('deletedAt').expr())],
+      deletedAt: ['deletedAt', deletedAt],
     }),
   ) as Expr<Replace<Out, P>, Out, { new: PP }>
   return link<Out, { new: PP }>()
@@ -116,9 +121,9 @@ export const getWhenMatchedForMerge = <
         }),
       ),
     )
-    .with(getWhenMatched(whenNotMatched, canWrite)).stages
+    .with(getWhenMatched<Out, P>(whenNotMatched, canWrite)).stages
 }
-export const getWhenMatched = <Out extends Model, P extends Model>(
+  export const getWhenMatched = <Out extends Model, P extends O & ID & TS>(
   whenNotMatched: 'discard' | 'fail' | 'insert',
   canWrite: Expr<boolean, Rec<'old' | 'merged', Out | Replace<Out, P>>> | null,
 ): RawStages<O, Rec<'old' | 'merged', Out | Replace<Out, P>>, Out | Replace<Out, P>> => {
@@ -275,7 +280,7 @@ export const $mergeId =
     SourcePart extends doc,
     Out extends Model,
     E = unknown,
-    EEE extends { [K in StrKey<EEE>]: rawItem } = {},
+    EEE extends { [K in keyof EEE]: rawItem } = {},
   >(
     out: MergeCollection<V, Out>,
     keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
@@ -347,7 +352,7 @@ export const $simpleMerge =
 
 export const $mergePart =
   <V extends O>() =>
-  <Out extends Model, SourcePart extends doc, EEE extends { [K in StrKey<EEE>]: rawItem }>(
+  <Out extends Model, SourcePart extends doc, EEE extends { [K in keyof EEE]: rawItem }>(
     out: RWCollection<Out | Replace<Out, Patch<V>>, Out>,
     keys: ExprsExact<TakeDoc<V, unknown>, SourcePart>,
     ext: Exact<Omit<SafeE<EEE>, keyof (ND & TS)>, IdHKT>,

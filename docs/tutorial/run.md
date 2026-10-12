@@ -3,9 +3,12 @@
 A `Machine` merges runners and loops. Each tick reports which stream did the work.
 
 ```ts
-import { Machine, prepare } from '@omegup/msync'
+import { MongoClient } from 'mongodb'
+import { Machine } from '@omegup/msync'
+import { useMongoDB } from '@omegup/msync/adapters/mongodb'
 
-const client = await prepare() // connects with MONGO_URL, or use your own MongoClient
+useMongoDB()
+const client = await new MongoClient(process.env.MONGO_URL).connect()
 const db = client.db(process.env.MONGO_NAME)
 
 const accounts = db.collection('accounts')

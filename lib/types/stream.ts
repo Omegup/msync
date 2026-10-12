@@ -1,6 +1,7 @@
-import type { BSON, Filter, Timestamp, UpdateFilter } from 'mongodb'
 import type {
   App,
+  Document,
+  Timestamp,
   HKT,
   ID,
   N,
@@ -55,8 +56,8 @@ export type Stages<out Q, out R extends Q, out SDom> = <E>(
 ) => E
 
 export type Actions<W> = {
-  updateMany: [Filter<W>, UpdateFilter<W> | BSON.Document[]]
-  deleteMany: [Filter<W>]
+  updateMany: [Document, Document | readonly Document[]]
+  deleteMany: [Document]
 }
 
 export type TeardownRecord<W, M extends keyof Actions<W>> = {

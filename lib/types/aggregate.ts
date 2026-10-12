@@ -1,8 +1,8 @@
-import type { Long, Timestamp } from 'mongodb'
+import type { Timestamp } from '../../types'
 
 export type AggregateCommand<T> = {
   cursor: {
-    id: Long | number
+    id: number | { toString(): string }
     firstBatch: T[]
     atClusterTime: Timestamp
     ns: string

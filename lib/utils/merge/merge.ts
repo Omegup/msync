@@ -56,11 +56,11 @@ const makeReiterate =
 
 export const mergeIterators = <K extends KEYS, Result, Info extends Record<K, HasJob>>(params: {
   sources: SourceIteratorResults<K, Result, Info>
-  interrupt?: (key: KEYS) => boolean
-  select?: Race<K, Result, Info>
+  interrupt?: ((key: KEYS) => boolean) | undefined
+  select?: Race<K, Result, Info> | undefined
   hooks?: {
     start?: (frame: Frame<Result, Info[K]>, result: IteratorResult<Result, Info[K]>) => void
-  }
+  } | undefined
 }): IteratorResult<Result, SourceResults<K, Info>> => {
   const { sources, interrupt, select = race, hooks } = params
   // The main `IteratorResult` returned by `mergeItResults`.
@@ -69,7 +69,7 @@ export const mergeIterators = <K extends KEYS, Result, Info extends Record<K, Ha
     next: select(sources).then(makeReiterate(sources, interrupt, hooks)),
     clear: async () => {
       for (const key in sources) {
-        await sources[key].clear()
+        await sources[key]?.clear()
       }
     },
   }

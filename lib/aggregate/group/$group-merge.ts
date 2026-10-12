@@ -1,8 +1,8 @@
-import type { Exclude, Omit } from '../../../types'
+import type { ConstHKT, Exclude, Omit } from '../../../types'
 import type { AsLiteral, ID, O, RORec, Rec, doc, notArr } from '../../../types/json'
-import { mergeExpr, type ExprsExact } from '../../expression/concat'
+import { mergeExpr, type ExprHKT, type ExprsExact } from '../../expression/concat'
 import { root } from '../../field'
-import type { Delta, DeltaAccumulators, Expr, StreamRunnerParam, TS } from '../../types'
+import type { Delta, DeltaAccumulatorHKT, DeltaAccumulators, Expr, StreamRunnerParam, TS } from '../../types'
 import { map1 } from '../../utils/json'
 import { mapExactToObject } from '../../utils/map-object'
 import { link } from '../prefix'
@@ -83,8 +83,8 @@ export const $groupMerge = <
         [
           {
             $unset: Object.keys({
-              ...mapExactToObject(extra, () => 1),
-              ...mapExactToObject(args, () => 1),
+              ...mapExactToObject<Extra<EE, V, GG>, ExprHKT<V_Grp<V, GG, Grp>>, ConstHKT<1>>(extra, () => 1),
+              ...mapExactToObject<O & Omit<V, Denied<GI<GG>>>, DeltaAccumulatorHKT<T>, ConstHKT<1>>(args, () => 1),
             }),
           },
           ...(out.whenNotMatched === 'insert'

@@ -1,8 +1,7 @@
-import type { Collection, Db } from 'mongodb'
 import type { Del, Expr, Model, Query } from '../lib/types'
 import type { ExactKeys } from '../lib/utils/map-object'
 import type { O, StrKey } from './json'
-import type { RawStage } from './mongo'
+import type { Collection, Db, RawStage } from './mongo'
 
 interface CommonCollection {
   readonly s: { readonly db: Db }

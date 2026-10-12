@@ -18,12 +18,25 @@ const published = {
   main: 'index.js',
   module: 'index.esm.js',
   typings: 'index.d.ts',
+  exports: {
+    '.': {
+      types: './index.d.ts',
+      import: './index.esm.js',
+      require: './index.js',
+    },
+    './adapters/mongodb': {
+      types: './adapters/mongodb.d.ts',
+      import: './adapters/mongodb.esm.js',
+      require: './adapters/mongodb.js',
+    },
+  },
   dependencies: {
     dayjs: pkg.dependencies.dayjs,
     dotenv: pkg.dependencies.dotenv,
     'json-canonicalize': pkg.dependencies['json-canonicalize'],
-    mongodb: pkg.dependencies.mongodb,
   },
+  peerDependencies: { mongodb: pkg.peerDependencies.mongodb },
+  peerDependenciesMeta: pkg.peerDependenciesMeta,
 }
 
 for (const mapName of ['index.js.map', 'index.esm.js.map']) {

@@ -1,5 +1,4 @@
 import {
-  UUID,
   type AsLiteral,
   type ID,
   type O,
@@ -31,6 +30,7 @@ import { type JoinId } from '../unwind'
 
 import { asBefore } from '../../utils/before'
 import { createIndex } from '../../utils/db-indexes'
+import { driver } from '../../driver'
 import { mergeIterators } from '../../utils/merge'
 import { log } from '../../utils'
 
@@ -140,7 +140,7 @@ const join = <
             await createIndex(
               leftSnapshot.coll,
               { [`before.${lField.str()}`]: 1 },
-              { name: 'left_' + new UUID().toString('base64') },
+              { name: 'left_' + new (driver().UUID)().toString('base64') },
             )
             log('Creating indexes for lookup right', rightSnapshot.coll.collectionName, {
               [`before.${rField.str()}`]: 1,
@@ -148,7 +148,7 @@ const join = <
             await createIndex(
               rightSnapshot.coll,
               { [`before.${rField.str()}`]: 1 },
-              { name: 'right_' + new UUID().toString('base64') },
+              { name: 'right_' + new (driver().UUID)().toString('base64') },
             )
           },
         )

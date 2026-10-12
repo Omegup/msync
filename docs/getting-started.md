@@ -71,9 +71,12 @@ A projection entry is a pair, `[fieldName, 1]`. A field written by a sink is a p
 ## Run it
 
 ```ts
-import { Machine, prepare } from '@omegup/msync'
+import { MongoClient } from 'mongodb'
+import { Machine } from '@omegup/msync'
+import { useMongoDB } from '@omegup/msync/adapters/mongodb'
 
-const client = await prepare() // connects with MONGO_URL
+useMongoDB()
+const client = await new MongoClient(process.env.MONGO_URL).connect()
 const db = client.db(process.env.MONGO_NAME)
 const accounts = db.collection('accounts')
 

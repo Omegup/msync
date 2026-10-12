@@ -1,9 +1,12 @@
+import { useMongoDB } from '../adapters/mongodb'
 import { writeFile } from 'fs/promises'
 import { Collection, MongoClient } from 'mongodb'
 import type { AsynIter, Iterator, IteratorResult } from '../lib/types'
 import type { ID, doc } from '../types'
 import { uri } from './uri'
 import type { CommandStartedEvent, Db, OptionalUnlessRequiredId } from 'mongodb'
+
+useMongoDB()
 
 export const run = <T, Info>(cont: Iterator<T, Info>) => runCont(cont())
 const runCont = async <T, Info>({ next }: IteratorResult<T, Info>): Promise<never> => {

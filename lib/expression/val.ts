@@ -1,4 +1,4 @@
-import type { Timestamp } from 'mongodb'
+import type { Timestamp } from '../../types'
 import type { Arr, ConstHKT, N, O, StrKey, jsonItem, notObj, rawItem } from '../../types'
 import type { Expr } from '../types'
 import { asExpr, asExprRaw } from './expr-base'

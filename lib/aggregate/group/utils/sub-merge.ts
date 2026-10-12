@@ -16,7 +16,7 @@ import type {
 import { concat, field, type ExprHKT, type ExprsExact } from '../../../expression/concat'
 import { $rand, current, nil, val } from '../../../expression/val'
 import { ctx, root } from '../../../field'
-import type { Expr, IsDeleted, Model, RawStages, TS } from '../../../types'
+import type { DeletedAt, Expr, IsDeleted, Model, RawStages, TS } from '../../../types'
 import type { DeltaAccumulatorHKT, DeltaAccumulators } from '../../../types/accumulator'
 import { set, subUpdater, to, type Get, type Updater, type UpdaterHKT } from '../../../update/updater'
 import { map1 } from '../../../utils/json'
@@ -33,7 +33,7 @@ type V<VV, GG extends string> = Omit<VV, IdAndTsKeys | GI<GG>>
 export type Prepare<Grp, GG extends string> = TS & ID & Rec<GI<GG>, Grp>
 type Par<T> = { [P in keyof T]?: T[P] | null }
 
-export type Loose<Grp, VV, GG extends string> = Prepare<Grp, GG> & Par<V<VV, GG>>
+export type Loose<Grp, VV, GG extends string> = Prepare<Grp, GG> & Par<V<VV, GG>> & DeletedAt
 export type Strict<Grp, VV, GG extends string, EE> = Prepare<Grp, GG> &
   V<VV, GG> &
   Omit<EE, IdAndTsKeys | GI<GG> | keyof V<VV, GG>>
@@ -220,17 +220,22 @@ export const subMerge = <
   }
 
   type ReadyForExtra = Replace<Out, V>
-  type ReadyForWhenMatched = Replace<ReadyForExtra, Extra>
+  type ReadyForWhenMatched = MatchedReady<Out, VV, GG, EE>
 
-  const updater: Updater<ReadyForExtra, ReadyForExtra, ReadyForWhenMatched, New> = set<Extra>()<
+  const updater = set<Extra>()<ReadyForExtra, ReadyForExtra, New>(addTSAndExtra) as Updater<
     ReadyForExtra,
     ReadyForExtra,
+    ReadyForWhenMatched,
     New
-  >(addTSAndExtra)
+  >
 
   type In = MatchedIn<Out, VV, GG, EE>
 
-  type WhenMatched = RawStages<O, Rec<'old' | 'merged', Out | Replace<Replace<Out, V>, Extra>>, In>
+  type WhenMatched = RawStages<
+    O,
+    Rec<'old' | 'merged', Out | ReadyForWhenMatched>,
+    In
+  >
   const whenMatched: WhenMatched = getWhenMatched<Out, Replace<V, Extra> & Model>(
     out.whenNotMatched,
     null,

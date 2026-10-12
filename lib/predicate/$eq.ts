@@ -1,5 +1,4 @@
-import type { Timestamp } from 'mongodb'
-import type { Arr, ArrHKT, ConstHKT, HKT, I, IdHKT, N, rawItem, RawObj, RConstHKT } from '../../types'
+import type { Arr, ArrHKT, ConstHKT, HKT, I, IdHKT, N, rawItem, RawObj, RConstHKT, Timestamp } from '../../types'
 import { operator } from './utils'
 
 const dualEq = operator<'$eq' | '$ne', ConstHKT<IdHKT<unknown>>, unknown>()

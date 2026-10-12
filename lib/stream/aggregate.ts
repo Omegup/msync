@@ -27,12 +27,12 @@ export const aggregate = <Result>(
     //   return state.f({ input: req }).then(() => new Promise(res => {}))
     // }
     const start2 = Date.now()
-    return db.command(req)
+    return db.command<AggregateCommand<Result>>(req)
       .then(
         result => {
           log('prepare', streamName, Date.now() - start)
           log('prepare2', streamName, start2 - start)
-          const r = result as AggregateCommand<Result>
+          const r = result
           log(
             'execed',
             streamName,

@@ -17,9 +17,6 @@ importers:
       json-canonicalize:
         specifier: ^2.0.0
         version: 2.0.0
-      mongodb:
-        specifier: ^6.8.0
-        version: 6.12.0
       synchronous-promise:
         specifier: ^2.0.17
         version: 2.0.17
@@ -28,11 +25,14 @@ importers:
         specifier: ^2.3.0
         version: 2.3.0
       '@omegup/typescript':
-        specifier: 7.1.0-dev.2
-        version: 7.1.0-dev.2
+        specifier: 7.1.0-dev.5
+        version: 7.1.0-dev.5
       '@types/node':
         specifier: ^25.6.0
         version: 25.6.0
+      mongodb:
+        specifier: ^6.8.0
+        version: 6.12.0
       prettier:
         specifier: ^3.3.3
         version: 3.4.2
@@ -325,20 +325,14 @@ packages:
   '@mongodb-js/saslprep@1.1.9':
     resolution: {integrity: sha512-tVkljjeEaAhCqTzajSdgbQ6gE6f3oneVwa3iXR6csiEwXXOFsiC6Uh9iAjAhXPtqa/XMDHWjjeNH/77m/Yq2dw==}
 
-  '@omegup/typescript-linux-x64@7.1.0-dev.2':
-    resolution: {integrity: sha512-GTsYmsayqGKh+OuPUzjs1kQKQmFbdWKdPApcX01SA/pZzSjVU+midFz/QSh41Q3NsfwwJWnpWizd6/23ApXf8w==}
+  '@omegup/typescript-linux-x64@7.1.0-dev.5':
+    resolution: {integrity: sha512-SozBdv8jXtPn5PsManPCek4bN/DksP3Siuf31DjI6Oa5IalWBjfOWkcBs6XlllH67ICL4pa4Vh4LJ3HpGPec0A==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [linux]
 
-  '@omegup/typescript-win32-x64@7.1.0-dev.2':
-    resolution: {integrity: sha512-iB3fOce8Lyyfp8wYAIZ6xLaxfRyEwBw5PJrd6ThqBckrvKher5G0d5UMyTda83sVhhyofLsCYUdxhhVY3cmcig==}
-    engines: {node: '>=16.20.0'}
-    cpu: [x64]
-    os: [win32]
-
-  '@omegup/typescript@7.1.0-dev.2':
-    resolution: {integrity: sha512-6lqe3YNwJHmRozXZ3Wlw3BZZR1rIXSH5oPR7zpLfAuSyjdNP3cYsNfoKqI6T7aJbtMCdjQvb2d2DeTxW2Zvikg==}
+  '@omegup/typescript@7.1.0-dev.5':
+    resolution: {integrity: sha512-xmHz8c0sOZ4fDnrkPaNb/nIx7X+Le+vAKSoEwveuB9yKs4KoQ/1qv3e4CNkZMoFElkds5mGwzmJR3oHEFjfBBQ==}
     engines: {node: '>=16.20.0'}
     hasBin: true
 
@@ -1612,16 +1606,12 @@ snapshots:
     dependencies:
       sparse-bitfield: 3.0.3
 
-  '@omegup/typescript-linux-x64@7.1.0-dev.2':
+  '@omegup/typescript-linux-x64@7.1.0-dev.5':
     optional: true
 
-  '@omegup/typescript-win32-x64@7.1.0-dev.2':
-    optional: true
-
-  '@omegup/typescript@7.1.0-dev.2':
+  '@omegup/typescript@7.1.0-dev.5':
     optionalDependencies:
-      '@omegup/typescript-linux-x64': 7.1.0-dev.2
-      '@omegup/typescript-win32-x64': 7.1.0-dev.2
+      '@omegup/typescript-linux-x64': 7.1.0-dev.5
 
   '@oxc-project/types@0.152.0': {}
 

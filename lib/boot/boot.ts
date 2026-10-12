@@ -1,6 +1,19 @@
 import crypto from 'crypto'
-import { Collection, UUID, type ChangeStream, type Timestamp } from 'mongodb'
-import type { N, O, O2, O3, RORec, StrKey, UpdateFilter, View } from '../../types'
+import type {
+  Collection,
+  Dict,
+  Document,
+  N,
+  O,
+  O2,
+  O3,
+  RORec,
+  StrKey,
+  Timestamp,
+  View,
+  WatchStream,
+} from '../../types'
+import { uuid } from '../driver'
 import type { HKT, I } from '../../types/hkt'
 import { $match_, $replaceWith_, $set_ } from '../aggregate/mongo-stages'
 import { $merge_ } from '../aggregate/out'
@@ -36,9 +49,9 @@ import type { Allowed, AllowedPick, Last, Teardown, TsData } from './boot-utils'
 import { actions } from './boot-utils'
 import { getFirstStages } from './first-stages'
 import { set, to } from '../update'
-import type { Updater } from '../update/updater';
+import type { Updater } from '../update/updater'
 
-export const streamNames: Record<string, string> = {}
+export const streamNames: Dict<string> = {}
 const executes = <
   q extends O,
   V extends Model,
@@ -186,7 +199,7 @@ const executes = <
           { before: 1 },
           {
             partialFilterExpression: { before: null },
-            name: 'before_' + new UUID().toString('base64'),
+            name: 'before_' + uuid(),
           },
         )
 
@@ -195,7 +208,7 @@ const executes = <
           { updated: 1 },
           {
             partialFilterExpression: { updated: true },
-            name: 'updated_' + new UUID().toString('base64'),
+            name: 'updated_' + uuid(),
           },
         )
 
@@ -204,7 +217,7 @@ const executes = <
           { updated: 1, after: 1, before: 1 },
           {
             partialFilterExpression: { updated: true, after: null, before: null },
-            name: 'updated_nulls_' + new UUID().toString('base64'),
+            name: 'updated_nulls_' + uuid(),
           },
         )
 
@@ -213,7 +226,7 @@ const executes = <
           { updated: 1, after: 1 },
           {
             partialFilterExpression: { updated: true, after: null },
-            name: 'updated_no_after_' + new UUID().toString('base64'),
+            name: 'updated_no_after_' + uuid(),
           },
         )
 
@@ -222,7 +235,7 @@ const executes = <
           { updated: 1 },
           {
             partialFilterExpression: { updated: true, after: null, before: null },
-            name: 'updated_nulls_' + new UUID().toString('base64'),
+            name: 'updated_nulls_' + uuid(),
           },
         )
         await ensureCollection(db, coll)
@@ -236,7 +249,7 @@ const executes = <
           hardMatch
             ? {
                 partialFilterExpression: hardMatch.raw(root()),
-                name: 'touchedAt_hard_' + new UUID().toString('base64'),
+                name: 'touchedAt_hard_' + uuid(),
               }
             : {},
         )
@@ -309,13 +322,14 @@ const executes = <
     }
 
     type Res = {}
-    type C = Pick<ChangeStream<{}, Res>, 'close' | 'tryNext'>
+    type C = WatchStream<Res>
 
     // Step 4 : run the aggregation // idempotent
     const makeStream = (): Promise<C> => makeWatchStream(view, streamName)
     const step4 =
-      ({ result, ts, stream }: { result: AggregateCommand<'out'>; ts?: Timestamp; stream: C }) =>
+      (args: { result: AggregateCommand<'out'>; ts?: Timestamp | undefined; stream: C }) =>
       async (): Next => {
+        const { result, ts, stream } = args
         const start = Date.now()
         // await snapshotCollection.updateMany({ before: null }, { $set: { before: null } })
         log('snapshot', streamName, 'ensure before null', Date.now() - start)
@@ -395,7 +409,7 @@ const executes = <
     // Step 7 : update __last
     const step7 = (l: L) => async (): Next => {
       const start = Date.now()
-      const patch: UpdateFilter<Last> = {
+      const patch: { $set: Document } = {
         $set: {
           ts: l.ts,
           job: null,

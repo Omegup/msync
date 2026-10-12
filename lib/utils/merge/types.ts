@@ -2,11 +2,14 @@ import type { Frame, IteratorResult, HasJob } from '../../types'
 
 export type KEYS = string
 export type SourceIteratorResults<K extends KEYS, Result, Info extends Record<K, unknown>> = {
+  readonly [P in K]?: IteratorResult<Result, Info[P]>
+}
+export type RSourceIteratorResults<K extends KEYS, Result, Info extends Record<K, unknown>> = {
   readonly [P in K]: IteratorResult<Result, Info[P]>
 }
 
 export type SourceResults<K extends KEYS, Info extends Record<K, HasJob>> = {
-  readonly [P in K]: { readonly key: P; readonly value: Info[P]; readonly job: Info[P]['job'] }
+  readonly [P in K]: { readonly key: P; readonly value: Info[P]; readonly job: (Info[P] & {})['job'] }
 }[K]
 
 export type RaceWinner<K extends KEYS, Result, Info extends Record<K, unknown>> = {

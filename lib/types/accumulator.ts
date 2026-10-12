@@ -1,5 +1,5 @@
 import type { Expr } from './expr'
-import type { HKT, I, N, O, RORec, RawObj, Rec, Type, U, Undef, jsonItem } from '../../types'
+import type { HKT, I, N, O, PRRec, RORec, RawObj, Rec, Type, U, Undef, jsonItem } from '../../types'
 import type { Field } from '../field'
 import type { Exact } from '../utils/map-object'
 
@@ -27,8 +27,8 @@ export type DeltaAccumulators<T, V extends object, C = unknown> = Exact<
   DeltaAccumulatorHKT<T, C>
 >
 
-export type AccumulatorsRoot<Acc extends Accumulators<never, RORec<string, jsonItem>, never>> =
-  Acc extends Accumulators<infer T extends O, RORec<string, jsonItem>, never> ? T : never
+export type AccumulatorsRoot<Acc extends Accumulators<never, PRRec<string, jsonItem>, never>> =
+  Acc extends Accumulators<infer T extends O, PRRec<string, jsonItem>, never> ? T : never
 
 export type Accumulator<in Doc, out T, in Ctx = unknown> = {
   [Type]?(_: typeof Accumulator): typeof Accumulator

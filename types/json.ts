@@ -1,5 +1,5 @@
-import type { Timestamp } from 'mongodb'
 import type { Type } from './class'
+import type { Timestamp } from './mongo'
 import type { Omit } from './global'
 export type { Type } from './class'
 
@@ -18,11 +18,12 @@ export interface JsonArr {
   readonly [_: number]: jsonItem | U
 }
 export type A = { [Type]: typeof array }
-export type Arr<T, N extends number = number> = A & { readonly [_ in N]: T }
+export type Arr<T> = A & { readonly [_: number]: T }
 type Obj = { [Type]: typeof object }
 export type O<T = unknown> = Obj & T
 export type RORec<K extends keyof never, T = unknown> = { readonly [P in K]: T }
 export type PRRec<K extends keyof never, T = unknown> = { [P in K]?: T }
+export type Dict<T> = { [P: string]: T }
 export type Par<K extends string, V extends Rec<K, jsonItem>> = { readonly [k in K]?: V[k] | N }
 export type Rec<K extends string, T = unknown> = O<RORec<K, T>>
 export type O2 = readonly [O, O]
@@ -40,9 +41,15 @@ export type ReplaceQ<R extends Q, VV, Q extends O> = Omit<R, StrKey<VV>> & Omit<
 
 // a generic type that restricts another type to be a literal
 // for exemple AsLiteral<'a'> is 'a' and AsLiteral<string> is never, AsLiteral<1> is 1 and AsLiteral<number> is never
+type AnyKeyed = { [x: string]: never; [x: number]: never; [x: symbol]: never }
+
 export type AsLiteral<T extends keyof any | boolean | N, V = NoUnion<T>> = T extends keyof any
-  ? {} extends { [K in T]: 1 }
-    ? never
-    : V
+  ? [Record<string, 1>] extends [never]
+    ? [Record<T, 1>] extends [never]
+      ? never
+      : V
+    : AnyKeyed extends { [K in T]: 1 }
+      ? never
+      : V
   : V
 type NoUnion<T, V = T> = T extends T ? ([V] extends [T] ? T : never) : never

@@ -1,10 +1,6 @@
-import type { App, HKT, I, IdHKT, Omit, RORec, StrKey } from '../../types'
+import type { App, Dict, HKT, I, IdHKT, Omit, RORec, StrKey } from '../../types'
 import { id } from './json'
 
-export const map = <T, K extends string & keyof T, V extends RORec<K, unknown>>(
-  x: Pick<T, K>,
-  f: <P extends K>(v: T[P], k: P) => V[P],
-): V => Object.fromEntries<V, 0>(Object.entries(x).map<[K, V[K]]>(([k, v]) => [k, f(v, k)]))
 
 export type ExactPart<T, F extends HKT<T[StrKey<T>]>> = MapOPart<T, MappedHKT<T, F>>
 
@@ -13,9 +9,7 @@ export type ExactPart1<T, F extends HKT<StrKey<T>>> = {
 }
 
 type s = string
-export type MapKDom<RK extends MapKDom<RK, F>, F extends HKT<StrKey<RK>>> = MapO<RK, F> & {
-  readonly [P in s]?: readonly [keyof RK, unknown]
-}
+
 export type ExactKeys<K extends string> = Exact<RORec<K, 1>, IdHKT>
 
 export type MapO<T, F extends HKT<K>, K extends StrKey<T> = StrKey<T>> = MapOPart<T, F, K> & {
@@ -41,7 +35,7 @@ export const mapExactToObject0 = <T, F extends HKT<K>, G extends HKT<K>, K exten
   x: MapO<T, F, K>,
   f: <P extends K>(v: App<F, P>, k: P) => App<G, P>,
 ): MapKPart1<T, G, K> => {
-  const filter = <T extends RORec<string, { 0: unknown }>, V extends T>(x: readonly Entry<T>[]) =>
+  const filter = <T extends Dict<{ 0: unknown }>, V extends T>(x: readonly Entry<T>[]) =>
     x.filter((x): x is Entry<V> => x[0] === x[1][0])
   const matched = filter<MapO<T, F, K>, MapOPart<T, F, K>>(Object.entries(x))
   return Object.fromEntries<MapKPart1<T, G, K>, 0>(

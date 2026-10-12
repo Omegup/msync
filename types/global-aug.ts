@@ -6,7 +6,7 @@ export {}
 
 declare global {
   type Entry<T, K extends keyof T = keyof T> = readonly [string, T[string & K]] &
-    { [k in K]: readonly [string & k, T[k]] }[K]
+    { [k in K]?: readonly [string & k, T[k]] }[K]
   interface ObjectConstructor {
     entries<T, _ = 0>(object?: T): readonly Entry<T>[]
     fromEntries<T, _ = 0>(entries: readonly Entry<T>[]): T
@@ -73,6 +73,10 @@ declare global {
   interface Array<T> extends ReadonlyArray<T> {
     includes<T, V extends T>(this: ReadonlyArray<V>, item: T, fromIndex?: number): item is V
     map<U>(callbackfn: (value: T, index: number, array: readonly T[]) => U, thisArg?: any): U[]
+    map<Arr extends ReadonlyArray<T>, U>(
+      this: Arr, 
+      callbackfn: (value: T, index: number, array: readonly T[]) => U, thisArg?: any
+    ): { [K in keyof Arr]: U }
     map<K extends string, T extends RORec<K>, U extends RORec<K>, _ extends 2 = 2>(
       this: readonly Entry<T, K>[],
       callbackfn: <P extends K>(value: [P, T[P]], index: number, array: this) => readonly [P, U[P]],

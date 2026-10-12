@@ -15,9 +15,9 @@ export class Machine<Result = unknown> {
   runner(): Iterator<Result, HasJob> {
     const items = this.sources.filter(x => x)
     if (items.length === 1) {
-      return items[0]
+      return items[0]!
     }
-    return firstWorksMerge<Result, HasJob>(items)
+    return firstWorksMerge<Result, HasJob, Iterator<Result, HasJob>[]>(items)
   }
 
   start(cb?: (info: HasJob) => void | boolean): Promise<never> {
