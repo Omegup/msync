@@ -42,7 +42,7 @@ export const getFirstStages = <V extends Model, KK extends StrKey<V>>(
     const hardQuery = $and(
       lastTS
         ? root<Model>().of('touchedAt').has($gtTs(previous(lastTS.ts)))
-        : root<D>().of('deletedAt').has($eq<Timestamp | N>(null)),
+        : root<D>().of('deletedAt').has($eq<Date | N>(null)),
       lastTS ? null : match && $expr(match),
       keepNulls ? pre : hardMatch,
     )

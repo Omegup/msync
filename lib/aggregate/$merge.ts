@@ -8,11 +8,10 @@ import type {
   Exclude,
   OPick,
   RWCollection,
-  Timestamp,
   WriteonlyCollection,
 } from '../../types'
 import type { doc, ID, N, O, rawItem, Rec, Replace, RORec, StrKey } from '../../types/json'
-import { mergeObjects, ne, notNull, or } from '../expression'
+import { mergeObjects, ne, notNull, now, or } from '../expression'
 import { field, type ExprHKT, type ExprsExact } from '../expression/concat'
 import { $ifNull, and, eq, eqTyped, ite, sub } from '../expression/logic'
 import { current, nil, val } from '../expression/val'
@@ -53,8 +52,8 @@ type Args<P, Out> = [added: Expr<P, unknown, { new: P }>, old: Expr<Out, Out>]
 type Result<P> = Expr<P, unknown, { new: P }>
 type Update<P, Out> = (...args: Args<P, Out>) => Result<P>
 type UpdateF<P, Out> = <K extends keyof IsDeleted>(
-  ...args: Args<Replace<P, RORec<K, Timestamp>>, Out>
-) => Result<Replace<P, RORec<K, Timestamp>>>
+  ...args: Args<Replace<P, RORec<K, Date>>, Out>
+) => Result<Replace<P, RORec<K, Date>>>
 
 export const getSubsetMatchForExt = <
   Out extends Model,
@@ -86,12 +85,12 @@ export const getWhenMatchedForMerge = <
   K extends keyof IsDeleted,
 >(
   whenNotMatched: 'discard' | 'fail' | 'insert',
-  update: Update<Replace<P, RORec<K, Timestamp>>, Out>,
+  update: Update<Replace<P, RORec<K, Date>>, Out>,
   canWrite: Expr<boolean, Rec<'old' | 'merged', Out | Replace<Out, P>>> | null,
-): RawStages<O, Out, Out | Replace<Out, P>, RORec<'new', Replace<P, RORec<K, Timestamp>>>> => {
-  const orNull = <T, C>(e: Expr<Timestamp | N, T, C>) =>
+): RawStages<O, Out, Out | Replace<Out, P>, RORec<'new', Replace<P, RORec<K, Date>>>> => {
+  const orNull = <T, C>(e: Expr<Date | N, T, C>) =>
     whenNotMatched === 'discard' ? $ifNull(e, nil) : e
-  type PP = Replace<P, RORec<K, Timestamp>>
+  type PP = Replace<P, RORec<K, Date>>
 
   type Merged = Replace<Out, P>
   type OldAndMerged = Rec<'old' | 'merged', Out | Merged>
@@ -100,7 +99,7 @@ export const getWhenMatchedForMerge = <
   'insert'
     ? ctx<O<DeletedAt>>()('new')
     : root<O<DeletedAt>>()
-  const deletedAt = orNull(newOrOld.of('deletedAt').expr()) as Expr<Timestamp | N, Out, { new: PP }>
+  const deletedAt = orNull(newOrOld.of('deletedAt').expr()) as Expr<Date | N, Out, { new: PP }>
   const merged = mergeObjects<Out, PP | O<DeletedAt>, Out, { new: PP }>(
     root<Out>().expr(),
     update(ctx<PP>()('new').expr(), root<Out>().expr()),
@@ -123,7 +122,7 @@ export const getWhenMatched = <Out extends Model, P extends O & ID & TS>(
   whenNotMatched: 'discard' | 'fail' | 'insert',
   canWrite: Expr<boolean, Rec<'old' | 'merged', Out | Replace<Out, P>>> | null,
 ): RawStages<O, Rec<'old' | 'merged', Out | Replace<Out, P>>, Out | Replace<Out, P>> => {
-  const orNull = <T, C>(e: Expr<Timestamp | N, T, C>) =>
+  const orNull = <T, C>(e: Expr<Date | N, T, C>) =>
     whenNotMatched === 'discard' ? $ifNull(e, nil) : e
 
   type Merged = Replace<Out, P>
@@ -219,7 +218,7 @@ const $mergeX = <
         .with<O, Replace<P, IsDeleted>>(
           $set_<O, P, Replace<P, IsDeleted>>(
             set<IsDeleted>()({
-              deletedAt: ['deletedAt', to<P, Timestamp>(current)],
+              deletedAt: ['deletedAt', to<P, Date>(now())],
             }),
           ),
         )

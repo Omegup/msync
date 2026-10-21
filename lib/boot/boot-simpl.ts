@@ -78,7 +78,7 @@ const executes = <
         _id: ['_id', 1],
       }),
     )
-  const notDeleted = root<D>().of('deletedAt').has($eq<Timestamp | N>(null))
+  const notDeleted = root<D>().of('deletedAt').has($eq<Date | N>(null))
 
   const stages = (lastTS: { _id: string; ts: Timestamp } | null) => {
     const hardQuery: Query<V> | undefined = $and(

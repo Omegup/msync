@@ -13,6 +13,7 @@ import type {
   Omit,
   Exclude,
 } from '../../../../types'
+import { now } from '../../../expression';
 import { concat, field, type ExprHKT, type ExprsExact } from '../../../expression/concat'
 import { $rand, current, nil, val } from '../../../expression/val'
 import { ctx, root } from '../../../field'
@@ -299,7 +300,7 @@ export const subMerge = <
         deletedAt: [
           'deletedAt',
           to<ReadyForMerge, IsDeleted['deletedAt'], unknown, Get<ReadyForMerge, 'deletedAt'>>(
-            current,
+            now(),
           ),
         ],
       }),

@@ -1,5 +1,6 @@
 import type { Filter, HKT, I, IdHKT, Omit, Replace, RWCollection } from '../../types'
 import type { ID, N, O, StrKey, doc, rawItem } from '../../types/json'
+import { now } from '../expression';
 import { mergeObjects } from '../expression/array'
 import { field, mergeExpr, type ExprHKT, type ExprsExact } from '../expression/concat'
 import { eq, ite } from '../expression/logic'
@@ -110,7 +111,7 @@ export const $insertPart = <T extends doc, EEE extends { [K in StrKey<EEE>]: raw
         eq<T | null, Delta<T>>(root<Delta<T>>().of('after').expr())(nil),
         field<DDel & Omit<SafeE<EEE>, keyof (ND & TS & ID)>, Delta<T>>(
           mergeExpr<SafeE<EEE>, DDel, Delta<T>>(extExpr, {
-            deletedAt: ['deletedAt', current],
+            deletedAt: ['deletedAt', now()],
             _id: [
               '_id',
               assertNotNull(root<Delta<T>>().of('before').of<T, '_id', null>('_id').expr()),
