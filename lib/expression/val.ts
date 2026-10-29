@@ -1,9 +1,14 @@
 import type { Timestamp } from '../../types'
 import type { Arr, ConstHKT, N, O, StrKey, jsonItem, notObj, rawItem } from '../../types'
+import { ctx } from '../field'
 import type { Expr } from '../types'
-import { asExpr, asExprRaw } from './expr-base'
-import type { ExprHKT, ExprsExact } from './concat'
 import { mapExactToObject } from '../utils/map-object'
+import { $reduce } from './array'
+import { floor, multiply } from './arith'
+import type { ExprHKT, ExprsExact } from './concat'
+import { $substr, concat } from './concat'
+import { asExpr, asExprRaw } from './expr-base'
+import { range } from './range'
 
 export const val = <T extends rawItem>(val: T): Expr<T, unknown> =>
   asExpr({
@@ -19,6 +24,21 @@ export const val = <T extends rawItem>(val: T): Expr<T, unknown> =>
 export const current: Expr<Timestamp, unknown> = asExpr({
   raw: () => asExprRaw<Timestamp, unknown, unknown>('$$CLUSTER_TIME'),
 })
+export const $rand: Expr<number, unknown> = asExpr({
+  raw: () => asExprRaw<number, unknown, unknown>({ $rand: {} }),
+})
+export const rand = $reduce<number, string, unknown, unknown>(
+  range(val(0), val(17)),
+  val(''),
+  concat(
+    ctx<string>()('value').expr(),
+    $substr(
+      val('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'),
+      floor(multiply($rand, val(62))),
+      val(1),
+    ),
+  ),
+)
 export const $let = <T, D, C, V extends object>(
   vars: ExprsExact<V, D, C>,
   inExpr: Expr<T, D, C & V>,
@@ -36,17 +56,17 @@ export const $let = <T, D, C, V extends object>(
 export const nil = val(null)
 
 export const $getField: {
-  <T, K extends StrKey<T>, D, C = unknown>(expr: Expr<T, D, C>, field: K): Expr<T[K], D, C>
+  <T, K extends StrKey<T>, D, C = unknown>(expr: Expr<T, D, C>, field: K | Expr<K, D, C>): Expr<T[K], D, C>
   <T, K extends StrKey<T>, D, C = unknown>(
     expr: Expr<T | N, D, C>,
-    field: K,
+    field: K | Expr<K, D, C>,
   ): Expr<T[K] | null, D, C>
-} = <T, K extends StrKey<T>, D, C = unknown>(expr: Expr<T | N, D, C>, field: K) =>
+} = <T, K extends StrKey<T>, D, C = unknown>(expr: Expr<T | N, D, C>, field: K | Expr<K, D, C>) =>
   asExpr<T[K] | null, D, C>({
     raw: f =>
       asExprRaw({
         $getField: {
-          field: field,
+          field: typeof field === 'string' ? field : field.raw(f).get(),
           input: expr.raw(f).get(),
         },
       }),
@@ -69,11 +89,3 @@ export const func = <T extends jsonItem, A extends readonly jsonItem[], D, C = u
       }),
   })
 
-export const rand = function () {
-  const s = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  return Array(17)
-    .fill(0)
-    .map(() => s[Math.floor(Math.random() * 62)])
-    .join('')
-}
-export const $rand = func(rand)

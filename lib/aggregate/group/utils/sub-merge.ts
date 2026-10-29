@@ -13,9 +13,9 @@ import type {
   Omit,
   Exclude,
 } from '../../../../types'
-import { now } from '../../../expression';
+import { now, rand } from '../../../expression';
 import { concat, field, type ExprHKT, type ExprsExact } from '../../../expression/concat'
-import { $rand, current, nil, val } from '../../../expression/val'
+import { current, nil, val } from '../../../expression/val'
 import { ctx, root } from '../../../field'
 import type { DeletedAt, Expr, IsDeleted, Model, RawStages, TS } from '../../../types'
 import type { DeltaAccumulatorHKT, DeltaAccumulators } from '../../../types/accumulator'
@@ -186,7 +186,7 @@ export const subMerge = <
   ): MapO<RORec<K, X>, F> => map1(k, v)
 
   const F1: MapO<ID & TS, Update<V_Grp, ID & TS>> = {
-    _id: ['_id', to(idPrefix ? concat(val(idPrefix), $rand) : $rand)],
+    _id: ['_id', to(idPrefix ? concat(val(idPrefix), rand) : rand)],
     touchedAt: ['touchedAt', to(current)],
   }
   const F2: MapO<RORec<GID, Grp>, Update<V_Grp, RORec<GID, Grp>>> = mapId<

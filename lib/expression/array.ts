@@ -1,4 +1,4 @@
-import type { App, Arr, HKT, N, O, RORec, Rec, notArr } from '../../types'
+import type { App, Arr, HKT, KVEntry, N, O, RORec, Rec, notArr } from '../../types'
 import { ctx } from '../field'
 import type { Expr } from '../types'
 import { gte, add } from './arith'
@@ -50,7 +50,7 @@ export const sortArray = <T, D, C, K extends keyof T>({
   sortBy: K
   order?: 1 | -1
 }) =>
-  asExpr<Arr<T>, D, C>({  
+  asExpr<Arr<T>, D, C>({
     raw: f =>
       asExprRaw({ $sortArray: { input: expr.raw(f).get(), sortBy: { [sortBy]: order ?? -1 } } }),
   })
@@ -77,6 +77,11 @@ export const concatArray = <T, D, C>(...exprs: Expr<Arr<T>, D, C>[]) =>
     raw: f => asExprRaw({ $concatArrays: exprs.map(x => x.raw(f).get()) }),
   })
 
+export const $setUnion = <T, D, C>(...exprs: Expr<Arr<T>, D, C>[]) =>
+  asExpr<Arr<T>, D, C>({
+    raw: f => asExprRaw({ $setUnion: exprs.map(x => x.raw(f).get()) }),
+  })
+
 export const first = <T, D, C>(expr: Expr<Arr<T>, D, C>) =>
   asExpr<T | null, D, C>({
     raw: f => asExprRaw({ $first: expr.raw(f).get() }),
@@ -94,6 +99,11 @@ export const mergeObjects = <T1, T2, D, C = unknown, N extends null = never>(
 ) =>
   asExpr<(T1 | NullToOBJ<N>) & T2, D, C>({
     raw: f => asExprRaw({ $mergeObjects: exprs.map(x => x.raw(f).get()) }),
+  })
+
+export const $objectToArray = <T extends O, D, C>(expr: Expr<T, D, C>) =>
+  asExpr<Arr<KVEntry<T>>, D, C>({
+    raw: f => asExprRaw({ $objectToArray: expr.raw(f).get() }),
   })
 
 export const anyElementTrue = <D, C = unknown>(expr: Expr<Arr<boolean>, D, C>) =>

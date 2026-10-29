@@ -53,3 +53,4 @@ export type AsLiteral<T extends keyof any | boolean | N, V = NoUnion<T>> = T ext
       : V
   : V
 type NoUnion<T, V = T> = T extends T ? ([V] extends [T] ? T : never) : never
+export type KVEntry<T> = O<{ [K in StrKey<T>]: { readonly k: K; readonly v: T[K] } }[StrKey<T>]>
