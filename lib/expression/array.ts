@@ -106,6 +106,11 @@ export const $objectToArray = <T extends O, D, C>(expr: Expr<T, D, C>) =>
     raw: f => asExprRaw({ $objectToArray: expr.raw(f).get() }),
   })
 
+export const $arrayToObject = <T extends O, D, C>(expr: Expr<Arr<KVEntry<T>>, D, C>) =>
+  asExpr<T, D, C>({
+    raw: f => asExprRaw({ $arrayToObject: expr.raw(f).get() }),
+  })
+
 export const anyElementTrue = <D, C = unknown>(expr: Expr<Arr<boolean>, D, C>) =>
   asExpr<boolean, D, C>({
     raw: f => asExprRaw({ $anyElementTrue: expr.raw(f).get() }),

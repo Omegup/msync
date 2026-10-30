@@ -25,8 +25,8 @@ importers:
         specifier: ^2.3.0
         version: 2.3.0
       '@omegup/typescript':
-        specifier: 7.1.0-dev.5
-        version: 7.1.0-dev.5
+        specifier: 7.1.0-dev.6
+        version: 7.1.0-dev.6
       '@types/node':
         specifier: ^25.6.0
         version: 25.6.0
@@ -325,14 +325,20 @@ packages:
   '@mongodb-js/saslprep@1.1.9':
     resolution: {integrity: sha512-tVkljjeEaAhCqTzajSdgbQ6gE6f3oneVwa3iXR6csiEwXXOFsiC6Uh9iAjAhXPtqa/XMDHWjjeNH/77m/Yq2dw==}
 
-  '@omegup/typescript-linux-x64@7.1.0-dev.5':
-    resolution: {integrity: sha512-SozBdv8jXtPn5PsManPCek4bN/DksP3Siuf31DjI6Oa5IalWBjfOWkcBs6XlllH67ICL4pa4Vh4LJ3HpGPec0A==}
+  '@omegup/typescript-linux-x64@7.1.0-dev.6':
+    resolution: {integrity: sha512-5ulQJTIpZfCwBeVK+a8cSnRyx0mVNArUtvbu5G+8y4EeLQ/Syz4d1dow19itLF+uKuZLNeRp0xu4iOCc/f+SEA==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [linux]
 
-  '@omegup/typescript@7.1.0-dev.5':
-    resolution: {integrity: sha512-xmHz8c0sOZ4fDnrkPaNb/nIx7X+Le+vAKSoEwveuB9yKs4KoQ/1qv3e4CNkZMoFElkds5mGwzmJR3oHEFjfBBQ==}
+  '@omegup/typescript-win32-x64@7.1.0-dev.6':
+    resolution: {integrity: sha512-5qoPpSDR8r58TSOh8CnCXNFfBpxzFXE0NtU2/oGueOAISuxRgwHjbnQSGmhpjCbZB3F8eTCgZI8YYO1taeGCfQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [win32]
+
+  '@omegup/typescript@7.1.0-dev.6':
+    resolution: {integrity: sha512-ZL8flIdrudihUqG/uPyr1idyTnTtz3gl2zE6W16361fwks1zORPJydD4JcnnyhDF5EwOcJv54JI/khKPU4vXjA==}
     engines: {node: '>=16.20.0'}
     hasBin: true
 
@@ -1606,12 +1612,16 @@ snapshots:
     dependencies:
       sparse-bitfield: 3.0.3
 
-  '@omegup/typescript-linux-x64@7.1.0-dev.5':
+  '@omegup/typescript-linux-x64@7.1.0-dev.6':
     optional: true
 
-  '@omegup/typescript@7.1.0-dev.5':
+  '@omegup/typescript-win32-x64@7.1.0-dev.6':
+    optional: true
+
+  '@omegup/typescript@7.1.0-dev.6':
     optionalDependencies:
-      '@omegup/typescript-linux-x64': 7.1.0-dev.5
+      '@omegup/typescript-linux-x64': 7.1.0-dev.6
+      '@omegup/typescript-win32-x64': 7.1.0-dev.6
 
   '@oxc-project/types@0.152.0': {}
 
