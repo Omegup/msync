@@ -1,5 +1,6 @@
 import type {
   App,
+  Arr,
   ConstHKT,
   HKT,
   I,
@@ -47,6 +48,27 @@ export const $substr = <D, C>(
       asExprRaw({
         $substrCP: [expr.raw(f).get(), start.raw(f).get(), length.raw(f).get()],
       }),
+  })
+export const $indexOfCP = <D, C>(
+  expr: Expr<string, D, C>,
+  substring: Expr<string, D, C>,
+  start?: Expr<number, D, C>,
+  end?: Expr<number, D, C>,
+) =>
+  asExpr<number, D, C>({
+    raw: f =>
+      asExprRaw({
+        $indexOfCP: [
+          expr.raw(f).get(),
+          substring.raw(f).get(),
+          ...(start ? [start.raw(f).get()] : []),
+          ...(end ? [end.raw(f).get()] : []),
+        ],
+      }),
+  })
+export const $split = <D, C>(expr: Expr<string, D, C>, delimiter: Expr<string, D, C>) =>
+  asExpr<Arr<string>, D, C>({
+    raw: f => asExprRaw({ $split: [expr.raw(f).get(), delimiter.raw(f).get()] }),
   })
 export const padLeft = <D, C>(expr: Expr<string, D, C>, pad: string) =>
   asExpr<string, D, C>({

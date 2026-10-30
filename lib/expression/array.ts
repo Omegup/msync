@@ -92,6 +92,11 @@ export const last = <T, D, C>(expr: Expr<Arr<T>, D, C>) =>
     raw: f => asExprRaw({ $last: expr.raw(f).get() }),
   })
 
+export const $arrayElemAt = <T, D, C>(expr: Expr<Arr<T>, D, C>, idx: Expr<number, D, C>) =>
+  asExpr<T | null, D, C>({
+    raw: f => asExprRaw({ $arrayElemAt: [expr.raw(f).get(), idx.raw(f).get()] }),
+  })
+
 export type NullToOBJ<N extends null> = N extends null ? O : N
 
 export const mergeObjects = <T1, T2, D, C = unknown, N extends null = never>(
@@ -106,8 +111,8 @@ export const $objectToArray = <T extends O, D, C>(expr: Expr<T, D, C>) =>
     raw: f => asExprRaw({ $objectToArray: expr.raw(f).get() }),
   })
 
-export const $arrayToObject = <T extends O, D, C>(expr: Expr<Arr<KVEntry<T>>, D, C>) =>
-  asExpr<T, D, C>({
+export const $arrayToObject = <T, D, C>(expr: Expr<Arr<KVEntry<T>>, D, C>) =>
+  asExpr<O<Partial<T>>, D, C>({
     raw: f => asExprRaw({ $arrayToObject: expr.raw(f).get() }),
   })
 
