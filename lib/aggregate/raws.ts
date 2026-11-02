@@ -41,12 +41,14 @@ export const $set1 =
     asStages([
       {
         $set: Object.fromEntries(
-          updater.raw(f<T>()).map(([k, v]) => [
-            f<T>()
-              .of(k.slice(1) as keyof T)
-              .str(),
-            v,
-          ]),
+          updater.raw.map(ue =>
+            ue(([k, v]) => [
+              f<T>()
+                .of(k.slice(1) as keyof T)
+                .str(),
+              v.raw(f<T>()).get(),
+            ]),
+          ),
         ),
       },
     ])

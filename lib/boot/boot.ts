@@ -7,6 +7,8 @@ import type {
   O,
   O2,
   O3,
+  Rec,
+  Replace,
   RORec,
   StrKey,
   Timestamp,
@@ -49,7 +51,7 @@ import type { Allowed, AllowedPick, Last, Teardown, TsData } from './boot-utils'
 import { actions } from './boot-utils'
 import { getFirstStages } from './first-stages'
 import { set, to } from '../update'
-import type { Updater } from '../update/updater'
+import type { Get } from '../update/updater'
 
 export const streamNames: Dict<string> = {}
 const executes = <
@@ -346,15 +348,30 @@ const executes = <
               coll: snapshotCollection as Collection<UDelta<T> & Delta<T>>,
               input: link<UDelta<T> & Delta<T>>()
                 .with($match_(root<UDelta<T> & Delta<T>>().of('updated').has($eq<boolean>(true))))
-                .with<Delta<T>, Delta<T>>(
-                  $set_(
-                    set<RORec<'before', T | null>>()({
+                .with<O, Delta<T>>(
+                  $set_<
+                    O,
+                    UDelta<T> & Delta<T>,
+                    Replace<UDelta<T> & Delta<T>, Rec<'before', T | null>>
+                  >(
+                    set<RORec<'before', T | null>>()<UDelta<T> & Delta<T>, UDelta<T> & Delta<T>>({
                       before: [
                         'before',
-                        to($ifNull(root<UDelta<T> & Delta<T>>().of('before').expr(), nil)),
+                        to<
+                          UDelta<T> & Delta<T>,
+                          T | null,
+                          unknown,
+                          Get<UDelta<T> & Delta<T>, 'before'>
+                        >($ifNull(root<UDelta<T> & Delta<T>>().of('before').expr(), nil)),
                       ],
-                    }) as Updater<Delta<T>, Delta<T>, Delta<T>>,
-                  ),
+                    }),
+                  ) as RawStages<
+                    O,
+                    UDelta<T> & Delta<T>,
+                    Delta<T>,
+                    unknown,
+                    1
+                  >,
                 )
                 .with(input.delta)
                 .with(stages).stages,

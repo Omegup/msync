@@ -1,20 +1,25 @@
-import type { Arr, Exclude, HKT, I, N, O, StrKey, Type, notArr, rawItem } from '../../types'
-import { Field } from '../field'
+import type { Arr, Exclude, HKT, I, IdHKT, N, O, StrKey, Type, notArr } from '../../types'
+import { eqTyped, ite, nil, sub } from '../expression'
+import { Field, root } from '../field'
 import type { Expr } from '../types'
 import { mapExactToObject0, type MapO } from '../utils/map-object'
 
 type Omit<T, K extends keyof any> = T extends T ? Pick<T, Exclude<keyof T, K>> : never
 
 declare const Updater: unique symbol
+
+type UpdaterExpr<in D, in C> = <R>(c: <V>(e: readonly [string, Expr<V, D, C>]) => R) => R
 export type Updater<in R, in T, out V, in C = unknown> = {
   [Type]?(x: typeof Updater, r: R, t: T, c: C): V
-  readonly raw: <D extends O>(f: Field<D, R | N>) => readonly (readonly [string, rawItem])[]
+  readonly raw: readonly UpdaterExpr<R, C>[]
 }
 
 export const subUpdater = <P extends O, D, T, V, Ctx>(
   a: Updater<D, T, V, Ctx>,
   f: Field<P, D>,
-): Updater<P, T, V, Ctx> => ({ raw: <R extends O>(g: Field<R, P | N>) => a.raw(g.with(f)) })
+): Updater<P, T, V, Ctx> => ({
+  raw: a.raw.map(g => c => c(g(([p, g]) => [p, sub(g, f)]))),
+})
 
 export interface UpdaterHKT<R, Old, V, C, K extends keyof Old = keyof Old, V2 extends V = V>
   extends UpdaterQHKT<R, Old, V2, StrKey<V>, C, K> {}
@@ -30,16 +35,14 @@ export type Get<T, P extends string, K extends keyof T = never> = P extends K
     ? T[P]
     : undefined
 
-const rawSet =
-  <R, Old extends notArr, C, V, K extends keyof Old, KV extends StrKey<V>>(
-    fields: MapO<V, UpdaterQHKT<R, Old, V, KV, C, K>, KV>,
-  ) =>
-  <D extends O>(f: Field<D, R | N, unknown>): readonly (readonly [string, rawItem])[] => {
-    type U = UpdaterQHKT<R, Old, V, KV, C, K>
-    return Object.entries(mapExactToObject0<V, U, U, KV>(fields, v => v)).flatMap(([k, v]) =>
-      v.raw(f).map(([l, v]) => [`.${k}${l}`, v]),
-    )
-  }
+const rawSet = <R, Old extends notArr, C, V, K extends keyof Old, KV extends StrKey<V>>(
+  fields: MapO<V, UpdaterQHKT<R, Old, V, KV, C, K>, KV>,
+): readonly UpdaterExpr<R, C>[] => {
+  type U = UpdaterQHKT<R, Old, V, KV, C, K>
+  return Object.entries(mapExactToObject0<V, U, U, KV>(fields, v => v)).flatMap(([k, v]) =>
+    v.raw.map(v => c => v(([l, v]) => c([`.${k}${l}`, v]))),
+  )
+}
 
 export const set =
   <V>() =>
@@ -59,12 +62,38 @@ export const setQ = <VV, Q extends O>() => {
     raw: rawSet<R, R, C, VV, K, KV>(fields),
   })
 }
-export const weaken = <R, T, V, C = unknown>(
-  updater: Updater<R, T, V, C>,
-): Updater<R | null, T | N, V | null, C> => ({ raw: f => updater.raw(f) })
 
-export const to = <R, V, C = unknown, T = unknown>(expr: Expr<V, R, C>): Updater<R, T, V, C> => ({
-  raw: f => [['', expr.raw(f).get()]],
+export const mapUpdater = <R, T, V, W, Ctx = unknown>(
+  updater: Updater<R, T, V, Ctx>,
+  map: <V, D>(e: Expr<V, D, Ctx>) => Expr<V, D, Ctx>,
+): Updater<R, T, W, Ctx> => {
+  return {
+    raw: updater.raw.map(v => c => c(v(([p, v]) => [p, map(v)]))),
+  }
+}
+
+export const weaken = <R extends O, T, V, C = unknown>(
+  updater: Updater<R, T, V, C>,
+): Updater<R | null, T | N, V | null, C> => ({
+  raw: updater.raw.map(
+    v => c =>
+      v(<V>([p, v]: readonly [string, Expr<V, R, C>]) =>
+        c([
+          p,
+          ite<V | N, null, R, IdHKT, C>(
+            eqTyped<null, R, IdHKT, C>(root<R | null>().expr(), nil),
+            root<null>().expr(),
+            v,
+          ),
+        ]),
+      ),
+  ),
+})
+
+export const to = <R, V, Ctx = unknown, T = unknown>(
+  expr: Expr<V, R, Ctx>,
+): Updater<R, T, V, Ctx> => ({
+  raw: [c => c(['', expr])],
 })
 export const items = <R, T, V, C = unknown>(x: Updater<R, T, V, C>) =>
   x as {} as Updater<R, Arr<T>, Arr<V>, C>

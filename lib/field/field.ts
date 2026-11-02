@@ -17,7 +17,7 @@ export class Field<in R, out V, in C = unknown> {
     private raw: (x: string) => string,
     private concat: Concat,
   ) {}
-  static root = <T extends O>() => {
+  static root = <T extends O | null>() => {
     const concat: Concat = (f1, f2) =>
       new Field([f1.field, f2.field].filter(id).join('.'), f1.raw, f1.concat)
     return new Field<T, T>('', s => (s ? `$${s}` : '$$ROOT'), concat)

@@ -253,7 +253,7 @@ export const subMerge = <
     )
     .with<O, OldAndNew<ReadyForExtra>>(mergeAggregates)
     .with<O, OldAndNew<ReadyForWhenMatched>>(
-      $set_<O, OldAndNew<ReadyForExtra>, OldAndNew<ReadyForWhenMatched>>(
+      $set_<O, OldAndNew<ReadyForExtra>, OldAndNew<ReadyForWhenMatched>, New>(
         set<Rec<'merged', ReadyForWhenMatched>>()({
           merged: ['merged', subUpdater(updater, root<OldAndNew<ReadyForExtra>>().of('merged'))],
         }),
